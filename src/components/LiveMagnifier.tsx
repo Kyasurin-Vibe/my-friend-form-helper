@@ -24,14 +24,16 @@ const GUIDANCE_TEXT: Record<Guidance, string> = {
 
 // Lightweight TTS helper local to this screen, so it composes with the
 // outer useSpeech without fighting it for the queue.
-function speak(text: string) {
+function speak(text: string, onDone?: () => void) {
   if (typeof window === "undefined") return;
   const synth = window.speechSynthesis;
-  if (!synth) return;
+  if (!synth) { onDone?.(); return; }
   synth.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.rate = 0.95;
   u.pitch = 1.05;
+  u.onend = () => onDone?.();
+  u.onerror = () => onDone?.();
   synth.speak(u);
 }
 
@@ -46,12 +48,18 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   const [highContrast, setHighContrast] = useState(false);
   const [guidance, setGuidance] = useState<Guidance>("init");
   const [detected, setDetected] = useState<DetectedDoc | null>(null);
-  const [countdown, setCountdown] = useState(0); // seconds remaining (5..0)
+  const [countdown, setCountdown] = useState(0); // seconds remaining
   const [listening, setListening] = useState(false);
+  const [voiceArmed, setVoiceArmed] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [heard, setHeard] = useState<string>("");
   const confirmedRef = useRef(false);
+  const detectedRef = useRef<DetectedDoc | null>(null);
+  const speakingRef = useRef(false);
+  const shouldListenRef = useRef(false);
+  useEffect(() => { detectedRef.current = detected; }, [detected]);
 
-  // === Camera ===
+  // === Camera + mic permission ===
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -60,20 +68,24 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
           setError("This device doesn't support the camera.");
           return;
         }
+        // Ask for camera AND mic in one prompt so voice works after.
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-          audio: false,
+          audio: true,
         });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
+        // Stop the audio track right away — Web Speech opens its own.
+        stream.getAudioTracks().forEach((t) => t.stop());
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
         }
         setReady(true);
+        setVoiceArmed(true); // mic was just granted via user gesture
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Camera unavailable";
         setError(msg);
@@ -97,7 +109,6 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
       i++;
       if (i >= seq.length) {
         window.clearInterval(id);
-        // Trigger vision detection
         DemoServices.vision.detect().then((doc) => {
           if (stopped) return;
           setDetected(doc);
@@ -111,66 +122,94 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     };
   }, [ready]);
 
-  // === Speak guidance prompts ===
+  // === Speak guidance prompts (and pause mic while TTS plays) ===
   useEffect(() => {
     if (guidance === "init" || guidance === "hold-still") return;
-    if (guidance === "detected" && detected) {
-      speak(
-        `This looks like ${detected.code}. Is this the file you are looking for? Say yes to check it now, or no to keep looking.`,
-      );
-    } else if (guidance === "blurry") {
-      speak("The picture is too blurry. Please try again.");
-    } else {
-      speak(GUIDANCE_TEXT[guidance]);
-    }
+    const text =
+      guidance === "detected" && detected
+        ? `This looks like ${detected.code}. Is this the file you are looking for? Say yes to check it now, or no to keep looking.`
+        : guidance === "blurry"
+          ? "The picture is too blurry. Please try again."
+          : GUIDANCE_TEXT[guidance];
+    speakingRef.current = true;
+    try { DemoServices.voice.stop(); } catch {}
+    speak(text, () => {
+      speakingRef.current = false;
+      // Resume listening once TTS finished
+      if (shouldListenRef.current) startVoice();
+    });
   }, [guidance, detected]);
 
-  // === 5-second countdown after detection ===
+  // === Indicative countdown (visual only — does NOT auto-confirm) ===
   useEffect(() => {
     if (guidance !== "detected" || !detected) return;
-    setCountdown(5);
+    setCountdown(8);
     const id = window.setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          window.clearInterval(id);
-          if (!confirmedRef.current) {
-            confirmedRef.current = true;
-            onConfirm(detected);
-          }
-          return 0;
-        }
-        return c - 1;
-      });
+      setCountdown((c) => (c <= 1 ? 0 : c - 1));
     }, 1000);
     return () => window.clearInterval(id);
-  }, [guidance, detected, onConfirm]);
+  }, [guidance, detected]);
 
-  // === Voice recognition ===
-  useEffect(() => {
-    if (!ready) return;
+  // === Voice recognition: start when armed, auto-restart on end ===
+  function startVoice() {
     const svc = DemoServices.voice;
-    if (!svc.available()) return;
-    svc.start({
-      onStart: () => setListening(true),
-      onEnd: () => setListening(false),
-      onError: () => setListening(false),
-      onTranscript: (t) => setHeard(t),
-      onCommand: (cmd) => handleVoiceCommand(cmd),
-    });
-    return () => svc.stop();
+    if (!svc.available()) {
+      setVoiceError("Voice not supported in this browser. Use the buttons.");
+      return;
+    }
+    if (speakingRef.current) return; // wait until TTS done
+    try {
+      svc.start({
+        onStart: () => { setListening(true); setVoiceError(null); },
+        onEnd: () => {
+          setListening(false);
+          // Chrome auto-ends every ~10s; restart if still wanted
+          if (shouldListenRef.current && !speakingRef.current) {
+            setTimeout(() => startVoice(), 250);
+          }
+        },
+        onError: (err) => {
+          setListening(false);
+          if (err === "not-allowed" || err === "service-not-allowed") {
+            setVoiceError("Mic blocked. Allow microphone in your browser.");
+            shouldListenRef.current = false;
+          } else if (err !== "no-speech" && err !== "aborted") {
+            setVoiceError(err);
+          }
+        },
+        onTranscript: (t) => setHeard(t),
+        onCommand: (cmd) => handleVoiceCommand(cmd),
+      });
+    } catch (e: any) {
+      setVoiceError(e?.message || "could not start mic");
+    }
+  }
+
+  useEffect(() => {
+    if (!voiceArmed) return;
+    shouldListenRef.current = true;
+    startVoice();
+    return () => {
+      shouldListenRef.current = false;
+      try { DemoServices.voice.stop(); } catch {}
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+  }, [voiceArmed]);
 
   function handleVoiceCommand(cmd: VoiceCommand) {
     switch (cmd) {
-      case "yes":
-        if (detected && !confirmedRef.current) {
+      case "yes": {
+        const d = detectedRef.current;
+        if (d && !confirmedRef.current) {
           confirmedRef.current = true;
-          onConfirm(detected);
+          shouldListenRef.current = false;
+          try { DemoServices.voice.stop(); } catch {}
+          // Defer so we don't setState during a render in parent
+          setTimeout(() => onConfirm(d), 0);
         }
         break;
+      }
       case "no":
-        // Reset detection and keep scanning
         setDetected(null);
         setCountdown(0);
         setGuidance("corners");
@@ -191,8 +230,14 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   }
 
   function readDocAloud() {
+    speakingRef.current = true;
+    try { DemoServices.voice.stop(); } catch {}
     speak(
       "Schedule of Assets and Debts, form F L one forty two. I see sections for property, accounts, debts, signature, and date.",
+      () => {
+        speakingRef.current = false;
+        if (shouldListenRef.current) startVoice();
+      },
     );
   }
 
@@ -359,6 +404,20 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
           >
             "{heard}"
           </p>
+        )}
+        {voiceError && (
+          <div className="text-center mt-1">
+            <p style={{ fontSize: 13, color: "#b91c1c", fontWeight: 700 }}>{voiceError}</p>
+            <button
+              onClick={() => { shouldListenRef.current = true; setVoiceArmed(true); setVoiceError(null); startVoice(); }}
+              style={{
+                marginTop: 6, background: "var(--color-elder-primary)", color: "#fff",
+                border: 0, borderRadius: 12, padding: "8px 14px", fontWeight: 800, fontSize: 14,
+              }}
+            >
+              🎙 Tap to enable voice
+            </button>
+          </div>
         )}
       </div>
 
