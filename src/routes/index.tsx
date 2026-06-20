@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
+import { LiveMagnifier } from "@/components/LiveMagnifier";
 import { useSpeech } from "@/lib/useSpeech";
 import { addCase, buildCase, clearCases, type Branch } from "@/lib/handoff";
 import { playWarning, playSuccess } from "@/lib/chime";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,8 +34,10 @@ function ElderApp() {
   const [branch, setBranch] = useState<Branch>("missing");
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
   const [started, setStarted] = useState(false);
+  const [phase, setPhase] = useState<"find" | "magnifier" | "flow">("find");
   const speech = useSpeech();
   const navigate = useNavigate();
+
 
   const voiceOn = a11yMode !== "text";
   const showCaptions = a11yMode !== "voice";
@@ -44,7 +48,7 @@ function ElderApp() {
 
   // Speak on step change (after user has tapped once)
   useEffect(() => {
-    if (!started) return;
+    if (!started || phase !== "flow") return;
     const lines: Record<Step, string> = {
       1: "Hi, I'm My Friend. Put your paper in the box, and I'll take a look.",
       2: "That was a little blurry. Hold steady, and let's try again.",
@@ -63,11 +67,12 @@ function ElderApp() {
     if (step === 5) {
       addCase(buildCase(branch));
     }
-  }, [step, branch, started]); // eslint-disable-line
+  }, [step, branch, started, phase]); // eslint-disable-line
 
   const restart = () => {
     setStep(1);
     setStarted(false);
+    setPhase("find");
     clearCases();
     speech.cancel();
   };
@@ -75,15 +80,16 @@ function ElderApp() {
   const start = (mode: A11yMode) => {
     setA11yMode(mode);
     setStarted(true);
+    setPhase("find");
     if (mode !== "text") {
-      // tiny delay so setEnabled effect commits
       setTimeout(() => {
         speech.speak(
-          "Hi, I'm My Friend. Put your paper in the box, and I'll take a look."
+          "Ready to find your document? Open the magnifier, or tap I already found it.",
         );
       }, 50);
     }
   };
+
 
 
   return (
@@ -129,6 +135,27 @@ function ElderApp() {
         >
           {!started ? (
             <StartGate onStart={start} />
+          ) : phase === "find" ? (
+            <FindDocGate
+              onOpenMagnifier={() => setPhase("magnifier")}
+              onAlreadyFound={() => {
+                setPhase("flow");
+                setStep(1);
+              }}
+            />
+          ) : phase === "magnifier" ? (
+            <LiveMagnifier
+              onCancel={() => setPhase("find")}
+              onConfirm={() => {
+                setPhase("flow");
+                setStep(3);
+              }}
+              onHandoff={() => {
+                setBranch("missing");
+                setPhase("flow");
+                setStep(5);
+              }}
+            />
           ) : (
             <ScreenRouter
               step={step}
@@ -139,6 +166,7 @@ function ElderApp() {
               onGoCenter={() => navigate({ to: "/center" })}
             />
           )}
+
         </div>
       </div>
 
@@ -266,6 +294,63 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
     </div>
   );
 }
+
+function FindDocGate({
+  onOpenMagnifier,
+  onAlreadyFound,
+}: {
+  onOpenMagnifier: () => void;
+  onAlreadyFound: () => void;
+}) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+      <Mascot mode="idle" size={130} />
+      <h2 className="mt-3 font-extrabold" style={{ fontSize: 28, color: "var(--color-elder-ink)" }}>
+        Ready to find your document?
+      </h2>
+      <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
+        I'll open the magnifier so you can see clearly first. Nothing is uploaded yet.
+      </p>
+      <div className="w-full space-y-3">
+        <button
+          onClick={onOpenMagnifier}
+          className="w-full font-extrabold animate-button-pop-red active:scale-[0.96]"
+          style={{
+            background: "var(--color-elder-red)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 26,
+            padding: "24px",
+            fontSize: 24,
+            minHeight: 88,
+            boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
+          }}
+        >
+          🔍 Open Magnifier
+        </button>
+        <button
+          onClick={onAlreadyFound}
+          className="w-full font-extrabold active:scale-[0.96]"
+          style={{
+            background: "#fff",
+            color: "var(--color-elder-primary)",
+            border: "3px solid var(--color-elder-sky)",
+            borderRadius: 26,
+            padding: "22px",
+            fontSize: 22,
+            minHeight: 80,
+          }}
+        >
+          📄 I already found it
+        </button>
+      </div>
+      <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
+        The magnifier uses your camera only on this device.
+      </p>
+    </div>
+  );
+}
+
 
 function ScreenRouter({
   step,
