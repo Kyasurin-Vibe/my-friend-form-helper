@@ -487,7 +487,7 @@ function Screen2({
         </ul>
       </div>
       <VoiceControls speech={speech} />
-      <BigButton onClick={onNext}>Try again</BigButton>
+      <BigButton variant="danger" onClick={onNext}>Try again</BigButton>
     </div>
   );
 }
