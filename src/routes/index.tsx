@@ -393,11 +393,11 @@ function VoiceControls({
         className="font-bold"
         style={{
           background: "#fff",
-          border: "2px solid var(--color-elder-sky)",
+          border: "2px solid rgba(217,48,37,0.35)",
           borderRadius: 16,
           padding: "14px",
           fontSize: 17,
-          color: "var(--color-elder-primary)",
+          color: "var(--color-elder-red)",
         }}
       >
         🔊 Say it again
@@ -405,17 +405,17 @@ function VoiceControls({
       <button
         onClick={() =>
           speech.speak(
-            "Tap the big blue button at the bottom to keep going. I'll help you each step."
+            "Tap the big red button at the bottom to keep going. I'll help you each step."
           )
         }
         className="font-bold"
         style={{
           background: "#fff",
-          border: "2px solid var(--color-elder-sky)",
+          border: "2px solid rgba(217,48,37,0.35)",
           borderRadius: 16,
           padding: "14px",
           fontSize: 17,
-          color: "var(--color-elder-primary)",
+          color: "var(--color-elder-red)",
         }}
       >
         ❓ What do I do?
@@ -487,7 +487,7 @@ function Screen2({
         </ul>
       </div>
       <VoiceControls speech={speech} />
-      <BigButton onClick={onNext}>Try again</BigButton>
+      <BigButton variant="danger" onClick={onNext}>Try again</BigButton>
     </div>
   );
 }
@@ -525,7 +525,7 @@ function Screen3({
       <BigButton variant="ghost" onClick={readDoc}>
         🔊 Read the paper to me
       </BigButton>
-      <BigButton onClick={onNext}>Check my form</BigButton>
+      <BigButton variant="danger" onClick={onNext}>Check my form</BigButton>
     </div>
   );
 }
@@ -637,12 +637,12 @@ function Screen4({
           >
             ✍️ I'll fix it myself
           </BigButton>
-          <BigButton onClick={onSendToCenter}>
+          <BigButton variant="danger" onClick={onSendToCenter}>
             🤝 I don't know — send to a person
           </BigButton>
         </div>
       ) : (
-        <BigButton onClick={onSendToCenter}>What happens now?</BigButton>
+        <BigButton variant="danger" onClick={onSendToCenter}>What happens now?</BigButton>
       )}
     </div>
   );
@@ -734,7 +734,7 @@ function Screen5({
         You don't have to do anything else right now.
       </p>
       <VoiceControls speech={speech} />
-      <BigButton onClick={onGoCenter}>See the center's side →</BigButton>
+      <BigButton variant="danger" onClick={onGoCenter}>See the center's side →</BigButton>
     </div>
   );
 }
