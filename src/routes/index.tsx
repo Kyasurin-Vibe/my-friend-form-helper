@@ -25,14 +25,18 @@ export const Route = createFileRoute("/")({
 });
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
+export type A11yMode = "voice" | "text" | "both";
 
 function ElderApp() {
   const [step, setStep] = useState<Step>(1);
   const [branch, setBranch] = useState<Branch>("missing");
-  const [voiceOn, setVoiceOn] = useState(true);
+  const [a11yMode, setA11yMode] = useState<A11yMode>("both");
   const [started, setStarted] = useState(false);
   const speech = useSpeech();
   const navigate = useNavigate();
+
+  const voiceOn = a11yMode !== "text";
+  const showCaptions = a11yMode !== "voice";
 
   useEffect(() => {
     speech.setEnabled(voiceOn);
@@ -47,7 +51,7 @@ function ElderApp() {
       3: "I can see this clearly now. This is your FL-142 — your list of assets. I can see your name and your assets.",
       4:
         branch === "missing"
-          ? "I checked your form. I'm not sure this one is ready. There's no signature and no date."
+          ? "I checked your form. I'm not sure this one is ready. There's no signature and no date. Do you want to fix it yourself, or should I send it to a person?"
           : "I checked your form. This looks complete.",
       5:
         branch === "missing"
@@ -68,12 +72,19 @@ function ElderApp() {
     speech.cancel();
   };
 
-  const start = () => {
+  const start = (mode: A11yMode) => {
+    setA11yMode(mode);
     setStarted(true);
-    speech.speak(
-      "Hi, I'm My Friend. Put your paper in the box, and I'll take a look."
-    );
+    if (mode !== "text") {
+      // tiny delay so setEnabled effect commits
+      setTimeout(() => {
+        speech.speak(
+          "Hi, I'm My Friend. Put your paper in the box, and I'll take a look."
+        );
+      }, 50);
+    }
   };
+
 
   return (
     <div
@@ -90,8 +101,8 @@ function ElderApp() {
         setStep={setStep}
         branch={branch}
         setBranch={setBranch}
-        voiceOn={voiceOn}
-        setVoiceOn={setVoiceOn}
+        a11yMode={a11yMode}
+        setA11yMode={setA11yMode}
         restart={restart}
       />
 
@@ -124,6 +135,7 @@ function ElderApp() {
               setStep={setStep}
               branch={branch}
               speech={speech}
+              showCaptions={showCaptions}
               onGoCenter={() => navigate({ to: "/center" })}
             />
           )}
@@ -146,16 +158,16 @@ function PresenterBar({
   setStep,
   branch,
   setBranch,
-  voiceOn,
-  setVoiceOn,
+  a11yMode,
+  setA11yMode,
   restart,
 }: {
   step: Step;
   setStep: (s: Step) => void;
   branch: Branch;
   setBranch: (b: Branch) => void;
-  voiceOn: boolean;
-  setVoiceOn: (v: boolean) => void;
+  a11yMode: A11yMode;
+  setA11yMode: (m: A11yMode) => void;
   restart: () => void;
 }) {
   const chip = (label: string, active: boolean, onClick: () => void) => (
@@ -190,9 +202,10 @@ function PresenterBar({
       {chip("① Missing", branch === "missing", () => setBranch("missing"))}
       {chip("② Complete", branch === "complete", () => setBranch("complete"))}
       <span className="mx-1 opacity-40">|</span>
-      {chip(voiceOn ? "🔊 Voice on" : "🔇 Voice off", voiceOn, () =>
-        setVoiceOn(!voiceOn)
-      )}
+      <b>Mode</b>
+      {chip("🔊 Voice", a11yMode === "voice", () => setA11yMode("voice"))}
+      {chip("📝 Text", a11yMode === "text", () => setA11yMode("text"))}
+      {chip("🔊📝 Both", a11yMode === "both", () => setA11yMode("both"))}
       <button
         onClick={restart}
         className="px-3 py-1.5 rounded-full text-xs font-semibold"
@@ -204,40 +217,52 @@ function PresenterBar({
   );
 }
 
-function StartGate({ onStart }: { onStart: () => void }) {
+const CaptionsCtx = ({ children, value }: { children: React.ReactNode; value: boolean }) => (
+  <CaptionsContext.Provider value={value}>{children}</CaptionsContext.Provider>
+);
+import { createContext, useContext } from "react";
+const CaptionsContext = createContext<boolean>(true);
+
+function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
+  const choose = (mode: A11yMode) => {
+    if ("vibrate" in navigator) navigator.vibrate(40);
+    onStart(mode);
+  };
+  const choice = (label: string, sub: string, mode: A11yMode) => (
+    <button
+      onClick={() => choose(mode)}
+      className="w-full font-extrabold transition active:scale-[0.96] animate-button-pop text-left"
+      style={{
+        background: "#fff",
+        color: "var(--color-elder-ink)",
+        border: "3px solid var(--color-elder-sky)",
+        borderRadius: 22,
+        padding: "18px 20px",
+        fontSize: 22,
+        minHeight: 78,
+        boxShadow: "0 6px 18px rgba(47,111,176,0.12)",
+      }}
+    >
+      <div>{label}</div>
+      <div style={{ fontSize: 14, color: "#6b5d52", fontWeight: 600, marginTop: 2 }}>
+        {sub}
+      </div>
+    </button>
+  );
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-      <Mascot mode="idle" size={180} />
-      <h1
-        className="mt-4 font-extrabold"
-        style={{ fontSize: 36, color: "var(--color-elder-ink)" }}
-      >
+    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+      <Mascot mode="idle" size={150} />
+      <h1 className="mt-3 font-extrabold" style={{ fontSize: 32, color: "var(--color-elder-ink)" }}>
         My Friend
       </h1>
-      <p className="mt-1" style={{ fontSize: 18, color: "#6b5d52" }}>
-        Gentle help with your paperwork.
+      <p className="mt-1 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
+        How would you like me to help?
       </p>
-      <button
-        onClick={() => {
-          if ("vibrate" in navigator) navigator.vibrate(40);
-          onStart();
-        }}
-        className="mt-10 w-full font-extrabold transition active:scale-[0.96] animate-button-pop"
-        style={{
-          background: "var(--color-elder-primary)",
-          color: "#fff",
-          borderRadius: 28,
-          padding: "28px",
-          fontSize: 28,
-          minHeight: 92,
-          boxShadow: "0 14px 32px rgba(47,111,176,0.36)",
-        }}
-      >
-        👆 Tap to begin
-      </button>
-      <p className="mt-3 text-sm" style={{ color: "#6b5d52" }}>
-        Sound will turn on.
-      </p>
+      <div className="w-full space-y-3">
+        {choice("🔊  Talk to me", "I'll read everything out loud.", "voice")}
+        {choice("📝  Show me words", "I'll show big captions, no sound.", "text")}
+        {choice("🔊📝  Both", "Voice and captions together.", "both")}
+      </div>
     </div>
   );
 }
@@ -247,29 +272,44 @@ function ScreenRouter({
   setStep,
   branch,
   speech,
+  showCaptions,
   onGoCenter,
 }: {
   step: Step;
   setStep: (s: Step) => void;
   branch: Branch;
   speech: ReturnType<typeof useSpeech>;
+  showCaptions: boolean;
   onGoCenter: () => void;
 }) {
   const next = (n: Step) => setStep(n);
-  switch (step) {
-    case 1:
-      return <Screen1 onNext={() => next(2)} speech={speech} />;
-    case 2:
-      return <Screen2 onNext={() => next(3)} speech={speech} />;
-    case 3:
-      return <Screen3 onNext={() => next(4)} speech={speech} />;
-    case 4:
-      return <Screen4 branch={branch} onNext={() => next(5)} speech={speech} />;
-    case 5:
-      return <Screen5 branch={branch} onGoCenter={onGoCenter} speech={speech} />;
-    case 6:
-      return <Screen6 />;
-  }
+  return (
+    <CaptionsCtx value={showCaptions}>
+      {(() => {
+        switch (step) {
+          case 1:
+            return <Screen1 onNext={() => next(2)} speech={speech} />;
+          case 2:
+            return <Screen2 onNext={() => next(3)} speech={speech} />;
+          case 3:
+            return <Screen3 onNext={() => next(4)} speech={speech} />;
+          case 4:
+            return (
+              <Screen4
+                branch={branch}
+                onSendToCenter={() => next(5)}
+                onFixSelf={() => setStep(1)}
+                speech={speech}
+              />
+            );
+          case 5:
+            return <Screen5 branch={branch} onGoCenter={onGoCenter} speech={speech} />;
+          case 6:
+            return <Screen6 />;
+        }
+      })()}
+    </CaptionsCtx>
+  );
 }
 
 // ===== Shared building blocks =====
@@ -285,10 +325,12 @@ function MascotHeader({
 }) {
   const mode = speech.speaking ? "speaking" : "idle";
   const size = small ? 96 : speech.speaking ? 220 : 130;
+  const showCaptions = useContext(CaptionsContext);
+  const showCap = (showCaptions || speech.speaking) && !!speech.caption;
   return (
     <div className="flex flex-col items-center pt-5">
       <Mascot mode={mode} face={face} size={size} />
-      {speech.speaking && speech.caption && (
+      {showCap && (
         <p
           key={speech.caption}
           className="mt-3 px-2 text-center font-semibold animate-fade-up"
@@ -475,11 +517,13 @@ function Screen3({
 
 function Screen4({
   branch,
-  onNext,
+  onSendToCenter,
+  onFixSelf,
   speech,
 }: {
   branch: Branch;
-  onNext: () => void;
+  onSendToCenter: () => void;
+  onFixSelf: () => void;
   speech: ReturnType<typeof useSpeech>;
 }) {
   useEffect(() => {
@@ -567,7 +611,24 @@ function Screen4({
         </p>
       </div>
       <VoiceControls speech={speech} />
-      <BigButton onClick={onNext}>What happens now?</BigButton>
+      {branch === "missing" ? (
+        <div className="space-y-2">
+          <BigButton
+            variant="ghost"
+            onClick={() => {
+              speech.speak("Okay, I'll wait here. Fix it on your paper, then tap to scan again.");
+              onFixSelf();
+            }}
+          >
+            ✍️ I'll fix it myself
+          </BigButton>
+          <BigButton onClick={onSendToCenter}>
+            🤝 I don't know — send to a person
+          </BigButton>
+        </div>
+      ) : (
+        <BigButton onClick={onSendToCenter}>What happens now?</BigButton>
+      )}
     </div>
   );
 }
