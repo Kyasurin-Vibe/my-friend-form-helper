@@ -295,6 +295,63 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
   );
 }
 
+function FindDocGate({
+  onOpenMagnifier,
+  onAlreadyFound,
+}: {
+  onOpenMagnifier: () => void;
+  onAlreadyFound: () => void;
+}) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+      <Mascot mode="idle" size={130} />
+      <h2 className="mt-3 font-extrabold" style={{ fontSize: 28, color: "var(--color-elder-ink)" }}>
+        Ready to find your document?
+      </h2>
+      <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
+        I'll open the magnifier so you can see clearly first. Nothing is uploaded yet.
+      </p>
+      <div className="w-full space-y-3">
+        <button
+          onClick={onOpenMagnifier}
+          className="w-full font-extrabold animate-button-pop-red active:scale-[0.96]"
+          style={{
+            background: "var(--color-elder-red)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 26,
+            padding: "24px",
+            fontSize: 24,
+            minHeight: 88,
+            boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
+          }}
+        >
+          🔍 Open Magnifier
+        </button>
+        <button
+          onClick={onAlreadyFound}
+          className="w-full font-extrabold active:scale-[0.96]"
+          style={{
+            background: "#fff",
+            color: "var(--color-elder-primary)",
+            border: "3px solid var(--color-elder-sky)",
+            borderRadius: 26,
+            padding: "22px",
+            fontSize: 22,
+            minHeight: 80,
+          }}
+        >
+          📄 I already found it
+        </button>
+      </div>
+      <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
+        The magnifier uses your camera only on this device.
+      </p>
+    </div>
+  );
+}
+
+
 function ScreenRouter({
   step,
   setStep,
