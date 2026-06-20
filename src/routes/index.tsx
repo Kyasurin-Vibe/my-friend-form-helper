@@ -393,11 +393,11 @@ function VoiceControls({
         className="font-bold"
         style={{
           background: "#fff",
-          border: "2px solid var(--color-elder-sky)",
+          border: "2px solid rgba(217,48,37,0.35)",
           borderRadius: 16,
           padding: "14px",
           fontSize: 17,
-          color: "var(--color-elder-primary)",
+          color: "var(--color-elder-red)",
         }}
       >
         🔊 Say it again
@@ -405,17 +405,17 @@ function VoiceControls({
       <button
         onClick={() =>
           speech.speak(
-            "Tap the big blue button at the bottom to keep going. I'll help you each step."
+            "Tap the big red button at the bottom to keep going. I'll help you each step."
           )
         }
         className="font-bold"
         style={{
           background: "#fff",
-          border: "2px solid var(--color-elder-sky)",
+          border: "2px solid rgba(217,48,37,0.35)",
           borderRadius: 16,
           padding: "14px",
           fontSize: 17,
-          color: "var(--color-elder-primary)",
+          color: "var(--color-elder-red)",
         }}
       >
         ❓ What do I do?
