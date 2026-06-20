@@ -101,8 +101,8 @@ function ElderApp() {
         setStep={setStep}
         branch={branch}
         setBranch={setBranch}
-        voiceOn={voiceOn}
-        setVoiceOn={setVoiceOn}
+        a11yMode={a11yMode}
+        setA11yMode={setA11yMode}
         restart={restart}
       />
 
@@ -135,6 +135,7 @@ function ElderApp() {
               setStep={setStep}
               branch={branch}
               speech={speech}
+              showCaptions={showCaptions}
               onGoCenter={() => navigate({ to: "/center" })}
             />
           )}
@@ -157,16 +158,16 @@ function PresenterBar({
   setStep,
   branch,
   setBranch,
-  voiceOn,
-  setVoiceOn,
+  a11yMode,
+  setA11yMode,
   restart,
 }: {
   step: Step;
   setStep: (s: Step) => void;
   branch: Branch;
   setBranch: (b: Branch) => void;
-  voiceOn: boolean;
-  setVoiceOn: (v: boolean) => void;
+  a11yMode: A11yMode;
+  setA11yMode: (m: A11yMode) => void;
   restart: () => void;
 }) {
   const chip = (label: string, active: boolean, onClick: () => void) => (
@@ -201,9 +202,10 @@ function PresenterBar({
       {chip("① Missing", branch === "missing", () => setBranch("missing"))}
       {chip("② Complete", branch === "complete", () => setBranch("complete"))}
       <span className="mx-1 opacity-40">|</span>
-      {chip(voiceOn ? "🔊 Voice on" : "🔇 Voice off", voiceOn, () =>
-        setVoiceOn(!voiceOn)
-      )}
+      <b>Mode</b>
+      {chip("🔊 Voice", a11yMode === "voice", () => setA11yMode("voice"))}
+      {chip("📝 Text", a11yMode === "text", () => setA11yMode("text"))}
+      {chip("🔊📝 Both", a11yMode === "both", () => setA11yMode("both"))}
       <button
         onClick={restart}
         className="px-3 py-1.5 rounded-full text-xs font-semibold"
