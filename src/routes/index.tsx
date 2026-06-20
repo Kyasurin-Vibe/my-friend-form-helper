@@ -734,7 +734,7 @@ function Screen5({
         You don't have to do anything else right now.
       </p>
       <VoiceControls speech={speech} />
-      <BigButton onClick={onGoCenter}>See the center's side →</BigButton>
+      <BigButton variant="danger" onClick={onGoCenter}>See the center's side →</BigButton>
     </div>
   );
 }
