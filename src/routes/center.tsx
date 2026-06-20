@@ -21,6 +21,10 @@ function CenterDashboard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
+    seedDemoCases();
+  }, []);
+
+  useEffect(() => {
     if (cases.length && !selectedId) setSelectedId(cases[0].id);
   }, [cases, selectedId]);
 
