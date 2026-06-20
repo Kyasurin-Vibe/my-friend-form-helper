@@ -66,15 +66,9 @@ export function Mascot({ mode, face = "smile", size = 160 }: Props) {
               <circle cx="48" cy="54" r="2" fill="#fff" />
               <circle cx="76" cy="54" r="2" fill="#fff" />
             </>
-          ) : mode === "speaking" ? (
-            <>
-              <circle cx="46" cy={eyeY} r="5.5" fill="#241F1A" />
-              <circle cx="74" cy={eyeY} r="5.5" fill="#241F1A" />
-              <circle cx="47.5" cy={eyeY - 1.5} r="1.6" fill="#fff" />
-              <circle cx="75.5" cy={eyeY - 1.5} r="1.6" fill="#fff" />
-            </>
           ) : (
             <>
+              {/* smile: closed crescent eyes always */}
               <path d="M40 56 Q46 50 52 56" stroke="#241F1A" strokeWidth="3.5" strokeLinecap="round" fill="none" />
               <path d="M68 56 Q74 50 80 56" stroke="#241F1A" strokeWidth="3.5" strokeLinecap="round" fill="none" />
             </>
@@ -87,8 +81,6 @@ export function Mascot({ mode, face = "smile", size = 160 }: Props) {
             </>
           ) : face === "surprised" ? (
             <circle cx="60" cy="80" r="5.5" fill="none" stroke="#241F1A" strokeWidth="3" />
-          ) : mode === "speaking" ? (
-            <ellipse cx="60" cy="76" rx="8" ry="6" fill="#241F1A" />
           ) : (
             <path d="M52 76 Q60 84 68 76" stroke="#241F1A" strokeWidth="3.5" strokeLinecap="round" fill="none" />
           )}
