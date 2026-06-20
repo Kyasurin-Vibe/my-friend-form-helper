@@ -482,6 +482,9 @@ function Screen4({
   onNext: () => void;
   speech: ReturnType<typeof useSpeech>;
 }) {
+  useEffect(() => {
+    if (branch === "missing") playWarning();
+  }, [branch]);
   const rows =
     branch === "missing"
       ? [
