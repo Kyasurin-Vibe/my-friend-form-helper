@@ -217,16 +217,19 @@ function StartGate({ onStart }: { onStart: () => void }) {
         Gentle help with your paperwork.
       </p>
       <button
-        onClick={onStart}
-        className="mt-10 w-full font-extrabold transition active:scale-[0.99]"
+        onClick={() => {
+          if ("vibrate" in navigator) navigator.vibrate(40);
+          onStart();
+        }}
+        className="mt-10 w-full font-extrabold transition active:scale-[0.96] animate-button-pop"
         style={{
           background: "var(--color-elder-primary)",
           color: "#fff",
-          borderRadius: 22,
-          padding: "22px",
-          fontSize: 22,
-          minHeight: 72,
-          boxShadow: "0 10px 24px rgba(47,111,176,0.28)",
+          borderRadius: 28,
+          padding: "28px",
+          fontSize: 28,
+          minHeight: 92,
+          boxShadow: "0 14px 32px rgba(47,111,176,0.36)",
         }}
       >
         👆 Tap to begin
@@ -313,17 +316,20 @@ function BigButton({
   const primary = variant === "primary";
   return (
     <button
-      onClick={onClick}
-      className="w-full font-extrabold transition active:scale-[0.99]"
+      onClick={() => {
+        if ("vibrate" in navigator) navigator.vibrate(35);
+        onClick();
+      }}
+      className="w-full font-extrabold transition active:scale-[0.96] animate-button-pop"
       style={{
         background: primary ? "var(--color-elder-primary)" : "#fff",
         color: primary ? "#fff" : "var(--color-elder-primary)",
         border: primary ? "none" : "2px solid var(--color-elder-sky)",
-        borderRadius: 22,
-        padding: "22px",
-        fontSize: 22,
-        minHeight: 72,
-        boxShadow: primary ? "0 10px 24px rgba(47,111,176,0.28)" : "none",
+        borderRadius: 26,
+        padding: "26px",
+        fontSize: 26,
+        minHeight: 88,
+        boxShadow: primary ? "0 14px 30px rgba(47,111,176,0.34)" : "none",
       }}
     >
       {children}
