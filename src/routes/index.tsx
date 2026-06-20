@@ -273,15 +273,17 @@ function ScreenRouter({
 function MascotHeader({
   speech,
   small,
+  face,
 }: {
   speech: ReturnType<typeof useSpeech>;
   small?: boolean;
+  face?: "smile" | "x";
 }) {
   const mode = speech.speaking ? "speaking" : "idle";
   const size = small ? 96 : speech.speaking ? 220 : 130;
   return (
     <div className="flex flex-col items-center pt-5">
-      <Mascot mode={mode} size={size} />
+      <Mascot mode={mode} face={face} size={size} />
       {speech.speaking && speech.caption && (
         <p
           key={speech.caption}
@@ -415,7 +417,7 @@ function Screen2({
 }) {
   return (
     <div className="flex-1 flex flex-col p-6">
-      <MascotHeader speech={speech} />
+      <MascotHeader speech={speech} face="x" />
       <Viewfinder variant="blurry" />
       <div
         className="rounded-2xl p-3 mb-2"
