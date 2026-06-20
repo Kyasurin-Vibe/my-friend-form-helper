@@ -24,6 +24,7 @@
   --color-elder-surface: #FFFFFF;
   --color-elder-ink: #241F1A;
   --color-elder-primary: #2F6FB0;
+  --color-elder-red: #D93025;
   --color-elder-coral: #F5A98C;
   --color-elder-sky: #CDE7F5;
   --color-elder-amber: #E2A23B;
@@ -89,6 +90,13 @@
   100% { transform: scale(1); box-shadow: 0 14px 30px rgba(47,111,176,0.34); }
 }
 .animate-button-pop:active { animation: button-pop 0.18s ease-out; }
+
+@keyframes button-pop-red {
+  0% { transform: scale(1); box-shadow: 0 14px 30px rgba(217,48,37,0.34); }
+  40% { transform: scale(0.94); box-shadow: 0 6px 14px rgba(217,48,37,0.5); }
+  100% { transform: scale(1); box-shadow: 0 14px 30px rgba(217,48,37,0.34); }
+}
+.animate-button-pop-red:active { animation: button-pop-red 0.18s ease-out; }
 
 @keyframes warning-shake {
   0%, 100% { transform: translateX(0); }

@@ -354,25 +354,26 @@ function BigButton({
 }: {
   children: React.ReactNode;
   onClick: () => void;
-  variant?: "primary" | "ghost";
+  variant?: "primary" | "ghost" | "danger";
 }) {
   const primary = variant === "primary";
+  const danger = variant === "danger";
   return (
     <button
       onClick={() => {
         if ("vibrate" in navigator) navigator.vibrate(35);
         onClick();
       }}
-      className="w-full font-extrabold transition active:scale-[0.96] animate-button-pop"
+      className={`w-full font-extrabold transition active:scale-[0.96] ${danger ? "animate-button-pop-red" : "animate-button-pop"}`}
       style={{
-        background: primary ? "var(--color-elder-primary)" : "#fff",
-        color: primary ? "#fff" : "var(--color-elder-primary)",
-        border: primary ? "none" : "2px solid var(--color-elder-sky)",
+        background: danger ? "var(--color-elder-red)" : primary ? "var(--color-elder-primary)" : "#fff",
+        color: primary || danger ? "#fff" : "var(--color-elder-primary)",
+        border: primary || danger ? "none" : "2px solid var(--color-elder-sky)",
         borderRadius: 26,
         padding: "26px",
         fontSize: 26,
         minHeight: 88,
-        boxShadow: primary ? "0 14px 30px rgba(47,111,176,0.34)" : "none",
+        boxShadow: primary || danger ? "0 14px 30px rgba(0,0,0,0.18)" : "none",
       }}
     >
       {children}
@@ -452,7 +453,7 @@ function Screen1({
         Put your paper in the box.
       </p>
       <VoiceControls speech={speech} />
-      <BigButton onClick={onNext}>📷 Take the photo</BigButton>
+      <BigButton variant="danger" onClick={onNext}>📷 Take the photo</BigButton>
     </div>
   );
 }
