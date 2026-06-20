@@ -450,7 +450,7 @@ function Screen3({
 }) {
   return (
     <div className="flex-1 flex flex-col p-6">
-      <MascotHeader speech={speech} small face="surprised" />
+      <MascotHeader speech={speech} small face="smile" />
       <Viewfinder variant="clear" />
       <p
         className="text-center font-bold mb-3"
