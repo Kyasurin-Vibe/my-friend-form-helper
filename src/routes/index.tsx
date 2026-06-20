@@ -637,7 +637,7 @@ function Screen4({
           >
             ✍️ I'll fix it myself
           </BigButton>
-          <BigButton onClick={onSendToCenter}>
+          <BigButton variant="danger" onClick={onSendToCenter}>
             🤝 I don't know — send to a person
           </BigButton>
         </div>
