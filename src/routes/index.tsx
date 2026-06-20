@@ -33,7 +33,7 @@ function ElderApp() {
   const [step, setStep] = useState<Step>(1);
   const [branch, setBranch] = useState<Branch>("missing");
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(true);
   const [phase, setPhase] = useState<"find" | "magnifier" | "flow">("find");
   const speech = useSpeech();
   const navigate = useNavigate();
@@ -71,7 +71,7 @@ function ElderApp() {
 
   const restart = () => {
     setStep(1);
-    setStarted(false);
+    setStarted(true);
     setPhase("find");
     clearCases();
     speech.cancel();
