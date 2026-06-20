@@ -455,8 +455,8 @@ function Screen3({
 }: {
   onNext: () => void;
   speech: ReturnType<typeof useSpeech>;
+}) {
   useEffect(() => { playSuccess(); }, []);
-
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} small face="smile" />
