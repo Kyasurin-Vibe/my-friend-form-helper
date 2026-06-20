@@ -453,7 +453,7 @@ function Screen1({
         Put your paper in the box.
       </p>
       <VoiceControls speech={speech} />
-      <BigButton onClick={onNext}>📷 Take the photo</BigButton>
+      <BigButton variant="danger" onClick={onNext}>📷 Take the photo</BigButton>
     </div>
   );
 }
