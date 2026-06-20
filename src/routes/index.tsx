@@ -217,40 +217,52 @@ function PresenterBar({
   );
 }
 
-function StartGate({ onStart }: { onStart: () => void }) {
+const CaptionsCtx = ({ children, value }: { children: React.ReactNode; value: boolean }) => (
+  <CaptionsContext.Provider value={value}>{children}</CaptionsContext.Provider>
+);
+import { createContext, useContext } from "react";
+const CaptionsContext = createContext<boolean>(true);
+
+function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
+  const choose = (mode: A11yMode) => {
+    if ("vibrate" in navigator) navigator.vibrate(40);
+    onStart(mode);
+  };
+  const choice = (label: string, sub: string, mode: A11yMode) => (
+    <button
+      onClick={() => choose(mode)}
+      className="w-full font-extrabold transition active:scale-[0.96] animate-button-pop text-left"
+      style={{
+        background: "#fff",
+        color: "var(--color-elder-ink)",
+        border: "3px solid var(--color-elder-sky)",
+        borderRadius: 22,
+        padding: "18px 20px",
+        fontSize: 22,
+        minHeight: 78,
+        boxShadow: "0 6px 18px rgba(47,111,176,0.12)",
+      }}
+    >
+      <div>{label}</div>
+      <div style={{ fontSize: 14, color: "#6b5d52", fontWeight: 600, marginTop: 2 }}>
+        {sub}
+      </div>
+    </button>
+  );
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-      <Mascot mode="idle" size={180} />
-      <h1
-        className="mt-4 font-extrabold"
-        style={{ fontSize: 36, color: "var(--color-elder-ink)" }}
-      >
+    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+      <Mascot mode="idle" size={150} />
+      <h1 className="mt-3 font-extrabold" style={{ fontSize: 32, color: "var(--color-elder-ink)" }}>
         My Friend
       </h1>
-      <p className="mt-1" style={{ fontSize: 18, color: "#6b5d52" }}>
-        Gentle help with your paperwork.
+      <p className="mt-1 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
+        How would you like me to help?
       </p>
-      <button
-        onClick={() => {
-          if ("vibrate" in navigator) navigator.vibrate(40);
-          onStart();
-        }}
-        className="mt-10 w-full font-extrabold transition active:scale-[0.96] animate-button-pop"
-        style={{
-          background: "var(--color-elder-primary)",
-          color: "#fff",
-          borderRadius: 28,
-          padding: "28px",
-          fontSize: 28,
-          minHeight: 92,
-          boxShadow: "0 14px 32px rgba(47,111,176,0.36)",
-        }}
-      >
-        👆 Tap to begin
-      </button>
-      <p className="mt-3 text-sm" style={{ color: "#6b5d52" }}>
-        Sound will turn on.
-      </p>
+      <div className="w-full space-y-3">
+        {choice("🔊  Talk to me", "I'll read everything out loud.", "voice")}
+        {choice("📝  Show me words", "I'll show big captions, no sound.", "text")}
+        {choice("🔊📝  Both", "Voice and captions together.", "both")}
+      </div>
     </div>
   );
 }
@@ -260,29 +272,44 @@ function ScreenRouter({
   setStep,
   branch,
   speech,
+  showCaptions,
   onGoCenter,
 }: {
   step: Step;
   setStep: (s: Step) => void;
   branch: Branch;
   speech: ReturnType<typeof useSpeech>;
+  showCaptions: boolean;
   onGoCenter: () => void;
 }) {
   const next = (n: Step) => setStep(n);
-  switch (step) {
-    case 1:
-      return <Screen1 onNext={() => next(2)} speech={speech} />;
-    case 2:
-      return <Screen2 onNext={() => next(3)} speech={speech} />;
-    case 3:
-      return <Screen3 onNext={() => next(4)} speech={speech} />;
-    case 4:
-      return <Screen4 branch={branch} onNext={() => next(5)} speech={speech} />;
-    case 5:
-      return <Screen5 branch={branch} onGoCenter={onGoCenter} speech={speech} />;
-    case 6:
-      return <Screen6 />;
-  }
+  return (
+    <CaptionsCtx value={showCaptions}>
+      {(() => {
+        switch (step) {
+          case 1:
+            return <Screen1 onNext={() => next(2)} speech={speech} />;
+          case 2:
+            return <Screen2 onNext={() => next(3)} speech={speech} />;
+          case 3:
+            return <Screen3 onNext={() => next(4)} speech={speech} />;
+          case 4:
+            return (
+              <Screen4
+                branch={branch}
+                onSendToCenter={() => next(5)}
+                onFixSelf={() => setStep(1)}
+                speech={speech}
+              />
+            );
+          case 5:
+            return <Screen5 branch={branch} onGoCenter={onGoCenter} speech={speech} />;
+          case 6:
+            return <Screen6 />;
+        }
+      })()}
+    </CaptionsCtx>
+  );
 }
 
 // ===== Shared building blocks =====
