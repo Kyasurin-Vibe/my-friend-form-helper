@@ -277,7 +277,7 @@ function MascotHeader({
 }: {
   speech: ReturnType<typeof useSpeech>;
   small?: boolean;
-  face?: "smile" | "x";
+  face?: "smile" | "x" | "surprised";
 }) {
   const mode = speech.speaking ? "speaking" : "idle";
   const size = small ? 96 : speech.speaking ? 220 : 130;
@@ -450,7 +450,7 @@ function Screen3({
 }) {
   return (
     <div className="flex-1 flex flex-col p-6">
-      <MascotHeader speech={speech} small />
+      <MascotHeader speech={speech} small face="surprised" />
       <Viewfinder variant="clear" />
       <p
         className="text-center font-bold mb-3"
@@ -491,7 +491,7 @@ function Screen4({
         ];
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-      <MascotHeader speech={speech} small />
+      <MascotHeader speech={speech} small face="surprised" />
       <div
         className="rounded-3xl p-4 mt-3 mb-3"
         style={{
@@ -587,7 +587,7 @@ function Screen5({
         ];
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-      <MascotHeader speech={speech} small />
+      <MascotHeader speech={speech} small face={branch === "missing" ? "x" : "smile"} />
       <div
         className="rounded-3xl p-4 mt-3"
         style={{
