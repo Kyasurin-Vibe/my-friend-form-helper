@@ -405,6 +405,20 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
             "{heard}"
           </p>
         )}
+        {voiceError && (
+          <div className="text-center mt-1">
+            <p style={{ fontSize: 13, color: "#b91c1c", fontWeight: 700 }}>{voiceError}</p>
+            <button
+              onClick={() => { shouldListenRef.current = true; setVoiceArmed(true); setVoiceError(null); startVoice(); }}
+              style={{
+                marginTop: 6, background: "var(--color-elder-primary)", color: "#fff",
+                border: 0, borderRadius: 12, padding: "8px 14px", fontWeight: 800, fontSize: 14,
+              }}
+            >
+              🎙 Tap to enable voice
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Controls */}
