@@ -525,7 +525,7 @@ function Screen3({
       <BigButton variant="ghost" onClick={readDoc}>
         🔊 Read the paper to me
       </BigButton>
-      <BigButton onClick={onNext}>Check my form</BigButton>
+      <BigButton variant="danger" onClick={onNext}>Check my form</BigButton>
     </div>
   );
 }
