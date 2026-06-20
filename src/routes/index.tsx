@@ -25,14 +25,18 @@ export const Route = createFileRoute("/")({
 });
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
+export type A11yMode = "voice" | "text" | "both";
 
 function ElderApp() {
   const [step, setStep] = useState<Step>(1);
   const [branch, setBranch] = useState<Branch>("missing");
-  const [voiceOn, setVoiceOn] = useState(true);
+  const [a11yMode, setA11yMode] = useState<A11yMode>("both");
   const [started, setStarted] = useState(false);
   const speech = useSpeech();
   const navigate = useNavigate();
+
+  const voiceOn = a11yMode !== "text";
+  const showCaptions = a11yMode !== "voice";
 
   useEffect(() => {
     speech.setEnabled(voiceOn);
@@ -47,7 +51,7 @@ function ElderApp() {
       3: "I can see this clearly now. This is your FL-142 — your list of assets. I can see your name and your assets.",
       4:
         branch === "missing"
-          ? "I checked your form. I'm not sure this one is ready. There's no signature and no date."
+          ? "I checked your form. I'm not sure this one is ready. There's no signature and no date. Do you want to fix it yourself, or should I send it to a person?"
           : "I checked your form. This looks complete.",
       5:
         branch === "missing"
@@ -68,12 +72,19 @@ function ElderApp() {
     speech.cancel();
   };
 
-  const start = () => {
+  const start = (mode: A11yMode) => {
+    setA11yMode(mode);
     setStarted(true);
-    speech.speak(
-      "Hi, I'm My Friend. Put your paper in the box, and I'll take a look."
-    );
+    if (mode !== "text") {
+      // tiny delay so setEnabled effect commits
+      setTimeout(() => {
+        speech.speak(
+          "Hi, I'm My Friend. Put your paper in the box, and I'll take a look."
+        );
+      }, 50);
+    }
   };
+
 
   return (
     <div
