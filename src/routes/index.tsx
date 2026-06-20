@@ -71,7 +71,7 @@ function ElderApp() {
 
   const restart = () => {
     setStep(1);
-    setStarted(false);
+    setStarted(true);
     setPhase("find");
     clearCases();
     speech.cancel();
