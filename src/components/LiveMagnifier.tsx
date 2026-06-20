@@ -1,20 +1,39 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  DemoServices,
+  type DetectedDoc,
+  type VoiceCommand,
+} from "@/lib/services";
 
 type Props = {
-  onConfirm: () => void;
+  onConfirm: (detected?: DetectedDoc) => void;
   onCancel: () => void;
   onHandoff: () => void;
 };
 
-type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "detected";
+type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
 
 const GUIDANCE_TEXT: Record<Guidance, string> = {
   init: "Point the camera at your paper.",
   "move-closer": "Move a little closer.",
   "hold-still": "Hold still…",
   corners: "Put all four corners inside the frame.",
+  blurry: "The picture is too blurry. Please try again.",
   detected: "This looks like FL-142. Is this the file you are looking for?",
 };
+
+// Lightweight TTS helper local to this screen, so it composes with the
+// outer useSpeech without fighting it for the queue.
+function speak(text: string) {
+  if (typeof window === "undefined") return;
+  const synth = window.speechSynthesis;
+  if (!synth) return;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.95;
+  u.pitch = 1.05;
+  synth.speak(u);
+}
 
 export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -26,7 +45,13 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   const [contrast, setContrast] = useState(1);
   const [highContrast, setHighContrast] = useState(false);
   const [guidance, setGuidance] = useState<Guidance>("init");
+  const [detected, setDetected] = useState<DetectedDoc | null>(null);
+  const [countdown, setCountdown] = useState(0); // seconds remaining (5..0)
+  const [listening, setListening] = useState(false);
+  const [heard, setHeard] = useState<string>("");
+  const confirmedRef = useRef(false);
 
+  // === Camera ===
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -61,18 +86,115 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     };
   }, []);
 
-  // Friendly fake guidance cycle so the senior user feels coached.
+  // === Guidance cycle → mock vision detection ===
   useEffect(() => {
     if (!ready) return;
-    const seq: Guidance[] = ["move-closer", "hold-still", "corners", "hold-still", "detected"];
+    const seq: Guidance[] = ["move-closer", "hold-still", "corners", "hold-still"];
     let i = 0;
+    let stopped = false;
     const id = window.setInterval(() => {
       setGuidance(seq[i % seq.length]);
       i++;
-      if (seq[(i - 1) % seq.length] === "detected") window.clearInterval(id);
-    }, 1800);
-    return () => window.clearInterval(id);
+      if (i >= seq.length) {
+        window.clearInterval(id);
+        // Trigger vision detection
+        DemoServices.vision.detect().then((doc) => {
+          if (stopped) return;
+          setDetected(doc);
+          setGuidance("detected");
+        });
+      }
+    }, 1500);
+    return () => {
+      stopped = true;
+      window.clearInterval(id);
+    };
   }, [ready]);
+
+  // === Speak guidance prompts ===
+  useEffect(() => {
+    if (guidance === "init" || guidance === "hold-still") return;
+    if (guidance === "detected" && detected) {
+      speak(
+        `This looks like ${detected.code}. Is this the file you are looking for? Say yes to check it now, or no to keep looking.`,
+      );
+    } else if (guidance === "blurry") {
+      speak("The picture is too blurry. Please try again.");
+    } else {
+      speak(GUIDANCE_TEXT[guidance]);
+    }
+  }, [guidance, detected]);
+
+  // === 5-second countdown after detection ===
+  useEffect(() => {
+    if (guidance !== "detected" || !detected) return;
+    setCountdown(5);
+    const id = window.setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          window.clearInterval(id);
+          if (!confirmedRef.current) {
+            confirmedRef.current = true;
+            onConfirm(detected);
+          }
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [guidance, detected, onConfirm]);
+
+  // === Voice recognition ===
+  useEffect(() => {
+    if (!ready) return;
+    const svc = DemoServices.voice;
+    if (!svc.available()) return;
+    svc.start({
+      onStart: () => setListening(true),
+      onEnd: () => setListening(false),
+      onError: () => setListening(false),
+      onTranscript: (t) => setHeard(t),
+      onCommand: (cmd) => handleVoiceCommand(cmd),
+    });
+    return () => svc.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
+  function handleVoiceCommand(cmd: VoiceCommand) {
+    switch (cmd) {
+      case "yes":
+        if (detected && !confirmedRef.current) {
+          confirmedRef.current = true;
+          onConfirm(detected);
+        }
+        break;
+      case "no":
+        // Reset detection and keep scanning
+        setDetected(null);
+        setCountdown(0);
+        setGuidance("corners");
+        break;
+      case "zoom":
+        setZoom((z) => Math.min(3, +(z + 0.3).toFixed(2)));
+        break;
+      case "brighter":
+        setBrightness((b) => Math.min(1.6, +(b + 0.15).toFixed(2)));
+        break;
+      case "contrast":
+        setContrast((c) => Math.min(1.8, +(c + 0.15).toFixed(2)));
+        break;
+      case "read":
+        readDocAloud();
+        break;
+    }
+  }
+
+  function readDocAloud() {
+    speak(
+      "Schedule of Assets and Debts, form F L one forty two. I see sections for property, accounts, debts, signature, and date.",
+    );
+  }
 
   const filter = [
     `brightness(${brightness})`,
@@ -102,7 +224,18 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         <span className="font-extrabold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>
           🔍 Magnifier
         </span>
-        <span style={{ width: 64 }} />
+        <span
+          title={listening ? "Listening" : "Mic off"}
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: listening ? "#16a34a" : "#8a7d6f",
+            minWidth: 64,
+            textAlign: "right",
+          }}
+        >
+          {listening ? "🎙 Listening" : "🎙 off"}
+        </span>
       </div>
 
       {/* Camera stage */}
@@ -119,7 +252,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
             <p className="font-extrabold" style={{ fontSize: 20 }}>I can't open the camera.</p>
             <p className="mt-2" style={{ fontSize: 15, color: "#cbd2da" }}>{error}</p>
             <p className="mt-2" style={{ fontSize: 14, color: "#9aa4b2" }}>
-              Please allow camera access in your browser, or tap “I already found it”.
+              Please allow camera access in your browser, or tap "I already found it".
             </p>
           </div>
         ) : (
@@ -173,6 +306,30 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
                 }}
               />
             ))}
+            {/* Countdown ring overlay */}
+            {countdown > 0 && (
+              <div
+                className="absolute"
+                style={{
+                  top: 12,
+                  right: 12,
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "rgba(0,0,0,0.55)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                  fontWeight: 800,
+                  fontSize: 24,
+                  border: `4px solid ${countdown <= 2 ? "#fbbf24" : "#22c55e"}`,
+                  transition: "border-color 0.3s",
+                }}
+              >
+                {countdown}
+              </div>
+            )}
             {!ready && (
               <div className="absolute inset-0 flex items-center justify-center" style={{ color: "#fff" }}>
                 Starting camera…
@@ -195,6 +352,14 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         >
           {GUIDANCE_TEXT[guidance]}
         </p>
+        {heard && listening && (
+          <p
+            className="text-center"
+            style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}
+          >
+            "{heard}"
+          </p>
+        )}
       </div>
 
       {/* Controls */}
@@ -245,16 +410,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
       {/* Actions */}
       <div className="px-4 pt-3 pb-5 space-y-2">
         <button
-          onClick={() => {
-            if ("speechSynthesis" in window) {
-              const u = new SpeechSynthesisUtterance(
-                "Schedule of Assets and Debts, form F L one forty two. I see sections for property, accounts, debts, signature, and date.",
-              );
-              u.rate = 0.95;
-              window.speechSynthesis.cancel();
-              window.speechSynthesis.speak(u);
-            }
-          }}
+          onClick={readDocAloud}
           className="w-full font-extrabold"
           style={{
             background: "#fff",
@@ -269,7 +425,10 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
           🔊 Read this
         </button>
         <button
-          onClick={onConfirm}
+          onClick={() => {
+            confirmedRef.current = true;
+            onConfirm(detected ?? undefined);
+          }}
           disabled={!!error}
           className="w-full font-extrabold animate-button-pop-red"
           style={{
