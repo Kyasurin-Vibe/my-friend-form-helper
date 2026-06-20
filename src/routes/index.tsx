@@ -135,6 +135,27 @@ function ElderApp() {
         >
           {!started ? (
             <StartGate onStart={start} />
+          ) : phase === "find" ? (
+            <FindDocGate
+              onOpenMagnifier={() => setPhase("magnifier")}
+              onAlreadyFound={() => {
+                setPhase("flow");
+                setStep(1);
+              }}
+            />
+          ) : phase === "magnifier" ? (
+            <LiveMagnifier
+              onCancel={() => setPhase("find")}
+              onConfirm={() => {
+                setPhase("flow");
+                setStep(3);
+              }}
+              onHandoff={() => {
+                setBranch("missing");
+                setPhase("flow");
+                setStep(5);
+              }}
+            />
           ) : (
             <ScreenRouter
               step={step}
@@ -145,6 +166,7 @@ function ElderApp() {
               onGoCenter={() => navigate({ to: "/center" })}
             />
           )}
+
         </div>
       </div>
 
