@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { useSpeech } from "@/lib/useSpeech";
 import { addCase, buildCase, clearCases, type Branch } from "@/lib/handoff";
+import { playWarning, playSuccess } from "@/lib/chime";
 
 export const Route = createFileRoute("/")({
   head: () => ({
