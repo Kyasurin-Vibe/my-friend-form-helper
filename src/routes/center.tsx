@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCases, type HandoffCase } from "@/lib/handoff";
+import { useCases, seedDemoCases, type HandoffCase } from "@/lib/handoff";
 import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/center")({
@@ -19,6 +19,10 @@ export const Route = createFileRoute("/center")({
 function CenterDashboard() {
   const cases = useCases();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    seedDemoCases();
+  }, []);
 
   useEffect(() => {
     if (cases.length && !selectedId) setSelectedId(cases[0].id);
