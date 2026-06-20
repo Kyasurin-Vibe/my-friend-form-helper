@@ -121,7 +121,7 @@ function ElderApp() {
         }}
       >
         <div
-          className="w-full h-full overflow-hidden relative flex flex-col"
+          className="w-full h-full overflow-y-auto relative flex flex-col"
           style={{
             background: "var(--color-elder-bg)",
             borderRadius: 40,
