@@ -423,6 +423,7 @@ function Screen2({
   speech: ReturnType<typeof useSpeech>;
 }) {
   useEffect(() => {
+    playWarning();
     speech.speak("A few tips: hold still, add more light, and keep the corners in the box.");
   }, []); // eslint-disable-line
   return (
@@ -454,7 +455,8 @@ function Screen3({
 }: {
   onNext: () => void;
   speech: ReturnType<typeof useSpeech>;
-}) {
+  useEffect(() => { playSuccess(); }, []);
+
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} small face="smile" />
