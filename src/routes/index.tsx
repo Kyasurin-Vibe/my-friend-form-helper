@@ -277,7 +277,7 @@ function MascotHeader({
 }: {
   speech: ReturnType<typeof useSpeech>;
   small?: boolean;
-  face?: "smile" | "x";
+  face?: "smile" | "x" | "surprised";
 }) {
   const mode = speech.speaking ? "speaking" : "idle";
   const size = small ? 96 : speech.speaking ? 220 : 130;
