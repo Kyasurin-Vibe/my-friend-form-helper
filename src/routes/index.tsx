@@ -642,7 +642,7 @@ function Screen4({
           </BigButton>
         </div>
       ) : (
-        <BigButton onClick={onSendToCenter}>What happens now?</BigButton>
+        <BigButton variant="danger" onClick={onSendToCenter}>What happens now?</BigButton>
       )}
     </div>
   );
