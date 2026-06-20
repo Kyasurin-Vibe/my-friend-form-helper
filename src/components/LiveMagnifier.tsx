@@ -24,14 +24,16 @@ const GUIDANCE_TEXT: Record<Guidance, string> = {
 
 // Lightweight TTS helper local to this screen, so it composes with the
 // outer useSpeech without fighting it for the queue.
-function speak(text: string) {
+function speak(text: string, onDone?: () => void) {
   if (typeof window === "undefined") return;
   const synth = window.speechSynthesis;
-  if (!synth) return;
+  if (!synth) { onDone?.(); return; }
   synth.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.rate = 0.95;
   u.pitch = 1.05;
+  u.onend = () => onDone?.();
+  u.onerror = () => onDone?.();
   synth.speak(u);
 }
 
