@@ -499,17 +499,31 @@ function Screen3({
   speech: ReturnType<typeof useSpeech>;
 }) {
   useEffect(() => { playSuccess(); }, []);
+  const readDoc = () => {
+    speech.speak(
+      "This looks like a Schedule of Assets and Debts, form F L one forty two. I see your name, the case number, your assets, and your debts. There is also a place for your signature and the date at the bottom.",
+    );
+  };
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} small face="smile" />
       <Viewfinder variant="clear" />
       <p
-        className="text-center font-bold mb-3"
+        className="text-center font-bold mb-2"
         style={{ fontSize: 22, color: "var(--color-elder-ink)" }}
       >
         I can read this clearly.
       </p>
+      <p
+        className="text-center mb-3"
+        style={{ fontSize: 17, color: "#6b6256" }}
+      >
+        This looks like <strong>FL-142 — Schedule of Assets and Debts</strong>. I made the text larger so it's easier to see.
+      </p>
       <VoiceControls speech={speech} />
+      <BigButton variant="ghost" onClick={readDoc}>
+        🔊 Read the paper to me
+      </BigButton>
       <BigButton onClick={onNext}>Check my form</BigButton>
     </div>
   );
