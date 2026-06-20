@@ -415,6 +415,9 @@ function Screen2({
   onNext: () => void;
   speech: ReturnType<typeof useSpeech>;
 }) {
+  useEffect(() => {
+    speech.speak("A few tips: hold still, add more light, and keep the corners in the box.");
+  }, []); // eslint-disable-line
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} face="x" />
@@ -699,54 +702,33 @@ function Viewfinder({ variant }: { variant: "empty" | "blurry" | "clear" }) {
           borderRadius: 14,
         }}
       />
-      {/* corner marks — turn green with check when frame is aligned (clear) */}
-      {[
-        { top: 12, left: 12, borders: "border-t-4 border-l-4" },
-        { top: 12, right: 12, borders: "border-t-4 border-r-4" },
-        { bottom: 12, left: 12, borders: "border-b-4 border-l-4" },
-        { bottom: 12, right: 12, borders: "border-b-4 border-r-4" },
-      ].map((c, i) => (
-        <span
-          key={i}
-          className={`absolute ${c.borders}`}
-          style={{
-            ...c,
-            width: 22,
-            height: 22,
-            borderColor:
-              variant === "clear" ? "#22c55e" : "var(--color-elder-coral)",
-            borderRadius: 4,
-            transition: "border-color 220ms ease",
-          }}
-        />
-      ))}
-      {variant === "clear" &&
-        [
-          { top: 14, left: 14 },
-          { top: 14, right: 14 },
-          { bottom: 14, left: 14 },
-          { bottom: 14, right: 14 },
-        ].map((p, i) => (
+      {/* big green checkmark fills screen when frame is aligned (clear) */}
+      {variant === "clear" && (
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ background: "rgba(34,197,94,0.18)", zIndex: 10 }}
+          aria-hidden
+        >
           <span
-            key={`chk-${i}`}
-            className="absolute flex items-center justify-center"
             style={{
-              ...p,
-              width: 18,
-              height: 18,
-              borderRadius: 999,
+              width: 120,
+              height: 120,
+              borderRadius: "50%",
               background: "#22c55e",
               color: "white",
-              fontSize: 12,
+              fontSize: 72,
               fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               lineHeight: 1,
-              boxShadow: "0 0 0 2px rgba(34,197,94,0.25)",
+              boxShadow: "0 12px 40px rgba(34,197,94,0.35)",
             }}
-            aria-hidden
           >
             ✓
           </span>
-        ))}
+        </div>
+      )}
       {variant !== "empty" && <DocPaper blurry={variant === "blurry"} />}
       {variant === "empty" && (
         <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 14 }}>
