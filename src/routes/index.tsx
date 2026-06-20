@@ -515,11 +515,13 @@ function Screen3({
 
 function Screen4({
   branch,
-  onNext,
+  onSendToCenter,
+  onFixSelf,
   speech,
 }: {
   branch: Branch;
-  onNext: () => void;
+  onSendToCenter: () => void;
+  onFixSelf: () => void;
   speech: ReturnType<typeof useSpeech>;
 }) {
   useEffect(() => {
@@ -607,7 +609,24 @@ function Screen4({
         </p>
       </div>
       <VoiceControls speech={speech} />
-      <BigButton onClick={onNext}>What happens now?</BigButton>
+      {branch === "missing" ? (
+        <div className="space-y-2">
+          <BigButton
+            variant="ghost"
+            onClick={() => {
+              speech.speak("Okay, I'll wait here. Fix it on your paper, then tap to scan again.");
+              onFixSelf();
+            }}
+          >
+            ✍️ I'll fix it myself
+          </BigButton>
+          <BigButton onClick={onSendToCenter}>
+            🤝 I don't know — send to a person
+          </BigButton>
+        </div>
+      ) : (
+        <BigButton onClick={onSendToCenter}>What happens now?</BigButton>
+      )}
     </div>
   );
 }
