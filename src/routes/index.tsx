@@ -48,7 +48,7 @@ function ElderApp() {
 
   // Speak on step change (after user has tapped once)
   useEffect(() => {
-    if (!started) return;
+    if (!started || phase !== "flow") return;
     const lines: Record<Step, string> = {
       1: "Hi, I'm My Friend. Put your paper in the box, and I'll take a look.",
       2: "That was a little blurry. Hold steady, and let's try again.",
@@ -67,11 +67,12 @@ function ElderApp() {
     if (step === 5) {
       addCase(buildCase(branch));
     }
-  }, [step, branch, started]); // eslint-disable-line
+  }, [step, branch, started, phase]); // eslint-disable-line
 
   const restart = () => {
     setStep(1);
     setStarted(false);
+    setPhase("find");
     clearCases();
     speech.cancel();
   };
@@ -79,15 +80,16 @@ function ElderApp() {
   const start = (mode: A11yMode) => {
     setA11yMode(mode);
     setStarted(true);
+    setPhase("find");
     if (mode !== "text") {
-      // tiny delay so setEnabled effect commits
       setTimeout(() => {
         speech.speak(
-          "Hi, I'm My Friend. Put your paper in the box, and I'll take a look."
+          "Ready to find your document? Open the magnifier, or tap I already found it.",
         );
       }, 50);
     }
   };
+
 
 
   return (
