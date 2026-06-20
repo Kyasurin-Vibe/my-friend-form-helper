@@ -1,10 +1,12 @@
 type Props = {
   mode: "speaking" | "listening" | "idle";
+  face?: "smile" | "x";
   size?: number;
 };
 
-export function Mascot({ mode, size = 160 }: Props) {
+export function Mascot({ mode, face = "smile", size = 160 }: Props) {
   const eyeY = mode === "listening" ? 54 : 56;
+  const showBlush = face === "smile";
   return (
     <div
       className="relative inline-flex items-center justify-center"
@@ -42,9 +44,13 @@ export function Mascot({ mode, size = 160 }: Props) {
                C 16 34, 32 14, 60 14 Z"
             fill="var(--color-elder-coral)"
           />
-          {/* cheek highlight */}
-          <ellipse cx="44" cy="72" rx="9" ry="5" fill="#FBC7B0" opacity="0.85" />
-          <ellipse cx="78" cy="72" rx="9" ry="5" fill="#FBC7B0" opacity="0.85" />
+          {/* cheek highlight — only when smiling */}
+          {showBlush && (
+            <>
+              <ellipse cx="44" cy="72" rx="9" ry="5" fill="#FBC7B0" opacity="0.85" />
+              <ellipse cx="78" cy="72" rx="9" ry="5" fill="#FBC7B0" opacity="0.85" />
+            </>
+          )}
           {/* eyes */}
           {mode === "speaking" ? (
             <>
@@ -61,7 +67,12 @@ export function Mascot({ mode, size = 160 }: Props) {
             </>
           )}
           {/* mouth */}
-          {mode === "speaking" ? (
+          {face === "x" ? (
+            <>
+              <line x1="54" y1="72" x2="66" y2="80" stroke="#241F1A" strokeWidth="3.5" strokeLinecap="round" />
+              <line x1="66" y1="72" x2="54" y2="80" stroke="#241F1A" strokeWidth="3.5" strokeLinecap="round" />
+            </>
+          ) : mode === "speaking" ? (
             <ellipse cx="60" cy="76" rx="8" ry="6" fill="#241F1A" />
           ) : (
             <path d="M52 76 Q60 84 68 76" stroke="#241F1A" strokeWidth="3.5" strokeLinecap="round" fill="none" />
