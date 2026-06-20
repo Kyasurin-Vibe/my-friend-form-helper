@@ -325,10 +325,12 @@ function MascotHeader({
 }) {
   const mode = speech.speaking ? "speaking" : "idle";
   const size = small ? 96 : speech.speaking ? 220 : 130;
+  const showCaptions = useContext(CaptionsContext);
+  const showCap = (showCaptions || speech.speaking) && !!speech.caption;
   return (
     <div className="flex flex-col items-center pt-5">
       <Mascot mode={mode} face={face} size={size} />
-      {speech.speaking && speech.caption && (
+      {showCap && (
         <p
           key={speech.caption}
           className="mt-3 px-2 text-center font-semibold animate-fade-up"
