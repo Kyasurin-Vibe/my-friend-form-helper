@@ -277,39 +277,52 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
 }
 
 function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
+  const voiceOn = useContext(VoiceOnContext);
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onOpenMagnifier();
+  };
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-      <Mascot mode="idle" size={130} />
-      <h2 className="mt-3 font-extrabold" style={{ fontSize: 28, color: "var(--color-elder-ink)" }}>
-        Ready to find your document?
-      </h2>
-      <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
-        I'll open the magnifier so you can see clearly first. Nothing is uploaded yet.
-      </p>
-      <button
-        onClick={onOpenMagnifier}
-        className="w-full font-extrabold animate-button-pop-red active:scale-[0.96]"
-        style={{
-          background: "var(--color-elder-red)",
-          color: "#fff",
-          border: "none",
-          borderRadius: 26,
-          padding: "24px",
-          fontSize: 24,
-          minHeight: 88,
-          boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
-        }}
-      >
-        🔍 Open Magnifier
-      </button>
-      <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
-        The magnifier uses your camera only on this device.
-      </p>
+    <div className="flex-1 flex flex-col items-center p-6 text-center">
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <Mascot mode="idle" size={130} />
+        <h2 className="mt-3 font-extrabold" style={{ fontSize: 28, color: "var(--color-elder-ink)" }}>
+          Ready to find your document?
+        </h2>
+        <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
+          I'll open the magnifier so you can see clearly first. Nothing is uploaded yet.
+        </p>
+        <button
+          onClick={() => { cancelSpeech(); onOpenMagnifier(); }}
+          className="w-full font-extrabold animate-button-pop-red active:scale-[0.96]"
+          style={{
+            background: "var(--color-elder-red)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 26,
+            padding: "24px",
+            fontSize: 24,
+            minHeight: 88,
+            boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
+          }}
+        >
+          🔍 Open Magnifier
+        </button>
+        <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
+          The magnifier uses your camera only on this device.
+        </p>
+      </div>
+      <VoiceBar
+        speakableText={speakableForPhase("find", { analysis: null, sendResult: null, analyzeError: null })}
+        voiceOn={voiceOn}
+        onIntent={handleIntent}
+      />
     </div>
   );
 }
 
+
 function AnalyzingScreen() {
+  const voiceOn = useContext(VoiceOnContext);
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
       <Mascot mode="speaking" size={150} />
@@ -333,9 +346,17 @@ function AnalyzingScreen() {
           />
         ))}
       </div>
+      <div className="w-full max-w-sm mt-6">
+        <VoiceBar
+          speakableText={speakableForPhase("analyzing", { analysis: null, sendResult: null, analyzeError: null })}
+          voiceOn={voiceOn}
+          hideMic
+        />
+      </div>
     </div>
   );
 }
+
 
 function RetakeScreen({
   analysis,
