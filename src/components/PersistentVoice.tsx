@@ -110,6 +110,7 @@ export function PersistentVoice({
     if (!synth) { speakingRef.current = false; setSpeaking(false); return; }
     const u = new SpeechSynthesisUtterance(msg);
     u.rate = 0.95; u.pitch = 1.05;
+    try { u.lang = getBCP47(); } catch { /* noop */ }
     u.onend = () => {
       speakingRef.current = false;
       setSpeaking(false);
