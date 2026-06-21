@@ -1,6 +1,9 @@
 // Clean service abstractions for My Friend.
 // Real APIs can be wired later (Deepgram for STT, Claude/OpenAI/Gemini for vision).
 // For the hackathon, Demo / Web Speech fallbacks keep the flow working without keys.
+import { getBCP47 } from "@/lib/i18n";
+
+
 
 // ============ Voice Recognition ============
 
