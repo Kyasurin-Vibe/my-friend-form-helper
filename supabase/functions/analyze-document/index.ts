@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
     const langName = LANG_NAME[(language || "en").toLowerCase()] ?? "English";
     const systemWithLang =
       SYSTEM +
-      `\n- Write elderMessage, plainEnglishSummary, and possibleMissingFields in ${langName}. Keep them warm and plain. Keep documentType codes, enums, and field names in English.`;
+      `\n- Write documentName, elderMessage, plainEnglishSummary, and possibleMissingFields ONLY in ${langName}. Output each field exactly once, in ${langName} only — NEVER write the English version first and then a translation, and NEVER include English alongside (no English in parentheses, no bilingual text). The ONLY value kept in English is the internal documentType CODE (e.g. "FL-142"), which is never shown or spoken to the user.`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
