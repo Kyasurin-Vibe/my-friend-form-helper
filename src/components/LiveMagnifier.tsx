@@ -99,7 +99,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const [heard, setHeard] = useState("");
   const [hint, setHint] = useState<Hint>("starting");
   const [aiStatus, setAiStatus] = useState<"idle" | "checking" | "no_doc" | "unreadable" | "ready" | "unavailable">("idle");
-  const [overlayBox, setOverlayBox] = useState<DocumentBounds | null>(null);
+  const [, setOverlayBox] = useState<DocumentBounds | null>(null);
   const [zoom, setZoom] = useState<{ scale: number; ox: number; oy: number }>({ scale: 1, ox: 50, oy: 50 });
   const [brightnessFilter, setBrightnessFilter] = useState(1);
 
