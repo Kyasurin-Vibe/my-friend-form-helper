@@ -70,3 +70,26 @@ export function unlockAudio(): void {
     void a.play().catch(() => { /* noop */ });
   } catch { /* noop */ }
 }
+
+export async function playBlobWithUnlockedAudio(blob: Blob): Promise<void> {
+  const ctx = getAudioContext();
+  if (!ctx) throw new Error("AudioContext not available");
+
+  if (ctx.state === "suspended") {
+    await ctx.resume();
+  }
+
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+  await new Promise<void>((resolve, reject) => {
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuffer;
+      src.connect(ctx.destination);
+      src.onended = () => resolve();
+      src.start(0);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}

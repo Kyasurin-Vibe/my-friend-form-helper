@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getLang, getBCP47, getTTSVoice, ttsSupportsDeepgram, translateAsync, translateSync, splitAiSegments, stripAiMarkers } from "@/lib/i18n";
+import { isAudioUnlocked, playBlobWithUnlockedAudio } from "@/lib/audio-unlock";
 
 
 export type Branch = "missing" | "complete";
@@ -380,6 +381,12 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number; skipT
       if (error || !data || !(data instanceof Blob) || data.size < 200) {
         fallback();
         return;
+      }
+      if (isAudioUnlocked()) {
+        try {
+          await playBlobWithUnlockedAudio(data);
+          return;
+        } catch { /* fall back to HTMLAudioElement */ }
       }
       const url = URL.createObjectURL(data);
       const audio = new Audio(url);
