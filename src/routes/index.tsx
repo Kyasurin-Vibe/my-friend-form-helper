@@ -54,6 +54,7 @@ function ElderApp() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
   const [processedImage, setProcessedImage] = useState<string | undefined>(undefined);
+  const [capturedBounds, setCapturedBounds] = useState<DocumentBounds | null>(null);
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
   const [sending, setSending] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -67,7 +68,6 @@ function ElderApp() {
     speech.setEnabled(voiceOn);
   }, [voiceOn, speech]);
 
-  // Auto-speak the whole screen on entry (real data for dynamic ones).
   useEffect(() => {
     if (!voiceOn) return;
     const text = speakableForPhase(phase, { analysis, sendResult, analyzeError });
@@ -82,19 +82,23 @@ function ElderApp() {
     setSendResult(null);
     setCapturedImage(undefined);
     setProcessedImage(undefined);
+    setCapturedBounds(null);
     setAnalyzeError(null);
     speech.cancel();
   };
 
-  async function handleCapture(image?: string) {
-    setCapturedImage(image);
-    setProcessedImage(image);
-    if (!image) {
+  async function handleCapture(result?: { processed: string; original: string; bounds: DocumentBounds | null }) {
+    if (!result) {
+      setCapturedImage(undefined);
+      setProcessedImage(undefined);
+      setCapturedBounds(null);
       setAnalysis(null);
       setPhase("review");
       return;
     }
-    // Show the preview screen first — user confirms before we send to Claude.
+    setCapturedImage(result.original);
+    setProcessedImage(result.processed);
+    setCapturedBounds(result.bounds);
     setAnalyzeError(null);
     setPhase("preview");
   }
