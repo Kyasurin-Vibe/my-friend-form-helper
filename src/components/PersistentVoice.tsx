@@ -98,9 +98,23 @@ export function PersistentVoice({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const isTTSPlaying = useCallback((): boolean => {
+    if (typeof window === "undefined") return false;
+    try {
+      if (window.speechSynthesis?.speaking) return true;
+      const w = window as unknown as { __mfTtsAudio?: HTMLAudioElement };
+      const a = w.__mfTtsAudio;
+      if (a && !a.paused && !a.ended) return true;
+    } catch { /* noop */ }
+    return speakingRef.current;
+  }, []);
+
   const handleTranscript = useCallback((raw: string) => {
     const t = (raw || "").toLowerCase().trim();
     if (!t) return;
+    // Drop transcripts captured while our own TTS is talking — the mic was
+    // hearing the app's voice, not the user.
+    if (isTTSPlaying()) { setTranscript(""); return; }
     const now = Date.now();
     if (now - lastCmdAtRef.current < 500) return;
 
