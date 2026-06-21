@@ -765,7 +765,7 @@ function SentScreen({
 }) {
   const voiceOn = useContext(VoiceOnContext);
   const trackingId = sendResult?.trackingId ?? "—";
-  const centerName = sendResult?.centerName ?? "Legal Aid Center";
+  const centerName = sendResult?.centerName ?? getAccountablePartner(analysis?.resourceCategory).name;
   const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
   const missingCount = analysis?.possibleMissingFields.length ?? 0;
   // (voice actions wired below)
