@@ -265,7 +265,15 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         let next: Guidance;
         if (!hasDocumentRegion) {
           emptyStreak++;
-          next = emptyStreak >= 5 ? "no-doc" : "init";
+          const skinFrac = skinCount / (width * height);
+          const otherFrac = otherCount / (width * height);
+          if (emptyStreak >= 5) {
+            if (skinFrac > 0.06) next = "not-face";
+            else if (otherFrac > 0.10) next = "not-object";
+            else next = "no-doc";
+          } else {
+            next = "init";
+          }
         } else {
           emptyStreak = 0;
           if (meanLum < 70) next = "init";
