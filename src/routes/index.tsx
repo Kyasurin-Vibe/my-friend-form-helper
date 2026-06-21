@@ -498,7 +498,7 @@ function RetakeScreen({
       <div className="space-y-2 mt-auto">
         <BigButton variant="danger" onClick={onRetry}>📷 Try again</BigButton>
         <BigButton variant="ghost" onClick={onSendAnyway}>
-          {sending ? "Sending…" : "🤝 Send for human review"}
+          {sending ? "Sending…" : "🤝 Connect me with a person"}
         </BigButton>
         <VoiceBar
           speakableText={speakableForPhase("retake", { analysis, sendResult: null, analyzeError: null })}
