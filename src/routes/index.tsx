@@ -961,7 +961,7 @@ function speakableForPhase(
     case "review": {
       if (!ctx.analysis) {
         const err = ctx.analyzeError ? ` Note: ${ctx.analyzeError}.` : "";
-        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Send for review to send it to a person at the Legal Aid Center, or say yes.`;
+        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Connect me with a person to send it to a person at the Legal Aid Center, or say yes.`;
       }
       const a = ctx.analysis;
       const title = a.documentName || a.documentType || "a document";
@@ -971,7 +971,11 @@ function speakableForPhase(
         missing.length > 0
           ? ` I see some spots that may need attention: ${missing.join("; ")}.`
           : " Nothing obviously missing. A person will still confirm before anything is filed.";
-      return `This looks like ${title}.${summary}${missingPart} Tap Retake to take another photo, or say no. Tap Send it to send to the Legal Aid Center, or say yes.`;
+      const resources = getResources(a.documentType);
+      const resourcesIntro = resources.length > 0
+        ? ` Here are some places that can help you with this: ${resources.slice(0, 2).map(r => r.name + (r.contact ? ` — ${r.contact}` : "")).join(". ")}.`
+        : "";
+      return `This looks like ${title}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to the Legal Aid Center, or say yes.`;
     }
     case "sent": {
       const r = ctx.sendResult;
