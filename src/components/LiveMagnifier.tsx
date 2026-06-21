@@ -92,7 +92,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  const [autoCapture, setAutoCapture] = useState(true);
+  const [autoCapture] = useState(true);
   const [listening, setListening] = useState(false);
   const [voiceArmed, setVoiceArmed] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
