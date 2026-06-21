@@ -77,6 +77,9 @@
   from { transform: translateY(8px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 
 .animate-mascot-pulse { animation: mascot-pulse 1.4s ease-in-out infinite; }
 .animate-mascot-breathe { animation: mascot-breathe 3.5s ease-in-out infinite; }
