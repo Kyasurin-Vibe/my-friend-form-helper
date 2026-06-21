@@ -183,13 +183,14 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
             return;
           }
 
-          // Brightness intents
-          if (/\b(too bright|dimmer|darker|less light|too light)\b/.test(t)) {
+          // Brightness intents — check DIMMER first (more specific phrases),
+          // and be generous with how speech-to-text mis-hears "dimmer".
+          if (/\b(dim|dimmer|dimer|dimmed|demure|dimm|too bright|too light|too white|darker|darken|less light|less bright|lower brightness|reduce (the )?light|reduce brightness|make it darker|make it dimmer|tone it down)\b/.test(t)) {
             lastCmdAtRef.current = now;
             doDimmer();
             return;
           }
-          if (/\b(bright|brighter|too dark|more light|lighter|can't see it|cant see it|still can't see|still cant see)\b/.test(t)) {
+          if (/\b(bright|brighter|too dark|more light|lighter|light it up|brighten|can't see it|cant see it|still can't see|still cant see)\b/.test(t)) {
             lastCmdAtRef.current = now;
             doBrighter();
             return;
