@@ -231,16 +231,22 @@ export async function cropToBounds(
 }
 
 
+export type SendRecipient =
+  | { kind: "center" }
+  | { kind: "trusted"; name: string; relationship: string };
+
 export async function sendToCenter(opts: {
   originalImage?: string;
   processedImage?: string;
   analysis: AnalysisResult;
   initials?: string;
+  recipient?: SendRecipient;
 }): Promise<SendResult> {
   const { data, error } = await supabase.functions.invoke("send-to-center", { body: opts });
   if (error) throw error;
   return data as SendResult;
 }
+
 
 // Live cases query + realtime subscription for the staff dashboard.
 export function useCases(): CaseRow[] {

@@ -46,7 +46,13 @@ type Phase =
   | "analyzing"
   | "retake"
   | "review"
+  | "choose"
   | "sent";
+
+export type Recipient =
+  | { kind: "center" }
+  | { kind: "trusted"; name: string; relationship: string };
+
 
 const CaptionsContext = createContext<boolean>(true);
 const VoiceOnContext = createContext<boolean>(true);
@@ -198,13 +204,14 @@ function ElderApp() {
 
 
 
-  async function handleSend() {
+  async function handleSend(recipient: Recipient) {
     if (sending) return;
     setSending(true);
     try {
       const result = await sendToCenter({
         originalImage: capturedImage,
         processedImage: processedImage ?? capturedImage,
+        recipient,
         analysis:
           analysis ?? {
             readable: false,
@@ -227,6 +234,7 @@ function ElderApp() {
       setSending(false);
     }
   }
+
 
   return (
     <div
@@ -289,7 +297,7 @@ function ElderApp() {
               <RetakeScreen
                 analysis={analysis}
                 onRetry={() => setPhase("magnifier")}
-                onSendAnyway={handleSend}
+                onSendAnyway={() => setPhase("choose")}
                 sending={sending}
                 speech={speech}
               />
@@ -299,8 +307,15 @@ function ElderApp() {
                 analysis={analysis}
                 sending={sending}
                 analyzeError={analyzeError}
-                onSend={handleSend}
+                onSend={() => setPhase("choose")}
                 onRetake={() => setPhase("magnifier")}
+                speech={speech}
+              />
+            ) : phase === "choose" ? (
+              <ChooseRecipientScreen
+                sending={sending}
+                onBack={() => setPhase(analysis ? "review" : "retake")}
+                onPick={(r) => handleSend(r)}
                 speech={speech}
               />
             ) : (
@@ -312,6 +327,7 @@ function ElderApp() {
                 onRestart={restart}
               />
             )}
+
            </VoiceOnContext.Provider>
           </CaptionsContext.Provider>
 
@@ -822,6 +838,154 @@ function SentScreen({
 
 // ===== Shared building blocks =====
 
+function ChooseRecipientScreen({
+  sending,
+  onBack,
+  onPick,
+  speech,
+}: {
+  sending: boolean;
+  onBack: () => void;
+  onPick: (r: Recipient) => void;
+  speech: ReturnType<typeof useSpeech>;
+}) {
+  const voiceOn = useContext(VoiceOnContext);
+  const [mode, setMode] = useState<"pick" | "trusted">("pick");
+  const [name, setName] = useState("");
+  const [relationship, setRelationship] = useState("");
+
+  if (mode === "pick") {
+    return (
+      <div className="flex-1 flex flex-col p-6">
+        <MascotHeader speech={speech} small face="smile" />
+        <h2
+          className="text-center font-extrabold mt-2 mb-1"
+          style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
+        >
+          Who should I send this to?
+        </h2>
+        <p
+          className="text-center mb-4"
+          style={{ fontSize: 16, color: "#6b5d52" }}
+        >
+          Pick the person YOU trust. You're in charge.
+        </p>
+        <div className="space-y-3 mt-auto">
+          <BigButton variant="danger" onClick={() => onPick({ kind: "center" })}>
+            {sending ? "Sending…" : "🤝 Connect me with the Legal Aid Center"}
+          </BigButton>
+          <p
+            className="text-center"
+            style={{ fontSize: 13, color: "#8a7d6f", marginTop: -4 }}
+          >
+            Recommended. An accountable institution.
+          </p>
+          <BigButton variant="ghost" onClick={() => setMode("trusted")}>
+            👪 Send to my trusted person
+          </BigButton>
+          <p
+            className="text-center"
+            style={{ fontSize: 13, color: "#8a7d6f", marginTop: -4 }}
+          >
+            Someone YOU pick — your own attorney or a family member you trust.
+          </p>
+          <BigButton variant="ghost" onClick={onBack}>← Go back</BigButton>
+          <VoiceBar
+            speakableText={speakableForPhase("choose", { analysis: null, sendResult: null, analyzeError: null })}
+            voiceOn={voiceOn}
+            actions={[
+              { id: "center", label: "Connect me with the Legal Aid Center", description: "Send the document to the legal aid center (the recommended, accountable option)" },
+              { id: "trusted", label: "Send to my trusted person", description: "Open the form to enter a trusted contact the user picks themselves" },
+              { id: "back", label: "Go back", description: "Return to the previous screen" },
+            ]}
+            onAction={(id) => {
+              if (id === "center") onPick({ kind: "center" });
+              else if (id === "trusted") setMode("trusted");
+              else if (id === "back") onBack();
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const canSend = name.trim().length > 0 && relationship.trim().length > 0 && !sending;
+  return (
+    <div className="flex-1 flex flex-col p-6">
+      <MascotHeader speech={speech} small face="smile" />
+      <h2
+        className="text-center font-extrabold mt-2 mb-1"
+        style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
+      >
+        Who do you trust with this?
+      </h2>
+      <p
+        className="text-center mb-4"
+        style={{ fontSize: 15, color: "#6b5d52" }}
+      >
+        Only pick someone you trust completely.
+      </p>
+      <label
+        className="font-bold"
+        style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
+      >
+        Their name
+      </label>
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="e.g. Jane Smith"
+        autoComplete="off"
+        className="w-full mt-1 mb-3"
+        style={{
+          fontSize: 20,
+          padding: "14px 16px",
+          borderRadius: 14,
+          border: "2px solid #e7ddd0",
+          background: "#fff",
+          color: "var(--color-elder-ink)",
+        }}
+      />
+      <label
+        className="font-bold"
+        style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
+      >
+        How do you know them?
+      </label>
+      <input
+        type="text"
+        value={relationship}
+        onChange={(e) => setRelationship(e.target.value)}
+        placeholder="e.g. my attorney, my daughter, my pastor"
+        autoComplete="off"
+        className="w-full mt-1 mb-3"
+        style={{
+          fontSize: 20,
+          padding: "14px 16px",
+          borderRadius: 14,
+          border: "2px solid #e7ddd0",
+          background: "#fff",
+          color: "var(--color-elder-ink)",
+        }}
+      />
+      <div className="space-y-2 mt-auto">
+        <BigButton
+          variant="danger"
+          onClick={() =>
+            canSend && onPick({ kind: "trusted", name: name.trim(), relationship: relationship.trim() })
+          }
+        >
+          {sending ? "Sending…" : `📨 Send to ${name.trim() || "this person"}`}
+        </BigButton>
+        <BigButton variant="ghost" onClick={() => setMode("pick")}>← Back</BigButton>
+      </div>
+    </div>
+  );
+}
+
+
+
 function PreviewScreen({
   image,
   speech,
@@ -1002,6 +1166,9 @@ function speakableForPhase(
         : "";
       return `This looks like ${title}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to the Legal Aid Center, or say yes.`;
     }
+    case "choose":
+      return "Who should I send this to? Tap Connect me with the Legal Aid Center to send it to a person at the legal aid center, or say Legal Aid. Tap Send to my trusted person to send it to someone you pick yourself, like your own attorney or a trusted family member, or say trusted person. Tap Go back to return.";
+
     case "sent": {
       const r = ctx.sendResult;
       const id = r?.trackingId ?? "pending";
