@@ -123,9 +123,27 @@ export function PersistentVoice({
       return;
     }
 
-    // Per-screen
+    // Per-screen fast local match
     const handled = onCommandRef.current?.(t, { confirm: speakConfirm });
-    if (handled) lastCmdAtRef.current = now;
+    if (handled) { lastCmdAtRef.current = now; return; }
+
+    // AI-interpreted fallback for natural phrasing
+    const scr = screenRef.current;
+    const acts = actionsRef.current;
+    const dispatch = onActionRef.current;
+    if (!scr || !acts || acts.length === 0 || !dispatch) return;
+    if (interpretingRef.current) return;
+    interpretingRef.current = true;
+    lastCmdAtRef.current = now;
+    void interpretIntent(t, scr, acts)
+      .then(({ action, confidence }) => {
+        if (action && action !== "none" && confidence >= 0.5) {
+          dispatch(action, { confirm: speakConfirm });
+        } else {
+          speakConfirm("Sorry, I didn't catch that — you can tap a button.");
+        }
+      })
+      .finally(() => { interpretingRef.current = false; });
   }, [speakConfirm]);
 
   const startLoop = useCallback(() => {
