@@ -21,6 +21,7 @@ import { getResources, getAccountablePartner, normalizeSpokenEmail } from "@/lib
 import { cancelSpeech, startRecording, transcribeAudio, type VoiceAction } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 import { LANG_LABELS, type Lang, setLang, t, onLangChange, onTranslate, aiText } from "@/lib/i18n";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -444,19 +445,75 @@ function LanguagePickerScreen({ onPick }: { onPick: (l: Lang) => void }) {
     tl: "Kumusta! Nandito ako para tumulong.",
   };
 
-  const speakLabel = (l: Lang) => {
-    try {
-      const u = new SpeechSynthesisUtterance(LANG_LABELS[l].native);
-      u.rate = 0.95; u.pitch = 1.05;
-      const bcp: Record<Lang, string> = { en: "en-US", es: "es-ES", zh: "zh-CN", vi: "vi-VN", tl: "fil-PH" };
-      u.lang = bcp[l];
+  // On-mount multilingual greeting (OUTPUT ONLY — no STT on this screen).
+  // Plays "Choose your language" in all 5 languages, in sequence.
+  // English uses Deepgram Aura; others fall back to browser speechSynthesis.
+  useEffect(() => {
+    let cancelled = false;
+    let currentAudio: HTMLAudioElement | null = null;
+    const PHRASES: Array<{ lang: Lang; text: string; bcp: string }> = [
+      { lang: "en", text: "Choose your language", bcp: "en-US" },
+      { lang: "es", text: "Elige tu idioma", bcp: "es-ES" },
+      { lang: "zh", text: "选择语言", bcp: "zh-CN" },
+      { lang: "vi", text: "Chọn ngôn ngữ", bcp: "vi-VN" },
+      { lang: "tl", text: "Pumili ng wika", bcp: "fil-PH" },
+    ];
+
+    const speakBrowser = (text: string, bcp: string) =>
+      new Promise<void>((resolve) => {
+        try {
+          const u = new SpeechSynthesisUtterance(text);
+          u.rate = 0.95; u.pitch = 1.05; u.lang = bcp;
+          try {
+            const v = window.speechSynthesis.getVoices().find(
+              (vv) => vv.lang?.toLowerCase().startsWith(bcp.toLowerCase().slice(0, 2)),
+            );
+            if (v) u.voice = v;
+          } catch { /* noop */ }
+          u.onend = () => resolve();
+          u.onerror = () => resolve();
+          window.speechSynthesis.speak(u);
+        } catch { resolve(); }
+      });
+
+    const speakDeepgramEnglish = async (text: string): Promise<void> => {
       try {
-        const v = window.speechSynthesis.getVoices().find((vv) => vv.lang?.toLowerCase().startsWith(u.lang.toLowerCase().slice(0, 2)));
-        if (v) u.voice = v;
-      } catch { /* noop */ }
-      window.speechSynthesis.speak(u);
-    } catch { /* noop */ }
-  };
+        const { data, error } = (await supabase.functions.invoke("tts", {
+          body: { text, language: "en" },
+          // @ts-expect-error supabase-js supports responseType blob at runtime
+          responseType: "blob",
+        })) as { data: Blob | null; error: unknown };
+        if (cancelled || error || !data || !(data instanceof Blob) || data.size < 200) {
+          return speakBrowser(text, "en-US");
+        }
+        const url = URL.createObjectURL(data);
+        const audio = new Audio(url);
+        currentAudio = audio;
+        await new Promise<void>((resolve) => {
+          audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+          audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+          audio.play().catch(() => resolve());
+        });
+      } catch {
+        if (!cancelled) await speakBrowser(text, "en-US");
+      }
+    };
+
+    (async () => {
+      try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+      for (const p of PHRASES) {
+        if (cancelled) return;
+        if (p.lang === "en") await speakDeepgramEnglish(p.text);
+        else await speakBrowser(p.text, p.bcp);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      try { currentAudio?.pause(); } catch { /* noop */ }
+      try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+    };
+  }, []);
 
   const pick = (l: Lang) => {
     setLang(l);
@@ -479,7 +536,7 @@ function LanguagePickerScreen({ onPick }: { onPick: (l: Lang) => void }) {
         {langs.map((l) => (
           <button
             key={l}
-            onClick={() => { speakLabel(l); setTimeout(() => pick(l), 250); }}
+            onClick={() => pick(l)}
             className="w-full font-extrabold active:scale-[0.96] animate-button-pop"
             style={{
               background: "#fff",
