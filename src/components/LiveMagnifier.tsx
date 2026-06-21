@@ -42,10 +42,11 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  // Auto-driven — no manual controls. Smoothed via EMA in the analysis loop.
   const [zoom, setZoom] = useState(1.4);
   const [brightness, setBrightness] = useState(1);
   const [contrast, setContrast] = useState(1);
-  const [highContrast, setHighContrast] = useState(false);
+  const autoRef = useRef({ zoom: 1.4, brightness: 1, contrast: 1 });
   const [guidance, setGuidance] = useState<Guidance>("init");
   const [detected, setDetected] = useState<DetectedDoc | null>(null);
   const [countdown, setCountdown] = useState(0); // seconds remaining
