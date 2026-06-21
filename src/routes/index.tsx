@@ -1168,12 +1168,13 @@ function speakableForPhase(
       const why = ctx.analysis?.elderMessage
         ? `${ctx.analysis.elderMessage} `
         : "";
-      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Connect me with a person to let a real person look at it, or say yes.`;
+      const partnerName = getAccountablePartner(ctx.analysis?.resourceCategory).name;
+      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Connect me with a person to let a ${partnerName} look at it, or say yes.`;
     }
     case "review": {
       if (!ctx.analysis) {
         const err = ctx.analyzeError ? ` Note: ${ctx.analyzeError}.` : "";
-        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Connect me with a person to send it to a person at the Legal Aid Center, or say yes.`;
+        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Connect me with a person to send it to a real person, or say yes.`;
       }
       const a = ctx.analysis;
       const title = a.documentName || a.documentType || "a document";
@@ -1187,15 +1188,18 @@ function speakableForPhase(
       const resourcesIntro = resources.length > 0
         ? ` Here are some places that can help you with this: ${resources.slice(0, 2).map(r => r.name + (r.contact ? ` — ${r.contact}` : "")).join(". ")}.`
         : " This doesn't look like a form you need help with. If you'd still like a person to look at it, I can send it.";
-      return `This looks like ${title}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to the Legal Aid Center, or say yes.`;
+      const partnerName = getAccountablePartner(a.resourceCategory).name;
+      return `This looks like ${title}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to a ${partnerName}, or say yes.`;
     }
-    case "choose":
-      return "Who should I send this to? Tap Connect me with the Legal Aid Center to send it to a person at the legal aid center, or say Legal Aid. Tap Send to my trusted person to send it to someone you pick yourself, like your own attorney or a trusted family member, or say trusted person. Tap Go back to return.";
+    case "choose": {
+      const partner = getAccountablePartner(ctx.analysis?.resourceCategory);
+      return `Who should I send this to? Tap ${partner.label} to send it to a real person at an accountable institution, or say yes. Tap Send to my trusted person to send it to someone you pick yourself, like your own attorney or a trusted family member, or say trusted person. Tap Go back to return.`;
+    }
 
     case "sent": {
       const r = ctx.sendResult;
       const id = r?.trackingId ?? "pending";
-      const center = r?.centerName ?? "Legal Aid Center";
+      const center = r?.centerName ?? getAccountablePartner(ctx.analysis?.resourceCategory).name;
       const isReview = (r?.status ?? "needs_review") === "needs_review";
       const closing = isReview
         ? "I won't guess on something this important. A real person will check it for you."
