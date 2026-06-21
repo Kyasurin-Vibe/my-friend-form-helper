@@ -292,9 +292,9 @@ function ElderApp() {
           }}
         >
           <PersistentVoice
-            enabledFromMode={voiceOn && phase !== "language" && phase !== "viewer"}
-            paused={phase === "viewer" || phase === "magnifier" || phase === "language"}
-            speakable={phase === "language" || phase === "viewer" ? "" : speakableForPhase(phase, { analysis, sendResult, analyzeError })}
+            enabledFromMode={voiceOn && phase !== "language"}
+            paused={phase === "language"}
+            speakable={phase === "language" ? "" : speakableForPhase(phase, { analysis, sendResult, analyzeError })}
             helpHint={helpHintForPhase(phase)}
             onBack={getBackForPhase(phase, { setPhase, analysis, navigate })}
             onDone={() => { speech.cancel(); restart(); setPhase("home"); }}
