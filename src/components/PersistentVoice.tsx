@@ -57,11 +57,18 @@ export function PersistentVoice({
   const onCommandRef = useRef(onCommand);
   const onBackRef = useRef(onBack);
   const helpRef = useRef(helpHint);
+  const screenRef = useRef(screenId);
+  const actionsRef = useRef(actions);
+  const onActionRef = useRef(onAction);
+  const interpretingRef = useRef(false);
 
   useEffect(() => { speakableRef.current = speakable; }, [speakable]);
   useEffect(() => { onCommandRef.current = onCommand; }, [onCommand]);
   useEffect(() => { onBackRef.current = onBack; }, [onBack]);
   useEffect(() => { helpRef.current = helpHint; }, [helpHint]);
+  useEffect(() => { screenRef.current = screenId; }, [screenId]);
+  useEffect(() => { actionsRef.current = actions; }, [actions]);
+  useEffect(() => { onActionRef.current = onAction; }, [onAction]);
 
   const active = enabledFromMode && userOn && !paused;
 
