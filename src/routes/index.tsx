@@ -493,6 +493,7 @@ function RetakeScreen({
     playWarning();
   }, []);
   const voiceOn = useContext(VoiceOnContext);
+  const partner = getAccountablePartner(analysis?.resourceCategory);
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} face="x" />
@@ -524,7 +525,7 @@ function RetakeScreen({
           voiceOn={voiceOn}
           actions={[
             { id: "retry", label: "Try again", description: "Retake the photo" },
-            { id: "send", label: "Connect me with a person", description: "Send the photo to a real human at the legal aid center" },
+            { id: "send", label: "Connect me with a person", description: `Send the photo to a real human (a ${partner.name})` },
           ]}
           onAction={(id) => {
             if (id === "retry") onRetry();
