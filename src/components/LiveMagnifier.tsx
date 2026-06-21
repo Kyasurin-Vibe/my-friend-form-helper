@@ -98,17 +98,70 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     };
   }, []);
 
-  // === Local-only guidance cycle. NO AI calls happen in the magnifier. ===
-  // Recognition runs only after the user taps "Capture & analyze" (handled in parent).
+  // === Real frame analysis: only auto-capture when a paper-like, sharp,
+  // bright region fills enough of the frame. Faces / hands / room must NOT trigger. ===
   useEffect(() => {
     if (!ready) return;
-    const seq: Guidance[] = ["move-closer", "hold-still", "corners", "hold-still", "detected"];
-    let i = 0;
+    const v = videoRef.current;
+    if (!v) return;
+    const W = 96, H = 72;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+    if (!ctx) return;
+    let detectedStreak = 0;
     const id = window.setInterval(() => {
-      setGuidance(seq[Math.min(i, seq.length - 1)]);
-      i++;
-      if (i >= seq.length) window.clearInterval(id);
-    }, 1500);
+      if (confirmedRef.current) return;
+      if (!v.videoWidth) return;
+      try {
+        ctx.drawImage(v, 0, 0, W, H);
+        const data = ctx.getImageData(0, 0, W, H).data;
+        const lum = new Float32Array(W * H);
+        let lumSum = 0, paperCount = 0;
+        for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+          const r = data[i], g = data[i + 1], b = data[i + 2];
+          const y = 0.299 * r + 0.587 * g + 0.114 * b;
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const sat = max === 0 ? 0 : (max - min) / max;
+          lum[p] = y;
+          lumSum += y;
+          // Paper-like: bright AND low color saturation (skin/walls are saturated or dim)
+          if (y > 140 && sat < 0.22) paperCount++;
+        }
+        const meanLum = lumSum / (W * H);
+        const paperFrac = paperCount / (W * H);
+        // Sharpness: average gradient magnitude (rough Laplacian proxy)
+        let edgeSum = 0, edgeN = 0;
+        for (let y = 1; y < H - 1; y++) {
+          for (let x = 1; x < W - 1; x++) {
+            const p = y * W + x;
+            const dx = lum[p + 1] - lum[p - 1];
+            const dy = lum[p + W] - lum[p - W];
+            edgeSum += Math.abs(dx) + Math.abs(dy);
+            edgeN++;
+          }
+        }
+        const sharp = edgeSum / edgeN;
+
+        let next: Guidance;
+        if (meanLum < 70) next = "init"; // too dark / no view
+        else if (paperFrac < 0.28) next = "init"; // no paper-like region (face/room/hand)
+        else if (paperFrac < 0.45) next = "corners"; // partial paper — frame it
+        else if (sharp < 5.5) next = "blurry";
+        else next = "detected";
+
+        // Require 2 consecutive paper+sharp frames before triggering capture
+        if (next === "detected") {
+          detectedStreak++;
+          if (detectedStreak < 2) next = "hold-still";
+        } else {
+          detectedStreak = 0;
+        }
+
+        setGuidance((prev) => (prev === next ? prev : next));
+      } catch { /* noop */ }
+    }, 450);
     return () => window.clearInterval(id);
   }, [ready]);
 
@@ -132,7 +185,10 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
 
   // === Auto-capture countdown when document looks clear ===
   useEffect(() => {
-    if (guidance !== "detected") return;
+    if (guidance !== "detected") {
+      setCountdown(0);
+      return;
+    }
     if (confirmedRef.current) return;
     setCountdown(3);
     const id = window.setInterval(() => {
