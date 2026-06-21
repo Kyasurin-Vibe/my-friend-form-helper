@@ -1008,6 +1008,9 @@ function speakableForPhase(
         : "";
       return `This looks like ${title}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to the Legal Aid Center, or say yes.`;
     }
+    case "choose":
+      return "Who should I send this to? Tap Connect me with the Legal Aid Center to send it to a person at the legal aid center, or say Legal Aid. Tap Send to my trusted person to send it to someone you pick yourself, like your own attorney or a trusted family member, or say trusted person. Tap Go back to return.";
+
     case "sent": {
       const r = ctx.sendResult;
       const id = r?.trackingId ?? "pending";
