@@ -470,43 +470,22 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
                 transition: "filter 0.15s, transform 0.15s",
               }}
             />
-            {/* Document frame guide */}
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                inset: 24,
-                border: `4px ${guidance === "detected" ? "solid" : "dashed"} ${
-                  guidance === "detected" ? "#22c55e" : "rgba(255,255,255,0.9)"
-                }`,
-                borderRadius: 14,
-                boxShadow: "0 0 0 9999px rgba(0,0,0,0.15)",
-                transition: "border-color 0.2s",
-              }}
-            />
-            {/* Corner ticks */}
-            {[
-              { top: 18, left: 18 },
-              { top: 18, right: 18 },
-              { bottom: 18, left: 18 },
-              { bottom: 18, right: 18 },
-            ].map((pos, i) => (
+            {/* Real document detection outline — only shown when a paper-like region is present. */}
+            {detectionBox && (
               <div
-                key={i}
-                className="absolute"
+                className="absolute pointer-events-none"
                 style={{
-                  ...pos,
-                  width: 22,
-                  height: 22,
-                  borderColor: guidance === "detected" ? "#22c55e" : "#fff",
-                  borderStyle: "solid",
-                  borderWidth: 0,
-                  borderTopWidth: pos.top !== undefined ? 4 : 0,
-                  borderBottomWidth: pos.bottom !== undefined ? 4 : 0,
-                  borderLeftWidth: pos.left !== undefined ? 4 : 0,
-                  borderRightWidth: pos.right !== undefined ? 4 : 0,
+                  left: `${detectionBox.x * 100}%`,
+                  top: `${detectionBox.y * 100}%`,
+                  width: `${detectionBox.w * 100}%`,
+                  height: `${detectionBox.h * 100}%`,
+                  border: `5px solid ${guidance === "detected" ? "#22c55e" : "#fbbf24"}`,
+                  borderRadius: 12,
+                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.18)",
+                  transition: "all 0.18s ease-out",
                 }}
               />
-            ))}
+            )}
             {/* Countdown ring overlay */}
             {countdown > 0 && (
               <div
@@ -578,7 +557,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
       </div>
 
       {/* Single fallback action — the app drives, the user follows. */}
-      <div className="px-4 pt-4 pb-5 mt-auto space-y-2">
+      <div className="px-4 pt-4 pb-5 mt-auto">
         <button
           onClick={doCapture}
           disabled={!!error}
@@ -595,20 +574,6 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
           }}
         >
           📸 Capture now
-        </button>
-        <button
-          onClick={onHandoff}
-          className="w-full font-bold"
-          style={{
-            background: "#fff",
-            color: "var(--color-elder-ink)",
-            border: "2px solid #e7ddd0",
-            borderRadius: 18,
-            padding: "12px",
-            fontSize: 15,
-          }}
-        >
-          🤝 Not sure — send to a person
         </button>
       </div>
     </div>
