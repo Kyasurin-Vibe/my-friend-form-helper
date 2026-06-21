@@ -137,7 +137,7 @@ export function VoiceBar({
             minHeight: 52,
           }}
         >
-          🔊 Read this again
+          🔊 {lblReadAgain.replace(/^🔊\s*/, "")}
         </button>
         {!hideMic && (
           <button
@@ -159,7 +159,7 @@ export function VoiceBar({
             }}
             aria-label="Hold to talk"
           >
-            {working ? "…" : recording ? "● Listening" : "🎙 Hold to talk"}
+            {working ? "…" : recording ? lblListening : lblHoldToTalk}
           </button>
         )}
       </div>
