@@ -19,7 +19,7 @@ const GUIDANCE_TEXT: Record<Guidance, string> = {
   "hold-still": "Hold still…",
   corners: "Put all four corners inside the frame.",
   blurry: "The picture is too blurry. Please try again.",
-  detected: "Looks clear. Tap the red button to capture and check it.",
+  detected: "Looks clear. Capturing automatically…",
 };
 
 // Lightweight TTS helper local to this screen, so it composes with the
@@ -118,7 +118,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     if (guidance === "init" || guidance === "hold-still") return;
     const text =
       guidance === "detected"
-        ? "When the page is clear, tap the red button to capture and check it."
+        ? "Looks clear. Capturing now."
         : guidance === "blurry"
           ? "The picture is too blurry. Please try again."
           : GUIDANCE_TEXT[guidance];
@@ -128,17 +128,26 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
       speakingRef.current = false;
       if (shouldListenRef.current) startVoice();
     });
-  }, [guidance, detected]);
+  }, [guidance]);
 
-  // === Indicative countdown (visual only — does NOT auto-confirm) ===
+  // === Auto-capture countdown when document looks clear ===
   useEffect(() => {
-    if (guidance !== "detected" || !detected) return;
-    setCountdown(8);
+    if (guidance !== "detected") return;
+    if (confirmedRef.current) return;
+    setCountdown(3);
     const id = window.setInterval(() => {
-      setCountdown((c) => (c <= 1 ? 0 : c - 1));
+      setCountdown((c) => {
+        if (c <= 1) {
+          window.clearInterval(id);
+          doCapture();
+          return 0;
+        }
+        return c - 1;
+      });
     }, 1000);
     return () => window.clearInterval(id);
-  }, [guidance, detected]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guidance]);
 
   // === Voice recognition: start when armed, auto-restart on end ===
   function startVoice() {
