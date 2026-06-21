@@ -87,7 +87,8 @@ function ElderApp() {
       }
     } catch { /* noop */ }
     const off = onLangChange(() => forceRerender((n) => n + 1));
-    return () => { off(); };
+    const offT = onTranslate(() => forceRerender((n) => n + 1));
+    return () => { off(); offT(); };
   }, []);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
