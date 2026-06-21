@@ -14,10 +14,13 @@ Rules:
 - Use cautious wording: "looks like", "appears", "may be blank".
 - Identify VISIBLE blank/incomplete fields only (e.g. "signature area appears blank").
 - If the photo is blurry/dark/cropped/unreadable, set readable=false.
-- documentBounds: the TIGHT bounding box of the PAPER itself within the image, as fractions
-  0..1 (x,y = top-left corner of the paper; width,height = its size). EXCLUDE hands, table,
-  ceiling, and background — wrap the paper edges as tightly as possible. If you cannot see a
-  clear document, return x:0, y:0, width:1, height:1.
+- documentBounds: the TIGHT bounding box of the white paper/form/page content ONLY, as fractions
+  0..1 (x,y = top-left; width,height = size). Exclude all device bezel, dark screen edges, hands,
+  fingers, background, browser UI, camera UI, shadows, and table surface. If the document is shown
+  on a phone, tablet, laptop, or monitor, return bounds for the white document/form/page content
+  only — NOT the device screen or its frame. The crop should look like a scanner output, not a
+  photo of a device. Tight means the visible white form/page area only. If you cannot see a clear
+  document, return x:0, y:0, width:1, height:1.
 - elderMessage: ONE short warm sentence (max 22 words), no legal jargon.`;
 
 const TOOL = {
