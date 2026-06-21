@@ -1,12 +1,17 @@
 // VoiceBar: persistent "Read again" + tap-to-talk mic for any screen.
 // Cancels TTS the moment the user taps the mic or any action button.
+// When `actions` is provided, the spoken phrase is sent to an AI interpreter
+// that picks the matching on-screen button. Falls back to the simple intent
+// classifier for screens that only need confirm/cancel/repeat.
 
 import { useRef, useState } from "react";
 import {
   cancelSpeech,
   classifyIntent,
+  interpretCommand,
   startRecording,
   transcribeAudio,
+  type VoiceAction,
   type VoiceIntent,
 } from "@/lib/voice";
 import { speakWarm } from "@/lib/cases";
@@ -14,12 +19,23 @@ import { speakWarm } from "@/lib/cases";
 type Props = {
   speakableText: string;
   voiceOn: boolean;
+  /** Legacy: confirm/cancel/repeat mapping for simple screens. */
   onIntent?: (intent: VoiceIntent) => void;
+  /** Preferred: real buttons on this screen + a handler that runs one of them. */
+  actions?: VoiceAction[];
+  onAction?: (actionId: string) => void;
   /** when true, hide the mic (e.g. no decision on this screen) */
   hideMic?: boolean;
 };
 
-export function VoiceBar({ speakableText, voiceOn, onIntent, hideMic }: Props) {
+export function VoiceBar({
+  speakableText,
+  voiceOn,
+  onIntent,
+  actions,
+  onAction,
+  hideMic,
+}: Props) {
   const [recording, setRecording] = useState(false);
   const [working, setWorking] = useState(false);
   const [hint, setHint] = useState<string>("");
@@ -57,6 +73,31 @@ export function VoiceBar({ speakableText, voiceOn, onIntent, hideMic }: Props) {
         return;
       }
       const transcript = await transcribeAudio(blob);
+
+      // Preferred path: real on-screen buttons interpreted by AI.
+      if (actions && actions.length && onAction) {
+        if (!transcript) {
+          setHint("I didn't catch that — you can tap the button.");
+          if (voiceOn) speakWarm("I didn't catch that — you can tap the button.");
+          return;
+        }
+        const result = await interpretCommand(transcript, actions);
+        if (result.actionId === "repeat") {
+          reSpeak();
+          return;
+        }
+        if (result.actionId && result.actionId !== "none") {
+          const picked = actions.find((a) => a.id === result.actionId);
+          setHint(picked ? `I heard "${transcript}" — ${picked.label}.` : "");
+          onAction(result.actionId);
+          return;
+        }
+        setHint(`I heard "${transcript}" — you can tap the button you want.`);
+        if (voiceOn) speakWarm("I didn't catch which one you meant — you can tap the button.");
+        return;
+      }
+
+      // Legacy intent fallback.
       const intent = classifyIntent(transcript);
       if (intent === "repeat") {
         reSpeak();
