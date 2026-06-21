@@ -4,6 +4,7 @@ import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
 import { SimpleMagnifier } from "@/components/SimpleMagnifier";
 import { VoiceBar } from "@/components/VoiceBar";
+import { PersistentVoice } from "@/components/PersistentVoice";
 import { useSpeech } from "@/lib/useSpeech";
 import {
   analyzeDocument,
@@ -275,6 +276,25 @@ function ElderApp() {
             borderRadius: 40,
           }}
         >
+          <PersistentVoice
+            enabledFromMode={voiceOn}
+            paused={phase === "viewer" || phase === "magnifier"}
+            speakable={speakableForPhase(phase, { analysis, sendResult, analyzeError })}
+            helpHint={helpHintForPhase(phase)}
+            onBack={getBackForPhase(phase, { setPhase, analysis, navigate })}
+            onCommand={(t, { confirm }) =>
+              handlePhaseCommand(t, confirm, {
+                phase,
+                setPhase,
+                confirmPreview,
+                navigate,
+                restart,
+                handleSend,
+                analysis,
+              })
+            }
+          />
+
           <CaptionsContext.Provider value={showCaptions}>
            <VoiceOnContext.Provider value={voiceOn}>
             {phase === "start" ? (
@@ -1441,3 +1461,163 @@ function speakableForPhase(
     }
   }
 }
+
+// ===== Per-phase voice helpers =====
+
+function helpHintForPhase(phase: Phase): string {
+  switch (phase) {
+    case "home": return "Say 'see' for the magnifier, or 'question' to scan a document.";
+    case "viewer": return "Say 'bigger', 'smaller', or 'brighter'.";
+    case "find": return "Say 'open' to start the camera, or 'back' to go home.";
+    case "magnifier": return "Say 'yes' to capture, or 'no' to keep looking.";
+    case "preview": return "Say 'yes' to use this photo, or 'retake' to try again.";
+    case "analyzing": return "I'm reading it — one moment.";
+    case "retake": return "Say 'try again' for a new photo, or 'connect me' to send to a person.";
+    case "review": return "Say 'send' to connect with a person, or 'retake' for a new photo.";
+    case "choose": return "Say 'the center' for an institution, or 'someone I trust' for your own person.";
+    case "sent": return "Say 'start over' to scan again.";
+    default: return "Tap any button you see, or say what you want.";
+  }
+}
+
+function getBackForPhase(
+  phase: Phase,
+  { setPhase, analysis, navigate }: {
+    setPhase: (p: Phase) => void;
+    analysis: AnalysisResult | null;
+    navigate: ReturnType<typeof useNavigate>;
+  },
+): (() => void) | undefined {
+  switch (phase) {
+    case "viewer":
+    case "find":
+      return () => setPhase("home");
+    case "magnifier":
+      return () => setPhase("find");
+    case "preview":
+    case "retake":
+      return () => setPhase("magnifier");
+    case "review":
+      return () => setPhase("magnifier");
+    case "choose":
+      return () => setPhase(analysis ? "review" : "retake");
+    case "sent":
+      return () => setPhase("home");
+    default:
+      return undefined;
+  }
+}
+
+// Returns true when the transcript matched something on this screen.
+function handlePhaseCommand(
+  t: string,
+  confirm: (msg: string) => void,
+  ctx: {
+    phase: Phase;
+    setPhase: (p: Phase) => void;
+    confirmPreview: () => void;
+    navigate: ReturnType<typeof useNavigate>;
+    restart: () => void;
+    handleSend: (r: Recipient) => void | Promise<void>;
+    analysis: AnalysisResult | null;
+  },
+): boolean {
+  const { phase, setPhase, confirmPreview, navigate, restart, handleSend } = ctx;
+
+  const yes = /\b(yes|yeah|yep|yup|sure|okay|ok|do it|go ahead|use this|use it|it's clear|its clear|looks good|good|send|send it|capture|take it|snap|take the picture|take the photo|connect me)\b/;
+  const no = /\b(no|nope|nah|not yet|wait|keep looking|don't|dont)\b/;
+
+  switch (phase) {
+    case "home": {
+      if (/\b(see|bigger|magnify|magnifier|read this|help me see)\b/.test(t)) {
+        confirm("Opening the magnifier.");
+        setPhase("viewer");
+        return true;
+      }
+      if (/\b(question|document|scan|paper|form|help me with this|read it|help with)\b/.test(t)) {
+        confirm("Okay — let's scan it.");
+        setPhase("find");
+        return true;
+      }
+      return false;
+    }
+    case "find": {
+      if (yes.test(t) || /\b(open|scanner|camera|start|ready)\b/.test(t)) {
+        confirm("Opening the camera.");
+        setPhase("magnifier");
+        return true;
+      }
+      return false;
+    }
+    case "preview": {
+      if (/\b(retake|again|blurry|no good|try again)\b/.test(t) || no.test(t)) {
+        confirm("Okay — retake.");
+        setPhase("magnifier");
+        return true;
+      }
+      if (yes.test(t) || /\b(use this|it's clear|its clear|clear|good|fine)\b/.test(t)) {
+        confirm("Okay — using this.");
+        confirmPreview();
+        return true;
+      }
+      return false;
+    }
+    case "retake": {
+      if (/\b(try again|retake|another|new photo)\b/.test(t)) {
+        confirm("Okay — try again.");
+        setPhase("magnifier");
+        return true;
+      }
+      if (/\b(connect|send|person|human|help|someone)\b/.test(t) || yes.test(t)) {
+        confirm("Sending to a person.");
+        setPhase("choose");
+        return true;
+      }
+      return false;
+    }
+    case "review": {
+      if (/\b(retake|again|new photo)\b/.test(t)) {
+        confirm("Okay — retake.");
+        setPhase("magnifier");
+        return true;
+      }
+      if (/\b(send|connect|person|human|help|someone)\b/.test(t) || yes.test(t)) {
+        confirm("Sending now.");
+        setPhase("choose");
+        return true;
+      }
+      return false;
+    }
+    case "choose": {
+      if (/\b(legal aid|the center|center|social worker|institution|recommended|partner)\b/.test(t)) {
+        confirm("Sending to the center.");
+        void handleSend({ kind: "center" });
+        return true;
+      }
+      if (/\b(trust|trusted|my own|someone i trust|my person|family|attorney|daughter|son)\b/.test(t)) {
+        confirm("Okay — your trusted person.");
+        // The choose screen has its own internal state machine; the user will
+        // tap the form fields. We can't directly flip mode from here without
+        // exposing more state, so we just acknowledge — the big buttons remain.
+        return true;
+      }
+      return false;
+    }
+    case "sent": {
+      if (/\b(start over|again|new one|restart|another)\b/.test(t)) {
+        confirm("Starting over.");
+        restart();
+        return true;
+      }
+      if (/\b(center|dashboard|staff|see the center)\b/.test(t) || yes.test(t)) {
+        confirm("Opening the center.");
+        navigate({ to: "/center" });
+        return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
+}
+
