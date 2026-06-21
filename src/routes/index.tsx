@@ -633,13 +633,64 @@ function ReviewScreen({
           </p>
         )}
       </div>
+      <div
+        className="rounded-3xl p-4 mb-3"
+        style={{
+          background: "#fff",
+          border: "1px solid #EFE6D6",
+          boxShadow: "0 8px 24px rgba(36,31,26,0.06)",
+        }}
+      >
+        <p
+          className="text-xs uppercase font-bold tracking-wide mb-2"
+          style={{ color: "#6b5d52" }}
+        >
+          Here&apos;s help available for you
+        </p>
+        <div className="space-y-3">
+          {getResources(analysis.documentType).map((r, i) => (
+            <div
+              key={i}
+              className="rounded-2xl p-3"
+              style={{
+                background: "#FDFBF7",
+                border: "1px solid #EFE6D6",
+              }}
+            >
+              <p
+                className="font-extrabold"
+                style={{ fontSize: 18, color: "var(--color-elder-ink)" }}
+              >
+                {r.name}
+              </p>
+              <p className="mt-1" style={{ fontSize: 16, color: "#6b5d52" }}>
+                {r.helpsWith}
+              </p>
+              {r.contact && (
+                <p
+                  className="mt-1 font-semibold"
+                  style={{ fontSize: 15, color: "var(--color-elder-primary)" }}
+                >
+                  {r.contact}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="space-y-2 mt-auto">
-        <BigButton variant="ghost" onClick={onRetake}>📷 Retake</BigButton>
+        <BigButton variant="ghost" onClick={onRetake}>
+          📷 Retake
+        </BigButton>
         <BigButton variant="danger" onClick={onSend}>
-          {sending ? "Sending…" : "🤝 Send it"}
+          {sending ? "Sending…" : "🤝 Connect me with a person"}
         </BigButton>
         <VoiceBar
-          speakableText={speakableForPhase("review", { analysis, sendResult: null, analyzeError: null })}
+          speakableText={speakableForPhase("review", {
+            analysis,
+            sendResult: null,
+            analyzeError: null,
+          })}
           voiceOn={voiceOn}
           onIntent={handleIntent}
         />
