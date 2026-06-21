@@ -609,7 +609,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
                 transition: "filter 0.15s, transform 0.15s",
               }}
             />
-            {detectionBox && (
+            {detectionBox && !paperCorners && (
               <div
                 className="absolute pointer-events-none"
                 style={{
@@ -623,6 +623,22 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
                   transition: "all 0.18s ease-out",
                 }}
               />
+            )}
+            {paperCorners && (
+              <svg
+                className="absolute inset-0 w-full h-full pointer-events-none"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <polygon
+                  points={`${paperCorners.topLeftCorner.x * 100},${paperCorners.topLeftCorner.y * 100} ${paperCorners.topRightCorner.x * 100},${paperCorners.topRightCorner.y * 100} ${paperCorners.bottomRightCorner.x * 100},${paperCorners.bottomRightCorner.y * 100} ${paperCorners.bottomLeftCorner.x * 100},${paperCorners.bottomLeftCorner.y * 100}`}
+                  fill="rgba(34,197,94,0.08)"
+                  stroke={guidance === "detected" ? "#22c55e" : "#fbbf24"}
+                  strokeWidth="0.8"
+                  vectorEffect="non-scaling-stroke"
+                  style={{ transition: "all 0.2s ease-out" }}
+                />
+              </svg>
             )}
             {countdown > 0 && (
               <div
