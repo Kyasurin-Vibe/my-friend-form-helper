@@ -514,20 +514,39 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
 function HomeScreen({
   onMagnifier,
   onScanner,
+  onChangeLang,
 }: {
   onMagnifier: () => void;
   onScanner: () => void;
+  onChangeLang: () => void;
 }) {
   const voiceOn = useContext(VoiceOnContext);
   return (
-    <div className="flex-1 flex flex-col items-center p-6 text-center">
+    <div className="flex-1 flex flex-col items-center p-6 text-center relative">
+      <button
+        type="button"
+        onClick={() => { cancelSpeech(); onChangeLang(); }}
+        aria-label="Change language"
+        className="absolute top-3 right-3 font-bold active:scale-[0.96]"
+        style={{
+          background: "#fff",
+          color: "var(--color-elder-ink)",
+          border: "2px solid var(--color-elder-sky)",
+          borderRadius: 999,
+          padding: "6px 12px",
+          fontSize: 13,
+          boxShadow: "0 4px 12px rgba(47,111,176,0.12)",
+        }}
+      >
+        {t("lang.change")}
+      </button>
       <div className="flex-1 flex flex-col items-center justify-center w-full">
         <Mascot mode="idle" size={130} />
         <h1 className="mt-3 font-extrabold" style={{ fontSize: 30, color: "var(--color-elder-ink)" }}>
-          My Friend
+          {t("home.title")}
         </h1>
         <p className="mt-1 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
-          How can I help you today?
+          {t("home.subtitle")}
         </p>
         <div className="w-full space-y-4">
           <button
@@ -544,9 +563,9 @@ function HomeScreen({
               boxShadow: "0 8px 22px rgba(47,111,176,0.14)",
             }}
           >
-            <div style={{ fontSize: 26 }}>🔍 Help me see this</div>
+            <div style={{ fontSize: 26 }}>{t("home.see")}</div>
             <div style={{ fontSize: 15, color: "#6b5d52", fontWeight: 600, marginTop: 4 }}>
-              Open the magnifier — just look, no upload.
+              {t("home.see.sub")}
             </div>
           </button>
           <button
@@ -563,9 +582,9 @@ function HomeScreen({
               boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
             }}
           >
-            <div style={{ fontSize: 26 }}>❓ I have a question about a document</div>
+            <div style={{ fontSize: 26 }}>{t("home.scan")}</div>
             <div style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", fontWeight: 600, marginTop: 4 }}>
-              Scan it and I'll read it out and find help.
+              {t("home.scan.sub")}
             </div>
           </button>
         </div>
@@ -582,6 +601,7 @@ function HomeScreen({
     </div>
   );
 }
+
 
 function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
   const voiceOn = useContext(VoiceOnContext);
