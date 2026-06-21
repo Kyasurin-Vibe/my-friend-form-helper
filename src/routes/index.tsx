@@ -932,7 +932,7 @@ function ReviewScreen({
         }}
       >
         <p className="text-xs uppercase font-bold tracking-wide mb-1" style={{ color: "#6b5d52" }}>
-          Document
+          {t("document_label")}
         </p>
         <p className="font-extrabold mb-3" style={{ fontSize: 19, color: "var(--color-elder-ink)" }}>
           {docTitle}
