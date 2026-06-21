@@ -49,6 +49,17 @@ type Phase =
 const CaptionsContext = createContext<boolean>(true);
 const VoiceOnContext = createContext<boolean>(true);
 
+function isValidBounds(b: DocumentBounds | null | undefined): boolean {
+  if (!b) return false;
+  const { x, y, width, height } = b;
+  return (
+    Number.isFinite(x) && Number.isFinite(y) &&
+    Number.isFinite(width) && Number.isFinite(height) &&
+    width > 0.05 && height > 0.05 &&
+    x >= 0 && y >= 0 && x + width <= 1.0001 && y + height <= 1.0001
+  );
+}
+
 function ElderApp() {
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
   const [phase, setPhase] = useState<Phase>("find");
@@ -97,59 +108,62 @@ function ElderApp() {
       setPhase("review");
       return;
     }
-    // Capture ONLY. Do NOT analyze. Show cropped preview for user confirmation.
+    // Step 1: store the full-res frame. Show "Reading…" screen.
     setCapturedImage(result.original);
-    setProcessedImage(result.processed);
+    setProcessedImage(undefined);
     setCapturedBounds(result.bounds);
     setAnalysis(null);
     setAnalyzeError(null);
-    setPhase("preview");
-  }
-
-  async function confirmPreview() {
-    // User confirmed the preview. NOW run Claude analyze-document on the full-res image.
-    if (!capturedImage) {
-      setPhase("review");
-      return;
-    }
     setPhase("analyzing");
-    setAnalyzeError(null);
+
     const startedAt = Date.now();
     const minDisplay = 700;
-
     const centeredFallback: DocumentBounds = {
       x: 0.08, y: 0.04, width: 0.84, height: 0.92, confidence: 0,
     };
 
+    // Step 2: run Claude analyze-document on the full-res image. Recognition only — no send.
     let analysisResult: AnalysisResult | null = null;
     try {
-      analysisResult = await analyzeDocument(capturedImage);
+      analysisResult = await analyzeDocument(result.original);
       setAnalysis(analysisResult);
-
-      // Refine the stored crop using Claude's bounds if provided.
-      const refineBounds = analysisResult.documentBounds ?? capturedBounds ?? centeredFallback;
-      try {
-        const refined = await cropToBounds(capturedImage, refineBounds, 0.03);
-        setProcessedImage(refined);
-      } catch {
-        // keep existing processedImage
-      }
     } catch (e) {
       console.error("analyze failed", e);
       setAnalyzeError(e instanceof Error ? e.message : "Could not analyze right now.");
     }
+
+    // Step 3: crop using Claude's documentBounds (reliable). Fall back to centered crop.
+    const claudeBounds = analysisResult?.documentBounds ?? null;
+    const cropBounds = isValidBounds(claudeBounds) ? claudeBounds! : centeredFallback;
+    let cropped: string | undefined;
+    try {
+      cropped = await cropToBounds(result.original, cropBounds, 0.03);
+    } catch {
+      cropped = result.processed ?? result.original;
+    }
+    setProcessedImage(cropped);
 
     const elapsed = Date.now() - startedAt;
     if (elapsed < minDisplay) {
       await new Promise((r) => setTimeout(r, minDisplay - elapsed));
     }
 
-    // Go to review — user must explicitly confirm before send-to-center.
-    if (analysisResult && analysisResult.recommendedAction === "retake") {
-      setPhase("retake");
-    } else {
+    // Step 4: show cropped preview for explicit user confirmation.
+    setPhase("preview");
+  }
+
+  function confirmPreview() {
+    // User confirmed the cropped preview. Analysis is already done — go to review.
+    // send-to-center is NEVER called without explicit confirmation on the review screen.
+    if (analyzeError || !analysis) {
       setPhase("review");
+      return;
     }
+    if (analysis.recommendedAction === "retake") {
+      setPhase("retake");
+      return;
+    }
+    setPhase("review");
   }
 
 
