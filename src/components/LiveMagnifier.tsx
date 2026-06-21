@@ -576,9 +576,9 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
       <div className="px-4 pt-2 flex justify-center gap-2 flex-wrap">
         <button onClick={() => {
           setAutoCapture((v) => !v);
-          stableSinceRef.current = null;
-          stableBoxRef.current = null;
+          consecutiveReadyRef.current = 0;
         }} aria-pressed={autoCapture} style={{
+
           background: autoCapture ? "var(--color-elder-teal)" : "#fff",
           color: autoCapture ? "#fff" : "var(--color-elder-ink)",
           border: "2px solid var(--color-elder-teal)",
