@@ -155,7 +155,7 @@ async function tightenToPaperPixels(
       const max = Math.max(r, g, b) / 255;
       const min = Math.min(r, g, b) / 255;
       const saturation = max === 0 ? 0 : (max - min) / max;
-      const looksLikePaper = brightness > 132 && saturation < 0.38;
+      const looksLikePaper = brightness > 150 && saturation < 0.28;
       if (looksLikePaper) {
         paperish++;
         colCounts[x]++;
@@ -163,9 +163,9 @@ async function tightenToPaperPixels(
       }
     }
   }
-  if (paperish / (sw * sh) < 0.16) return null;
-  const colThreshold = Math.max(2, Math.round(sh * 0.045));
-  const rowThreshold = Math.max(2, Math.round(sw * 0.045));
+  if (paperish / (sw * sh) < 0.22) return null;
+  const colThreshold = Math.max(3, Math.round(sh * 0.12));
+  const rowThreshold = Math.max(3, Math.round(sw * 0.10));
   let x0 = 0;
   let x1 = sw - 1;
   let y0 = 0;
