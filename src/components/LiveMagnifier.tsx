@@ -357,6 +357,13 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     if (confirmedRef.current) return;
 
     setCountdown(3);
+    // Speak "Hold still… 3, 2, 1" once when countdown begins.
+    speakingRef.current = true;
+    try { DemoServices.voice.stop(); } catch { /* no-op */ }
+    speak("Hold still… 3, 2, 1", () => {
+      speakingRef.current = false;
+      if (shouldListenRef.current) startVoice();
+    });
     const id = window.setInterval(() => {
       setCountdown((current) => {
         if (current <= 1) {
