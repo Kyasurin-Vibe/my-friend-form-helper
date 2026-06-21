@@ -38,7 +38,6 @@ type Phase =
   | "start"
   | "find"
   | "magnifier"
-  | "preview"
   | "analyzing"
   | "retake"
   | "review"
@@ -83,7 +82,7 @@ function ElderApp() {
     speech.cancel();
   };
 
-  function handleCapture(image?: string) {
+  async function handleCapture(image?: string) {
     setCapturedImage(image);
     if (!image) {
       // Camera failed — go straight to human review path.
@@ -91,21 +90,17 @@ function ElderApp() {
       setPhase("review");
       return;
     }
-    // NEW: show the post-capture preview screen before sending to Claude.
-    setPhase("preview");
-  }
-
-  async function handleAnalyze(image: string) {
     setPhase("analyzing");
     setAnalyzeError(null);
     const startedAt = Date.now();
-    const minDisplay = 1200;
+    const minDisplay = 1200; // keep the loading screen visible long enough to see
     try {
       const result = await analyzeDocument(image);
       const elapsed = Date.now() - startedAt;
       if (elapsed < minDisplay) {
         await new Promise((r) => setTimeout(r, minDisplay - elapsed));
       }
+      // AI backstop: if Claude doesn't see a real document, return to camera.
       const looksLikeDoc =
         result.readable &&
         result.documentType &&
@@ -209,12 +204,6 @@ function ElderApp() {
               <LiveMagnifier
                 onCancel={() => setPhase("find")}
                 onConfirm={(img) => handleCapture(img)}
-              />
-            ) : phase === "preview" ? (
-              <PreviewScreen
-                image={capturedImage}
-                onConfirm={() => capturedImage && handleAnalyze(capturedImage)}
-                onRetake={() => setPhase("magnifier")}
               />
             ) : phase === "analyzing" ? (
               <AnalyzingScreen />
@@ -349,63 +338,6 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
   );
 }
 
-
-function PreviewScreen({
-  image,
-  onConfirm,
-  onRetake,
-}: {
-  image: string | undefined;
-  onConfirm: () => void;
-  onRetake: () => void;
-}) {
-  const voiceOn = useContext(VoiceOnContext);
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onConfirm();
-    else if (i === "cancel") onRetake();
-  };
-  return (
-    <div className="flex-1 flex flex-col p-5">
-      <div className="flex flex-col items-center">
-        <Mascot mode="idle" size={84} />
-        <h2
-          className="mt-2 font-extrabold text-center"
-          style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
-        >
-          Is this clear enough?
-        </h2>
-      </div>
-      <div
-        className="mt-3 rounded-2xl overflow-hidden flex items-center justify-center"
-        style={{
-          background: "#111",
-          border: "2px solid #EFE6D6",
-          minHeight: 240,
-          maxHeight: 360,
-        }}
-      >
-        {image ? (
-          <img
-            src={image}
-            alt="Captured document preview"
-            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-          />
-        ) : (
-          <p style={{ color: "#fff", padding: 24 }}>No image captured.</p>
-        )}
-      </div>
-      <div className="space-y-2 mt-4">
-        <BigButton variant="danger" onClick={onConfirm}>✅ Yes, use this</BigButton>
-        <BigButton variant="ghost" onClick={onRetake}>🔄 Retake</BigButton>
-        <VoiceBar
-          speakableText={speakableForPhase("preview", { analysis: null, sendResult: null, analyzeError: null })}
-          voiceOn={voiceOn}
-          onIntent={handleIntent}
-        />
-      </div>
-    </div>
-  );
-}
 
 function AnalyzingScreen() {
   const voiceOn = useContext(VoiceOnContext);
@@ -825,8 +757,6 @@ function speakableForPhase(
       return "Ready to find your document? I'll open the magnifier so you can see clearly first. Nothing is uploaded yet. Tap the red Open Magnifier button when you're ready, or say yes.";
     case "magnifier":
       return "Point the camera at your paper. Keep the corners inside the frame. I'll capture it when it looks clear.";
-    case "preview":
-      return "Is this clear enough? Tap Yes use this to read the document, or say yes. Tap Retake to take another photo, or say no.";
     case "analyzing":
       return "Let me read this for you. Reading your document. One moment.";
     case "retake": {
