@@ -1743,6 +1743,15 @@ function handlePhaseCommand(
   const yes = /\b(yes|yeah|yep|yup|sure|okay|ok|do it|go ahead|use this|use it|it's clear|its clear|looks good|good|send|send it|capture|take it|snap|take the picture|take the photo|connect me)\b/;
   const no = /\b(no|nope|nah|not yet|wait|keep looking|don't|dont)\b/;
 
+  // Global: "home" / "go home" returns to home from any non-language screen.
+  if (phase !== "home" && /\b(home|go home|main menu|back to home)\b/.test(t)) {
+    confirm("Going home.");
+    restart();
+    setPhase("home");
+    return true;
+  }
+
+
   switch (phase) {
     case "home": {
       if (/\b(see|look|magnify|magnifier|bigger|larger|zoom|read this|help me see|i wanna see|i want to see|i can'?t see|show me|seeing aid)\b/.test(t)) {
