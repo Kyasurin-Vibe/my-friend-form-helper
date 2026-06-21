@@ -576,8 +576,10 @@ function ReviewScreen({
           <VoiceBar
             speakableText={speakableForPhase("review", { analysis: null, sendResult: null, analyzeError })}
             voiceOn={voiceOn}
-            onIntent={handleIntent}
+            actions={reviewActions}
+            onAction={onReviewAction}
           />
+
         </div>
 
       </div>
@@ -702,8 +704,10 @@ function ReviewScreen({
             analyzeError: null,
           })}
           voiceOn={voiceOn}
-          onIntent={handleIntent}
+          actions={reviewActions}
+          onAction={onReviewAction}
         />
+
       </div>
 
     </div>
