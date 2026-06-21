@@ -745,7 +745,7 @@ function AnalyzingScreen() {
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
       <Mascot mode="speaking" size={150} />
       <h2 className="mt-4 font-extrabold" style={{ fontSize: 26, color: "var(--color-elder-ink)" }}>
-        Reading your document… one moment
+        {t("reading_doc")}
       </h2>
       <div
         className="mt-6"
@@ -760,7 +760,7 @@ function AnalyzingScreen() {
         }}
       />
       <div className="sr-only" role="status">
-        Reading your document… one moment
+        {t("reading_doc")}
       </div>
       <div className="w-full max-w-sm mt-6">
         <VoiceBar
