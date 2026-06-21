@@ -802,7 +802,7 @@ function RetakeScreen({
         style={{ background: "#FFF6E5", border: "1px solid #F5DDA8" }}
       >
         <p className="font-bold mb-1" style={{ fontSize: 20, color: "#7a5a1c" }}>
-          I couldn't read it clearly.
+          {t("couldnt_read")}
         </p>
         {analysis?.elderMessage && (
           <p className="mb-2" style={{ fontSize: 16, color: "#6b5d52" }}>
@@ -810,9 +810,9 @@ function RetakeScreen({
           </p>
         )}
         <ul className="space-y-1" style={{ fontSize: 17 }}>
-          <li>✋ Hold still</li>
-          <li>💡 More light</li>
-          <li>🟦 Keep the corners in the box</li>
+          <li>{t("hold_still_emoji")}</li>
+          <li>{t("more_light")}</li>
+          <li>{t("corners_in_box")}</li>
         </ul>
       </div>
       <div className="space-y-2 mt-auto">
