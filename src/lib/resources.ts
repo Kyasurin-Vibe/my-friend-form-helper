@@ -34,3 +34,17 @@ export function getResources(category?: string | null): Resource[] {
   const key = (category ?? "general").toLowerCase().trim();
   return RESOURCES_BY_CATEGORY[key] ?? RESOURCES_BY_CATEGORY.general;
 }
+
+export function getAccountablePartner(category?: string | null): { name: string; label: string } {
+  const key = (category ?? "general").toLowerCase().trim();
+  const map: Record<string, { name: string; label: string }> = {
+    legal:       { name: "Legal Aid Center",        label: "Connect me with the Legal Aid Center" },
+    benefits:    { name: "Benefits Caseworker",     label: "Connect me with a Benefits Caseworker" },
+    housing:     { name: "Housing Advocate",        label: "Connect me with a Housing Advocate" },
+    healthcare:  { name: "Community Health Worker", label: "Connect me with a Community Health Worker" },
+    immigration: { name: "Immigration Legal Aid",   label: "Connect me with Immigration Legal Aid" },
+    general:     { name: "Social Worker",           label: "Connect me with a Social Worker" },
+    none:        { name: "Social Worker",           label: "Connect me with a Social Worker" },
+  };
+  return map[key] ?? map.general;
+}
