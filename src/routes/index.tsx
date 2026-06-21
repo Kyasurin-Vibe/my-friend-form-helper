@@ -866,29 +866,29 @@ function Screen4({
 
 function Screen5({
   branch,
+  sendResult,
+  analysis,
   onGoCenter,
   speech,
 }: {
   branch: Branch;
+  sendResult: SendResult | null;
+  analysis: AnalysisResult | null;
   onGoCenter: () => void;
   speech: ReturnType<typeof useSpeech>;
 }) {
-  const log =
-    branch === "missing"
-      ? [
-          ["2:14", "Scanned FL-142"],
-          ["2:14", "Read: name, assets, debts"],
-          ["2:14", "Missing: signature, date"],
-          ["2:14", "Flagged: human review"],
-          ["2:15", "Sent to legal aid center"],
-        ]
-      : [
-          ["2:14", "Scanned FL-142"],
-          ["2:14", "Read: name, assets, debts"],
-          ["2:14", "All required fields present"],
-          ["2:14", "Flagged: human review"],
-          ["2:15", "Sent to legal aid center"],
-        ];
+  const trackingId = sendResult?.trackingId ?? "—";
+  const centerName = sendResult?.centerName ?? "Legal Aid Center";
+  const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
+
+  const log = [
+    "Photo captured on this device",
+    `Identified as ${analysis?.documentType ?? "unknown document"}`,
+    isReview
+      ? `Flagged ${analysis?.possibleMissingFields.length ?? 0} spot(s) for human review`
+      : "No obvious missing fields",
+    `Sent to ${centerName}`,
+  ];
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto">
       <MascotHeader speech={speech} small face={branch === "missing" ? "x" : "smile"} />
@@ -908,7 +908,7 @@ function Screen5({
             className="font-extrabold"
             style={{ fontSize: 22, letterSpacing: 0.5 }}
           >
-            MF-2048
+            {trackingId}
           </span>
         </div>
         <div
@@ -919,24 +919,24 @@ function Screen5({
             fontSize: 16,
           }}
         >
-          📨 Delivered — waiting for a staff member
+          📨 Delivered to {centerName}
         </div>
         <p
           className="mt-3 font-semibold"
           style={{ fontSize: 18, color: "var(--color-elder-ink)" }}
         >
-          {branch === "missing"
+          {isReview
             ? "I won't guess on something this important. A real person will check it for you."
-            : "A person will confirm it before you file."}
+            : "A person will confirm it before anything is filed."}
         </p>
         <div className="mt-3">
           <p className="text-xs uppercase font-bold tracking-wide" style={{ color: "#6b5d52" }}>
             What I did
           </p>
           <ul className="mt-1 space-y-1">
-            {log.map(([t, s]) => (
-              <li key={t + s} className="flex gap-3 text-[15px]">
-                <span style={{ color: "#6b5d52", minWidth: 40 }}>{t}</span>
+            {log.map((s, i) => (
+              <li key={i} className="flex gap-3 text-[15px]">
+                <span style={{ color: "#6b5d52", minWidth: 16 }}>{i + 1}.</span>
                 <span>{s}</span>
               </li>
             ))}
