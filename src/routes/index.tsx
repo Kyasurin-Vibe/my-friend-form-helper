@@ -240,7 +240,7 @@ function ElderApp() {
               <PreviewScreen
                 image={processedImage ?? capturedImage}
                 speech={speech}
-                onUse={runAnalyze}
+                onUse={confirmPreview}
                 onRetake={() => setPhase("magnifier")}
               />
 
