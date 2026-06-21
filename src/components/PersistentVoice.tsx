@@ -98,7 +98,7 @@ export function PersistentVoice({
     setSpeaking(false);
   }, []);
 
-  const speakConfirm = useCallback((msg: string) => {
+  const speakConfirmCore = useCallback((msg: string, preTranslated: boolean) => {
     setConfirmation(msg);
     speakingRef.current = true;
     setSpeaking(true);
@@ -125,7 +125,7 @@ export function PersistentVoice({
       };
       synth.speak(u);
     };
-    if (lang === "en") {
+    if (preTranslated || lang === "en") {
       startSpeak(msg);
     } else {
       const cached = translateSync(msg, lang);
@@ -135,6 +135,9 @@ export function PersistentVoice({
     window.setTimeout(() => setConfirmation((c) => (c === msg ? "" : c)), 2400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const speakConfirm = useCallback((msg: string) => speakConfirmCore(msg, false), [speakConfirmCore]);
+  const speakLocalized = useCallback((msg: string) => speakConfirmCore(msg, true), [speakConfirmCore]);
 
   const isTTSPlaying = useCallback((): boolean => {
     if (typeof window === "undefined") return false;
@@ -212,18 +215,21 @@ export function PersistentVoice({
     interpretingRef.current = true;
     lastCmdAtRef.current = now;
     void interpretIntent(t, scr, acts)
-      .then(({ action, confidence }) => {
+      .then(({ action, confidence, spokenResponse }) => {
+        const sr = (spokenResponse || "").trim();
         if (action === "__done__" && confidence >= 0.5 && onDoneRef.current) {
-          speakConfirm("Alright, have a good day.");
+          if (sr) speakLocalized(sr); else speakConfirm("Alright, have a good day.");
           window.setTimeout(() => { onDoneRef.current?.(); }, 1200);
         } else if (action && action !== "none" && action !== "__done__" && confidence >= 0.5 && dispatch) {
+          if (sr) speakLocalized(sr);
           dispatch(action, { confirm: speakConfirm });
         } else {
-          speakConfirm("Sorry, I didn't catch that — you can tap a button.");
+          if (sr) speakLocalized(sr);
+          else speakConfirm("Sorry, I didn't catch that — you can tap a button.");
         }
       })
       .finally(() => { interpretingRef.current = false; });
-  }, [speakConfirm]);
+  }, [speakConfirm, speakLocalized]);
 
   const startLoop = useCallback(() => {
     const svc = DemoServices.voice;
