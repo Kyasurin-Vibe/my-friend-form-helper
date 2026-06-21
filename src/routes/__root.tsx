@@ -122,6 +122,30 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // Unlock audio on the FIRST user gesture anywhere in the app (iOS Safari/
+  // Chrome block audio until then). Once unlocked, every later Deepgram
+  // <audio> and speechSynthesis.speak() plays reliably for the session.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let done = false;
+    const handler = () => {
+      if (done) return;
+      done = true;
+      void import("../lib/audio-unlock").then((m) => m.unlockAudio());
+      window.removeEventListener("pointerdown", handler, true);
+      window.removeEventListener("touchstart", handler, true);
+      window.removeEventListener("keydown", handler, true);
+    };
+    window.addEventListener("pointerdown", handler, true);
+    window.addEventListener("touchstart", handler, true);
+    window.addEventListener("keydown", handler, true);
+    return () => {
+      window.removeEventListener("pointerdown", handler, true);
+      window.removeEventListener("touchstart", handler, true);
+      window.removeEventListener("keydown", handler, true);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}

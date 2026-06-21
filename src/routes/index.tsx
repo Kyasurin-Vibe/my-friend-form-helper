@@ -22,6 +22,7 @@ import { cancelSpeech, startRecording, transcribeAudio, type VoiceAction } from 
 import { playWarning } from "@/lib/chime";
 import { LANG_LABELS, type Lang, setLang, t, onLangChange, onTranslate, aiText } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { unlockAudio } from "@/lib/audio-unlock";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -516,6 +517,9 @@ function LanguagePickerScreen({ onPick }: { onPick: (l: Lang) => void }) {
   }, []);
 
   const pick = (l: Lang) => {
+    // FIRST user gesture on the app — unlock audio for iOS Safari/Chrome so
+    // every later Deepgram <audio> and speechSynthesis.speak() plays reliably.
+    unlockAudio();
     setLang(l);
     try { window.speechSynthesis.cancel(); } catch { /* noop */ }
     // Speak greeting in chosen language, then go home (voice loop starts on Home).
