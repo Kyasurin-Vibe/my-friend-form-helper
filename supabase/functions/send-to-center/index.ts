@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
       initials?: string;
       recipient?:
         | { kind: "center"; partnerName?: string }
-        | { kind: "trusted"; name?: string; relationship?: string };
+        | { kind: "trusted"; name?: string; relationship?: string; email?: string };
     };
     const { analysis, initials } = body;
     const originalImage = body.originalImage ?? body.image;
