@@ -252,10 +252,16 @@ export async function sendToCenter(opts: {
 
 
 // Live cases query + realtime subscription for the staff dashboard.
-export function useCases(): CaseRow[] {
+// Pass `enabled=false` to skip fetching/subscribing — used while the
+// caller is still resolving whether the signed-in user has the staff role.
+export function useCases(enabled: boolean = true): CaseRow[] {
   const [cases, setCases] = useState<CaseRow[]>([]);
 
   useEffect(() => {
+    if (!enabled) {
+      setCases([]);
+      return;
+    }
     let active = true;
 
     const load = async () => {
@@ -286,7 +292,7 @@ export function useCases(): CaseRow[] {
       active = false;
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [enabled]);
 
   return cases;
 }
