@@ -185,7 +185,10 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
 
   // === Auto-capture countdown when document looks clear ===
   useEffect(() => {
-    if (guidance !== "detected") return;
+    if (guidance !== "detected") {
+      setCountdown(0);
+      return;
+    }
     if (confirmedRef.current) return;
     setCountdown(3);
     const id = window.setInterval(() => {
