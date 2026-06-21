@@ -33,7 +33,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: "elevenlabs_not_configured" }, { status: 503, headers: CORS });
     }
 
-    const voiceId = voice || DEFAULT_VOICE_ID;
+    // Only accept ElevenLabs-style voice ids (20-char alphanumeric).
+    // Legacy Deepgram ids like "aura-asteria-en" are ignored.
+    const isElevenLabsId = typeof voice === "string" && /^[A-Za-z0-9]{20}$/.test(voice);
+    const voiceId = isElevenLabsId ? (voice as string) : DEFAULT_VOICE_ID;
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
 
     const r = await fetch(url, {
