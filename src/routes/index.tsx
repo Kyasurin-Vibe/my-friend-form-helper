@@ -376,7 +376,10 @@ function ElderApp() {
                 onBack={() => setPhase(analysis ? "review" : "retake")}
                 onPick={(r) => handleSend(r)}
                 speech={speech}
+                mode={chooseMode}
+                setMode={setChooseMode}
               />
+
             ) : (
               <SentScreen
                 sendResult={sendResult}
