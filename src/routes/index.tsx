@@ -7,6 +7,7 @@ import { useSpeech } from "@/lib/useSpeech";
 import {
   analyzeDocument,
   cropToBounds,
+  detectDocumentBounds,
   sendToCenter,
   speakWarm,
   type AnalysisResult,
@@ -118,30 +119,57 @@ function ElderApp() {
 
     const startedAt = Date.now();
     const minDisplay = 700;
+    // Tight centered A4-ish crop — never the full raw frame.
     const centeredFallback: DocumentBounds = {
-      x: 0.08, y: 0.04, width: 0.84, height: 0.92, confidence: 0,
+      x: 0.14, y: 0.06, width: 0.72, height: 0.88, confidence: 0,
     };
 
-    // Step 2: run Claude analyze-document on the full-res image. Recognition only — no send.
-    let analysisResult: AnalysisResult | null = null;
-    try {
-      analysisResult = await analyzeDocument(result.original);
-      setAnalysis(analysisResult);
-    } catch (e) {
+    // Run BOTH in parallel:
+    //  - detect-document (downscaled, fast) → reliable bounds for the preview crop
+    //  - analyze-document (full-res) → recognition for the review screen
+    const detectPromise = detectDocumentBounds(result.original);
+    const analyzePromise = analyzeDocument(result.original).catch((e) => {
       console.error("analyze failed", e);
       setAnalyzeError(e instanceof Error ? e.message : "Could not analyze right now.");
-    }
+      return null;
+    });
 
-    // Step 3: crop using Claude's documentBounds (reliable). Fall back to centered crop.
-    const claudeBounds = analysisResult?.documentBounds ?? null;
-    const cropBounds = isValidBounds(claudeBounds) ? claudeBounds! : centeredFallback;
-    let cropped: string | undefined;
+    const detectRes = await detectPromise;
+    const detectBounds =
+      detectRes &&
+      detectRes.documentPresent &&
+      detectRes.confidence >= 0.55 &&
+      detectRes.documentBounds &&
+      isValidBounds({ ...detectRes.documentBounds, confidence: detectRes.confidence })
+        ? { ...detectRes.documentBounds, confidence: detectRes.confidence }
+        : null;
+
+    // Prefer dedicated detector bounds, then local bounds from scanner, then centered fallback.
+    // NEVER fall back to the raw frame.
+    const cropBounds: DocumentBounds =
+      detectBounds ??
+      (isValidBounds(result.bounds) ? result.bounds! : centeredFallback);
+
+    let cropped: string;
     try {
       cropped = await cropToBounds(result.original, cropBounds, 0.03);
     } catch {
       cropped = result.processed ?? result.original;
     }
     setProcessedImage(cropped);
+
+    // Wait for analyze (parallel) to finish before showing preview so review screen is ready.
+    const analysisResult = await analyzePromise;
+    if (analysisResult) setAnalysis(analysisResult);
+
+    // If Claude analyze returned even tighter bounds, refine the preview crop.
+    const claudeBounds = analysisResult?.documentBounds ?? null;
+    if (isValidBounds(claudeBounds)) {
+      try {
+        const refined = await cropToBounds(result.original, claudeBounds!, 0.03);
+        setProcessedImage(refined);
+      } catch { /* keep prior cropped */ }
+    }
 
     const elapsed = Date.now() - startedAt;
     if (elapsed < minDisplay) {
@@ -248,7 +276,7 @@ function ElderApp() {
               />
             ) : phase === "preview" ? (
               <PreviewScreen
-                image={processedImage ?? capturedImage}
+                image={processedImage}
                 speech={speech}
                 onUse={confirmPreview}
                 onRetake={() => setPhase("magnifier")}

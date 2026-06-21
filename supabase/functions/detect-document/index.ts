@@ -15,24 +15,36 @@ const MODELS = [
   "claude-3-5-sonnet-20241022",
 ];
 
-const SYSTEM = `You are a fast document presence detector for a phone camera scanner.
+const SYSTEM = `You are a fast document presence + bounds detector for a phone camera scanner.
 You receive ONE small low-res frame. Decide ONLY these things:
-- documentPresent: true if a paper document (form, letter, certificate, invoice, ID, etc.) clearly fills most of the frame.
+- documentPresent: true if a paper document (form, letter, certificate, invoice, ID, etc.) is clearly visible in the frame.
 - readable: true if the document text/structure looks sharp enough to read (not blurry, not glare-covered, not too dark, not heavily cropped).
 - confidence: 0..1, your confidence in BOTH judgments together.
+- documentBounds: tight bounding box of the paper document, NORMALIZED 0..1 to image dims (x,y top-left). Include only the document — not hands, not ceiling, not background. If you cannot clearly see a single document, set documentBounds to null.
 Reply by calling the "report_presence" tool exactly once. No prose.`;
 
 const TOOL = {
   name: "report_presence",
-  description: "Report whether a readable document is in the frame.",
+  description: "Report whether a readable document is in the frame, and its bounds.",
   input_schema: {
     type: "object",
     additionalProperties: false,
-    required: ["documentPresent", "readable", "confidence"],
+    required: ["documentPresent", "readable", "confidence", "documentBounds"],
     properties: {
       documentPresent: { type: "boolean" },
       readable: { type: "boolean" },
       confidence: { type: "number", minimum: 0, maximum: 1 },
+      documentBounds: {
+        type: ["object", "null"],
+        required: ["x", "y", "width", "height"],
+        additionalProperties: false,
+        properties: {
+          x: { type: "number", minimum: 0, maximum: 1 },
+          y: { type: "number", minimum: 0, maximum: 1 },
+          width: { type: "number", minimum: 0, maximum: 1 },
+          height: { type: "number", minimum: 0, maximum: 1 },
+        },
+      },
     },
   },
 } as const;
@@ -59,7 +71,7 @@ async function callClaude(apiKey: string, model: string, parsed: { media_type: s
       },
       body: JSON.stringify({
         model,
-        max_tokens: 80,
+        max_tokens: 200,
         system: SYSTEM,
         tools: [TOOL],
         tool_choice: { type: "tool", name: "report_presence" },
@@ -117,11 +129,23 @@ Deno.serve(async (req) => {
         if (!ai || typeof ai !== "object") {
           return Response.json({ documentPresent: false, readable: false, confidence: 0, _error: "no_tool_use" }, { headers: CORS });
         }
+        const b = ai.documentBounds;
+        const bounds = b && typeof b === "object"
+          && Number.isFinite(Number(b.x)) && Number.isFinite(Number(b.y))
+          && Number.isFinite(Number(b.width)) && Number.isFinite(Number(b.height))
+          ? {
+              x: Math.max(0, Math.min(1, Number(b.x))),
+              y: Math.max(0, Math.min(1, Number(b.y))),
+              width: Math.max(0, Math.min(1, Number(b.width))),
+              height: Math.max(0, Math.min(1, Number(b.height))),
+            }
+          : null;
         return Response.json(
           {
             documentPresent: !!ai.documentPresent,
             readable: !!ai.readable,
             confidence: Math.max(0, Math.min(1, Number(ai.confidence) || 0)),
+            documentBounds: bounds,
           },
           { headers: CORS },
         );
