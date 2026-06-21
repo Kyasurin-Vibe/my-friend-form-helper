@@ -146,7 +146,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     introSpokenRef.current = true;
     speakingRef.current = true;
     speak(
-      "Point the camera at your paper. Fit it inside the frame. I'll capture it when it looks clear, or tap the red button.",
+      "Fit your paper inside the frame. Say \"yes\" or tap the red button when ready.",
       () => {
         speakingRef.current = false;
         if (shouldListenRef.current) startVoice();
