@@ -1074,7 +1074,8 @@ function VoiceField({
       if (!blob) return;
       const transcript = (await transcribeAudio(blob)).trim();
       if (transcript) {
-        const cleaned = transcript.replace(/[.。!?！？]+$/g, "").trim();
+        let cleaned = transcript.replace(/[.。!?！？]+$/g, "").trim();
+        if (normalize) cleaned = normalize(cleaned);
         onChange(cleaned);
       }
     } finally {
