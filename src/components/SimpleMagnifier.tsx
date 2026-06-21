@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DemoServices } from "@/lib/services";
-import { translateAsync, translateSync, getLang, getBCP47 } from "@/lib/i18n";
+import { translateAsync, translateSync, getLang, getBCP47, useTranslated } from "@/lib/i18n";
 
 type Props = {
   onBack: () => void;
