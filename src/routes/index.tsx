@@ -1557,12 +1557,12 @@ function handlePhaseCommand(
 
   switch (phase) {
     case "home": {
-      if (/\b(see|bigger|magnify|magnifier|read this|help me see)\b/.test(t)) {
+      if (/\b(see|look|magnify|magnifier|bigger|larger|zoom|read this|help me see|i wanna see|i want to see|i can'?t see|show me|seeing aid)\b/.test(t)) {
         confirm("Opening the magnifier.");
         setPhase("viewer");
         return true;
       }
-      if (/\b(question|document|scan|paper|form|help me with this|read it|help with)\b/.test(t)) {
+      if (/\b(question|document|scan|paper|my paper|form|help me with this|read it|help with|ask)\b/.test(t)) {
         confirm("Okay — let's scan it.");
         setPhase("find");
         return true;
