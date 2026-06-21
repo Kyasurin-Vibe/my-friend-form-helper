@@ -6,7 +6,7 @@
 // - Buttons remain primary; voice is purely additive. If the mic is blocked,
 //   a gentle note is shown and the screen still works via taps.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { DemoServices } from "@/lib/services";
 import { cancelSpeech } from "@/lib/voice";
 import { speakWarm } from "@/lib/cases";
