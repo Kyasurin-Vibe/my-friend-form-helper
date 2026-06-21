@@ -485,11 +485,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           color: "var(--color-elder-primary)", borderRadius: 14, padding: "8px 14px", fontSize: 15,
         }}>{t("back")}</button>
         <span className="font-extrabold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>{t("scanner_title")}</span>
-        <span style={{
-          fontSize: 13, fontWeight: 700,
-          color: listening ? "#16a34a" : "#8a7d6f",
-          minWidth: 64, textAlign: "right",
-        }}>{listening ? t("listening") : t("mic_off_short")}</span>
+        <span style={{ minWidth: 64 }} aria-hidden />
       </div>
 
       <div className="mx-4 rounded-2xl overflow-hidden relative" style={{
