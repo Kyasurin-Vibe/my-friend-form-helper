@@ -82,6 +82,7 @@ function ElderApp() {
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
   const [sending, setSending] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [chooseMode, setChooseMode] = useState<"pick" | "trusted">("pick");
   const speech = useSpeech();
   const navigate = useNavigate();
 
