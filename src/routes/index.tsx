@@ -858,11 +858,13 @@ function SentScreen({
 
 function ChooseRecipientScreen({
   sending,
+  analysis,
   onBack,
   onPick,
   speech,
 }: {
   sending: boolean;
+  analysis: AnalysisResult | null;
   onBack: () => void;
   onPick: (r: Recipient) => void;
   speech: ReturnType<typeof useSpeech>;
@@ -871,6 +873,7 @@ function ChooseRecipientScreen({
   const [mode, setMode] = useState<"pick" | "trusted">("pick");
   const [name, setName] = useState("");
   const [relationship, setRelationship] = useState("");
+  const partner = getAccountablePartner(analysis?.resourceCategory);
 
   if (mode === "pick") {
     return (
@@ -890,7 +893,7 @@ function ChooseRecipientScreen({
         </p>
         <div className="space-y-3 mt-auto">
           <BigButton variant="danger" onClick={() => onPick({ kind: "center" })}>
-            {sending ? "Sending…" : "🤝 Connect me with the Legal Aid Center"}
+            {sending ? "Sending…" : `🤝 ${partner.label}`}
           </BigButton>
           <p
             className="text-center"
@@ -909,10 +912,10 @@ function ChooseRecipientScreen({
           </p>
           <BigButton variant="ghost" onClick={onBack}>← Go back</BigButton>
           <VoiceBar
-            speakableText={speakableForPhase("choose", { analysis: null, sendResult: null, analyzeError: null })}
+            speakableText={speakableForPhase("choose", { analysis, sendResult: null, analyzeError: null })}
             voiceOn={voiceOn}
             actions={[
-              { id: "center", label: "Connect me with the Legal Aid Center", description: "Send the document to the legal aid center (the recommended, accountable option)" },
+              { id: "center", label: partner.label, description: `Send the document to a ${partner.name} (the recommended, accountable option)` },
               { id: "trusted", label: "Send to my trusted person", description: "Open the form to enter a trusted contact the user picks themselves" },
               { id: "back", label: "Go back", description: "Return to the previous screen" },
             ]}
