@@ -491,10 +491,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
           🔊 Read this
         </button>
         <button
-          onClick={() => {
-            confirmedRef.current = true;
-            onConfirm(detected ?? undefined);
-          }}
+          onClick={doCapture}
           disabled={!!error}
           className="w-full font-extrabold animate-button-pop-red"
           style={{
@@ -508,7 +505,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
             opacity: error ? 0.5 : 1,
           }}
         >
-          ✓ Yes, this is the file
+          📸 Capture & check
         </button>
         <button
           onClick={onHandoff}
