@@ -61,6 +61,48 @@ export async function analyzeDocument(imageDataUrl: string, userGoal?: string): 
   return data as AnalysisResult;
 }
 
+export type DetectBoundsResult = {
+  documentPresent: boolean;
+  readable: boolean;
+  confidence: number;
+  documentBounds: { x: number; y: number; width: number; height: number } | null;
+};
+
+async function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = reject;
+    el.src = src;
+  });
+}
+
+export async function downscaleDataUrl(dataUrl: string, targetWidth = 320, quality = 0.55): Promise<string> {
+  if (typeof window === "undefined") return dataUrl;
+  const img = await loadImg(dataUrl);
+  const scale = Math.min(1, targetWidth / img.naturalWidth);
+  const w = Math.max(1, Math.round(img.naturalWidth * scale));
+  const h = Math.max(1, Math.round(img.naturalHeight * scale));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, w, h);
+  return c.toDataURL("image/jpeg", quality);
+}
+
+export async function detectDocumentBounds(fullFrameDataUrl: string): Promise<DetectBoundsResult | null> {
+  try {
+    const small = await downscaleDataUrl(fullFrameDataUrl, 320, 0.55);
+    const { data, error } = await supabase.functions.invoke("detect-document", { body: { image: small } });
+    if (error || !data) return null;
+    return data as DetectBoundsResult;
+  } catch (e) {
+    console.warn("detectDocumentBounds failed", e);
+    return null;
+  }
+}
+
 /**
  * Crop a captured image to the AI-returned bounds with ~3% padding.
  * Returns the original data URL if bounds are null or cropping fails.
