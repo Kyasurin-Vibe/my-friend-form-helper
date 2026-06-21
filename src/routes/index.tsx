@@ -427,6 +427,39 @@ function ElderApp() {
 }
 function LanguagePickerScreen({ onPick }: { onPick: (l: Lang) => void }) {
   const langs: Lang[] = ["en", "es", "zh", "vi", "tl"];
+  // Short post-selection greeting spoken in the chosen language.
+  const GREETING: Record<Lang, string> = {
+    en: "Hello! I'm here to help.",
+    es: "¡Hola! Estoy aquí para ayudarle.",
+    zh: "您好!我在这里帮您。",
+    vi: "Xin chào! Tôi ở đây để giúp bạn.",
+    tl: "Kumusta! Nandito ako para tumulong.",
+  };
+  const [listening, setListening] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+  const greetedRef = useRef(false);
+
+  // Speak the English picker greeting once on mount.
+  useEffect(() => {
+    if (greetedRef.current) return;
+    greetedRef.current = true;
+    try {
+      const u = new SpeechSynthesisUtterance(
+        "What language do you speak? Say it, or tap your language.",
+      );
+      u.rate = 0.95; u.pitch = 1.05; u.lang = "en-US";
+      window.speechSynthesis.speak(u);
+    } catch { /* noop */ }
+  }, []);
+
+  const pick = (l: Lang) => {
+    setLang(l);
+    // Speak short greeting in chosen language, then go home.
+    try { window.speechSynthesis.cancel(); } catch { /* noop */ }
+    speakWarm(GREETING[l], { skipTranslate: true }).catch(() => { /* noop */ });
+    setTimeout(() => onPick(l), 400);
+  };
+
   const speakLabel = (l: Lang) => {
     try {
       const u = new SpeechSynthesisUtterance(LANG_LABELS[l].native);
@@ -440,20 +473,68 @@ function LanguagePickerScreen({ onPick }: { onPick: (l: Lang) => void }) {
       window.speechSynthesis.speak(u);
     } catch { /* noop */ }
   };
+
+  const handleSpeak = async () => {
+    if (listening) return;
+    setHint(null);
+    setListening(true);
+    try {
+      const { language } = await detectSpokenLanguage(2500);
+      const allowed: Lang[] = ["en", "es", "zh", "vi", "tl"];
+      if (language && (allowed as string[]).includes(language)) {
+        pick(language as Lang);
+      } else {
+        setHint("I didn't catch that — please tap your language.");
+        try {
+          const u = new SpeechSynthesisUtterance("I didn't catch that — please tap your language.");
+          u.rate = 0.95; u.lang = "en-US";
+          window.speechSynthesis.speak(u);
+        } catch { /* noop */ }
+      }
+    } catch {
+      setHint("I couldn't hear you — please tap your language.");
+    } finally {
+      setListening(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center p-6 text-center">
-      <Mascot mode="idle" size={120} />
+      <Mascot mode={listening ? "speaking" : "idle"} size={120} />
       <h1 className="mt-3 font-extrabold" style={{ fontSize: 22, color: "var(--color-elder-ink)", lineHeight: 1.35 }}>
         What language do you speak?<br />
         <span style={{ fontSize: 16, fontWeight: 700, color: "#6b5d52" }}>
           ¿Qué idioma habla? · 您说什么语言? · Bạn nói ngôn ngữ nào? · Anong wika ang gusto mo?
         </span>
       </h1>
+      <button
+        onClick={handleSpeak}
+        disabled={listening}
+        className="w-full font-extrabold active:scale-[0.96] animate-button-pop mt-4"
+        style={{
+          background: "var(--color-elder-red)",
+          color: "#fff",
+          border: "none",
+          borderRadius: 22,
+          padding: "18px 22px",
+          fontSize: 22,
+          minHeight: 72,
+          boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
+          opacity: listening ? 0.7 : 1,
+        }}
+      >
+        {listening ? "🎙 Listening…" : "🎙 Speak your language"}
+      </button>
+      {hint && (
+        <p className="mt-3" style={{ fontSize: 15, color: "#b91c1c", fontWeight: 600 }}>
+          {hint}
+        </p>
+      )}
       <div className="w-full space-y-3 mt-5">
         {langs.map((l) => (
           <button
             key={l}
-            onClick={() => { speakLabel(l); setTimeout(() => onPick(l), 250); }}
+            onClick={() => { speakLabel(l); setTimeout(() => pick(l), 250); }}
             onFocus={() => speakLabel(l)}
             className="w-full font-extrabold active:scale-[0.96] animate-button-pop"
             style={{
