@@ -1634,13 +1634,12 @@ function handlePhaseCommand(
       }
       if (/\b(trust|trusted|my own|someone i trust|my person|family|attorney|daughter|son)\b/.test(t)) {
         confirm("Okay — your trusted person.");
-        // The choose screen has its own internal state machine; the user will
-        // tap the form fields. We can't directly flip mode from here without
-        // exposing more state, so we just acknowledge — the big buttons remain.
+        setChooseMode("trusted");
         return true;
       }
       return false;
     }
+
     case "sent": {
       if (/\b(start over|again|new one|restart|another)\b/.test(t)) {
         confirm("Starting over.");
