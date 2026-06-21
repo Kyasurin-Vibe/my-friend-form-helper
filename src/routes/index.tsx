@@ -1661,7 +1661,7 @@ function handlePhaseCommand(
 
 // ===== AI-interpreted action catalog per phase =====
 
-function getPhaseActions(phase: Phase): { id: string; description: string }[] {
+function getPhaseActions(phase: Phase, chooseMode: "pick" | "trusted" = "pick"): { id: string; description: string }[] {
   switch (phase) {
     case "home":
       return [
@@ -1688,9 +1688,14 @@ function getPhaseActions(phase: Phase): { id: string; description: string }[] {
         { id: "retake", description: "Retake the photo instead" },
       ];
     case "choose":
+      if (chooseMode === "trusted") {
+        return [
+          { id: "back_to_pick", description: "Go back to the recipient choice (the user changed their mind)" },
+        ];
+      }
       return [
         { id: "center", description: "Send to the recommended center / institution / partner / legal aid / social worker" },
-        { id: "trusted", description: "Send to someone the user personally trusts, like family, daughter, son, attorney" },
+        { id: "trusted", description: "Send to someone the user personally trusts — trusted person, my own person, family, daughter, son, attorney, lawyer" },
       ];
     case "sent":
       return [
@@ -1713,9 +1718,10 @@ function runPhaseAction(
     restart: () => void;
     handleSend: (r: Recipient) => void | Promise<void>;
     analysis: AnalysisResult | null;
+    setChooseMode: (m: "pick" | "trusted") => void;
   },
 ): void {
-  const { setPhase, confirmPreview, navigate, restart, handleSend } = ctx;
+  const { setPhase, confirmPreview, navigate, restart, handleSend, setChooseMode } = ctx;
   switch (id) {
     case "magnifier": confirm("Opening the magnifier."); setPhase("viewer"); return;
     case "scan": confirm("Okay — let's scan it."); setPhase("find"); return;
@@ -1726,12 +1732,14 @@ function runPhaseAction(
     case "connect_person": confirm("Sending to a person."); setPhase("choose"); return;
     case "send": confirm("Sending now."); setPhase("choose"); return;
     case "center": confirm("Sending to the center."); void handleSend({ kind: "center" }); return;
-    case "trusted": confirm("Okay — your trusted person."); return;
+    case "trusted": confirm("Okay — your trusted person."); setChooseMode("trusted"); return;
+    case "back_to_pick": confirm("Okay — going back."); setChooseMode("pick"); return;
     case "restart": confirm("Starting over."); restart(); return;
     case "open_center": confirm("Opening the center."); navigate({ to: "/center" }); return;
     default: return;
   }
 }
+
 
 function DoneButton({ onClick }: { onClick: () => void }) {
   return (
