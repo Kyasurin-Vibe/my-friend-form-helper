@@ -511,7 +511,10 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         }}
       >
         {error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6" style={{ color: "#fff" }}>
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center text-center p-6"
+            style={{ color: "#fff" }}
+          >
             <p className="font-extrabold" style={{ fontSize: 20 }}>
               I can't open the camera.
             </p>
@@ -575,7 +578,10 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
               </div>
             )}
             {!ready && (
-              <div className="absolute inset-0 flex items-center justify-center" style={{ color: "#fff" }}>
+              <div
+                className="absolute inset-0 flex items-center justify-center"
+                style={{ color: "#fff" }}
+              >
                 Starting camera…
               </div>
             )}
@@ -596,7 +602,10 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           {GUIDANCE_TEXT[guidance]}
         </p>
         {heard && listening && (
-          <p className="text-center" style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}>
+          <p
+            className="text-center"
+            style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}
+          >
             &quot;{heard}&quot;
           </p>
         )}
