@@ -176,10 +176,12 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
             const y = Math.floor(p / W);
             if (x < minX) minX = x; if (x > maxX) maxX = x;
             if (y < minY) minY = y; if (y > maxY) maxY = y;
-            const neighbors = [p - 1, p + 1, p - W, p + W];
-            for (const n of neighbors) {
-              if (n < 0 || n >= paperMask.length || visited[n] || !paperMask[n]) continue;
-              if ((n === p - 1 && x === 0) || (n === p + 1 && x === W - 1)) continue;
+            for (const { dx, dy } of ADJACENT_OFFSETS) {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+              const n = ny * W + nx;
+              if (visited[n] || !paperMask[n]) continue;
               visited[n] = 1;
               queue[tail++] = n;
             }
