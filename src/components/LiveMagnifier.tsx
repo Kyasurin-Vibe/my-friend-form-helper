@@ -158,23 +158,38 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         }
         const sharp = edgeSum / edgeN;
 
-        let minX = W, maxX = -1, minY = H, maxY = -1;
-        for (let y = 0; y < H; y++) {
-          if (rowCounts[y] > W * 0.18) { minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
-        }
-        for (let x = 0; x < W; x++) {
-          if (colCounts[x] > H * 0.18) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
+        const visited = new Uint8Array(W * H);
+        const queue = new Uint16Array(W * H);
+        let best = { count: 0, minX: W, maxX: -1, minY: H, maxY: -1 };
+        for (let start = 0; start < paperMask.length; start++) {
+          if (!paperMask[start] || visited[start]) continue;
+          let head = 0, tail = 0, count = 0;
+          let minX = W, maxX = -1, minY = H, maxY = -1;
+          queue[tail++] = start;
+          visited[start] = 1;
+          while (head < tail) {
+            const p = queue[head++];
+            count++;
+            const x = p % W;
+            const y = Math.floor(p / W);
+            if (x < minX) minX = x; if (x > maxX) maxX = x;
+            if (y < minY) minY = y; if (y > maxY) maxY = y;
+            const neighbors = [p - 1, p + 1, p - W, p + W];
+            for (const n of neighbors) {
+              if (n < 0 || n >= paperMask.length || visited[n] || !paperMask[n]) continue;
+              if ((n === p - 1 && x === 0) || (n === p + 1 && x === W - 1)) continue;
+              visited[n] = 1;
+              queue[tail++] = n;
+            }
+          }
+          if (count > best.count) best = { count, minX, maxX, minY, maxY };
         }
 
+        const minX = best.minX, maxX = best.maxX, minY = best.minY, maxY = best.maxY;
         const boxW = Math.max(0, maxX - minX + 1);
         const boxH = Math.max(0, maxY - minY + 1);
         const boxArea = boxW * boxH;
-        let boxPaper = 0;
-        if (boxArea > 0) {
-          for (let y = minY; y <= maxY; y++) {
-            for (let x = minX; x <= maxX; x++) boxPaper += paperMask[y * W + x];
-          }
-        }
+        const boxPaper = best.count;
         const boxAreaFrac = boxArea / (W * H);
         const boxDensity = boxArea > 0 ? boxPaper / boxArea : 0;
         const aspect = boxH > 0 ? boxW / boxH : 0;
