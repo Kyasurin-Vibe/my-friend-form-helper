@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   DemoServices,
-  type DetectedDoc,
   type VoiceCommand,
 } from "@/lib/services";
 
@@ -12,6 +11,7 @@ type Props = {
 };
 
 type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
+type DetectionBox = { x: number; y: number; w: number; h: number };
 
 const GUIDANCE_TEXT: Record<Guidance, string> = {
   init: "Point the camera at your paper.",
@@ -21,6 +21,10 @@ const GUIDANCE_TEXT: Record<Guidance, string> = {
   blurry: "The picture is too blurry. Please try again.",
   detected: "Looks clear. Capturing automatically…",
 };
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
 
 // Lightweight TTS helper local to this screen, so it composes with the
 // outer useSpeech without fighting it for the queue.
