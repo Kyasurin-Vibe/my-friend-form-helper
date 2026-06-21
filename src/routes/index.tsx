@@ -853,7 +853,8 @@ function speakableForPhase(
     case "magnifier":
       return "Point the camera at your paper. Keep the corners inside the frame. I'll capture it when it looks clear.";
     case "preview":
-      return "Is this clear enough? Tap Yes use this to send it to be read, or say yes. Tap Retake to take another photo, or say no.";
+      return "Is this clear enough? Tap Yes use this and I'll read it for you, or say yes. Tap Retake to take another photo, or say no.";
+
     case "analyzing":
       return "Let me read this for you. Reading your document. One moment.";
 
