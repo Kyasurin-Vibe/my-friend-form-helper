@@ -1,9 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useCases, CENTER_NAME, type CaseRow } from "@/lib/cases";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/center")({
+export const Route = createFileRoute("/_authenticated/center")({
   head: () => ({
     meta: [
       { title: `My Friend — ${CENTER_NAME} · Review Queue` },
@@ -12,13 +12,44 @@ export const Route = createFileRoute("/center")({
         content:
           "Staff dashboard for reviewing cases handed off by My Friend. Calm, professional, accountable.",
       },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: CenterDashboard,
 });
 
+function useStaffRole() {
+  const [state, setState] = useState<{ loading: boolean; isStaff: boolean }>({
+    loading: true,
+    isStaff: false,
+  });
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) {
+        if (active) setState({ loading: false, isStaff: false });
+        return;
+      }
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", uid)
+        .in("role", ["staff", "admin"]);
+      if (active) setState({ loading: false, isStaff: (data ?? []).length > 0 });
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+  return state;
+}
+
 function CenterDashboard() {
-  const cases = useCases();
+  const { loading, isStaff } = useStaffRole();
+  const navigate = useNavigate();
+  const cases = useCases(isStaff);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,6 +57,46 @@ function CenterDashboard() {
   }, [cases, selectedId]);
 
   const selected = cases.find((c) => c.id === selectedId) || null;
+
+  if (loading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center text-slate-500 text-sm">
+        Checking access…
+      </div>
+    );
+  }
+
+  if (!isStaff) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-slate-50 px-4">
+        <div className="max-w-md text-center bg-white border border-slate-200 rounded-lg p-8">
+          <h1 className="text-xl font-semibold text-slate-900">Staff access required</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            Your account is signed in but has not been granted Legal Aid Center staff
+            access. Ask an administrator to add the{" "}
+            <code className="px-1 bg-slate-100 rounded">staff</code> role to your user.
+          </p>
+          <div className="mt-6 flex gap-2 justify-center">
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/auth" });
+              }}
+              className="px-4 py-2 rounded-md text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            >
+              Sign out
+            </button>
+            <Link
+              to="/"
+              className="px-4 py-2 rounded-md text-sm font-medium bg-slate-900 text-white hover:bg-slate-800"
+            >
+              Go to elder app
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
