@@ -336,6 +336,30 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     return () => window.clearInterval(id);
   }, [ready]);
 
+  // Lazy-load jscanify+OpenCV. If it loads, run a slower polygon detection loop
+  // to render snapped corner overlay and enable extractPaper on capture.
+  // If it fails to load, the existing yellow/green box and raw-frame capture stay.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    let intervalId: number | undefined;
+    loadJscanify().then((inst) => {
+      if (cancelled || !inst) return;
+      jscanRef.current = inst;
+      intervalId = window.setInterval(() => {
+        if (confirmedRef.current) return;
+        const video = videoRef.current;
+        if (!video || !video.videoWidth) return;
+        const corners = findPaperCornersNormalized(inst, video);
+        setPaperCorners(corners);
+      }, 700);
+    });
+    return () => {
+      cancelled = true;
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+    };
+  }, [ready]);
+
   useEffect(() => {
     if (guidance === "init" || guidance === "hold-still") return;
     const text =
