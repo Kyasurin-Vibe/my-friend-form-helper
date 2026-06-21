@@ -536,7 +536,7 @@ function LanguagePickerScreen({ onPick }: { onPick: (l: Lang) => void }) {
         {langs.map((l) => (
           <button
             key={l}
-            onClick={() => { speakLabel(l); setTimeout(() => pick(l), 250); }}
+            onClick={() => pick(l)}
             className="w-full font-extrabold active:scale-[0.96] animate-button-pop"
             style={{
               background: "#fff",
