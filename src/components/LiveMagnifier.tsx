@@ -278,7 +278,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           }));
         }
 
-        // Decide hint
+        // Cache for AI pre-check / fallback hints
+        meanLumRef.current = meanLum;
+        sharpRef.current = sharp;
+
+        // Local hint (visual feedback only; AUTO-CAPTURE is driven by Claude polling).
         let nextHint: Hint = "starting";
         if (meanLum < 65) nextHint = "tooDark";
         else if (skinFrac > 0.22 && paperFrac < 0.18) nextHint = "possibleFace";
@@ -288,27 +292,6 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         else nextHint = "documentDetected";
         setHint(nextHint);
 
-        // Stability tracking for auto-capture
-        const now = performance.now();
-        if (nextHint === "documentDetected" && smooth) {
-          const sb = stableBoxRef.current;
-          const drift = sb
-            ? Math.abs(sb.x - smooth.x) + Math.abs(sb.y - smooth.y) +
-              Math.abs(sb.width - smooth.width) + Math.abs(sb.height - smooth.height)
-            : 999;
-          if (drift < 0.08 && sb) {
-            if (stableSinceRef.current == null) stableSinceRef.current = now;
-            if (autoCapture && countdown === 0 && now - (stableSinceRef.current ?? now) > 800) {
-              startCountdown();
-            }
-          } else {
-            stableBoxRef.current = smooth;
-            stableSinceRef.current = now;
-          }
-        } else {
-          stableSinceRef.current = null;
-          stableBoxRef.current = null;
-        }
       } catch {
         // transient
       }
