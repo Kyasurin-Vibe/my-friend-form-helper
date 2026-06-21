@@ -506,7 +506,7 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
             boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
           }}
         >
-          🔍 Open Magnifier
+          🔍 Open Scanner
         </button>
         <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
           The magnifier uses your camera only on this device.
@@ -516,7 +516,7 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
         speakableText={speakableForPhase("find", { analysis: null, sendResult: null, analyzeError: null })}
         voiceOn={voiceOn}
         actions={[
-          { id: "open", label: "Open Magnifier", description: "Start the camera to find the document" },
+          { id: "open", label: "Open Scanner", description: "Start the camera to scan the document" },
         ]}
         onAction={(id) => { if (id === "open") onOpenMagnifier(); }}
       />
@@ -1388,7 +1388,7 @@ function speakableForPhase(
     case "viewer":
       return "Magnifier. Point your camera at anything you'd like to see bigger. Say back to return home, or say I have a question to scan a document.";
     case "find":
-      return "Ready to find your document? I'll open the magnifier so you can see clearly first. Nothing is uploaded yet. Tap the red Open Magnifier button when you're ready, or say yes.";
+      return "Ready to find your document? I'll open the scanner so you can see clearly first. Nothing is uploaded yet. Tap the red Open Scanner button when you're ready, or say yes.";
     case "magnifier":
       return "Point the camera at your paper. Keep the corners inside the frame. I'll capture it when it looks clear.";
     case "preview":
