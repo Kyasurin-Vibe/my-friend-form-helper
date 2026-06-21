@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { DemoServices, type VoiceCommand } from "@/lib/services";
 import type { DocumentBounds } from "@/lib/cases";
 import { supabase } from "@/integrations/supabase/client";
-import { translateAsync, translateSync, getLang, getBCP47 } from "@/lib/i18n";
+import { translateAsync, translateSync, getLang, getBCP47, t, onLangChange } from "@/lib/i18n";
 
 
 type CaptureResult = {
@@ -108,6 +108,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [heard, setHeard] = useState("");
   const [hint, setHint] = useState<Hint>("starting");
+  const [, _bumpLang] = useState(0);
+  useEffect(() => onLangChange(() => _bumpLang((n) => n + 1)), []);
   const [aiStatus, setAiStatus] = useState<"idle" | "checking" | "no_doc" | "unreadable" | "ready" | "unavailable">("idle");
   const [, setOverlayBox] = useState<DocumentBounds | null>(null);
   const [zoom, setZoom] = useState<{ scale: number; ox: number; oy: number }>({ scale: 1, ox: 50, oy: 50 });
@@ -551,18 +553,18 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   }
 
   const hintText: Record<Hint, string> = {
-    starting: "Starting camera…",
-    tooDark: "💡 Too dark — move to better light",
-    empty: "📄 Fit your paper inside the frame",
-    possibleFace: "🙂 That looks like a face, not a document",
-    moveCloser: "↕ Move a little closer",
-    holdStill: "✋ Hold still",
-    documentDetected: "✋ Hold still",
-    aiChecking: "🔍 Checking your document…",
-    aiNoDoc: "📄 Fit your paper inside the frame",
-    aiUnreadable: "🔎 Move closer and hold still",
-    aiReady: "✋ Hold still",
-    aiUnavailable: "📸 Say \"yes\" or tap Capture when ready",
+    starting: t("starting_camera"),
+    tooDark: t("hint_too_dark"),
+    empty: t("hint_empty"),
+    possibleFace: t("hint_face"),
+    moveCloser: t("hint_closer"),
+    holdStill: t("hint_hold"),
+    documentDetected: t("hint_hold"),
+    aiChecking: t("hint_checking"),
+    aiNoDoc: t("hint_empty"),
+    aiUnreadable: t("hint_unreadable"),
+    aiReady: t("hint_hold"),
+    aiUnavailable: t("hint_say_yes"),
   };
   const hintColor: Record<Hint, string> = {
     starting: "#6b5d52",
@@ -586,13 +588,13 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         <button onClick={onCancel} className="font-bold" style={{
           background: "#fff", border: "2px solid var(--color-elder-sky)",
           color: "var(--color-elder-primary)", borderRadius: 14, padding: "8px 14px", fontSize: 15,
-        }}>← Back</button>
-        <span className="font-extrabold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>📷 Scanner</span>
+        }}>{t("back")}</button>
+        <span className="font-extrabold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>{t("scanner_title")}</span>
         <span style={{
           fontSize: 13, fontWeight: 700,
           color: listening ? "#16a34a" : "#8a7d6f",
           minWidth: 64, textAlign: "right",
-        }}>{listening ? "🎙 Listening" : "🎙 off"}</span>
+        }}>{listening ? t("listening") : t("mic_off_short")}</span>
       </div>
 
       <div className="mx-4 rounded-2xl overflow-hidden relative" style={{
@@ -600,9 +602,9 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
       }}>
         {error ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6" style={{ color: "#fff" }}>
-            <p className="font-extrabold" style={{ fontSize: 20 }}>I can't open the camera.</p>
+            <p className="font-extrabold" style={{ fontSize: 20 }}>{t("camera_unavailable")}</p>
             <p className="mt-2" style={{ fontSize: 15, color: "#cbd2da" }}>{error}</p>
-            <p className="mt-2" style={{ fontSize: 14, color: "#9aa4b2" }}>Please allow camera access in your browser.</p>
+            <p className="mt-2" style={{ fontSize: 14, color: "#9aa4b2" }}>{t("allow_camera")}</p>
           </div>
         ) : (
           <>
@@ -637,7 +639,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
               </div>
             )}
             {!ready && (
-              <div className="absolute inset-0 flex items-center justify-center" style={{ color: "#fff" }}>Starting camera…</div>
+              <div className="absolute inset-0 flex items-center justify-center" style={{ color: "#fff" }}>{t("starting_camera")}</div>
             )}
           </>
         )}
@@ -648,7 +650,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           fontSize: 18, color: hintColor[hint], minHeight: 26, transition: "color 200ms",
         }}>{hintText[hint]}</p>
         <p className="text-center" style={{ fontSize: 14, color: "#6b5d52", minHeight: 20 }}>
-          Fit your paper inside the frame. Say &quot;yes&quot; or tap the red button when ready.
+          {t("scan_hint")}
         </p>
         {heard && listening && (
           <p className="text-center" style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}>
@@ -663,7 +665,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
             }} style={{
               marginTop: 6, background: "var(--color-elder-primary)", color: "#fff", border: 0,
               borderRadius: 12, padding: "8px 14px", fontWeight: 800, fontSize: 14,
-            }}>🎙 Tap to enable voice</button>
+            }}>{t("enable_voice")}</button>
           </div>
         )}
       </div>
@@ -685,7 +687,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           borderRadius: 999, padding: "8px 14px", fontWeight: 800, fontSize: 14,
           boxShadow: voiceArmed && listening ? "0 0 0 6px rgba(34,197,94,0.18)" : "none",
           transition: "all 0.2s",
-        }}>🎙 Voice {voiceArmed ? "ON" : "OFF"}</button>
+        }}>{voiceArmed ? t("voice_label_on") : t("voice_label_off")}</button>
       </div>
 
       <div className="px-4 pt-3 pb-5 mt-auto">
@@ -695,7 +697,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
             background: "var(--color-elder-red)", color: "#fff", borderRadius: 22,
             padding: "20px", fontSize: 22, minHeight: 78,
             boxShadow: "0 14px 30px rgba(0,0,0,0.18)", opacity: error ? 0.5 : 1,
-          }}>📸 Capture now</button>
+          }}>{t("capture_now_btn")}</button>
       </div>
     </div>
   );

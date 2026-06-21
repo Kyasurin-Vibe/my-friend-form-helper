@@ -172,6 +172,24 @@ const DICT: Record<string, Partial<Record<Lang, string>>> = {
   partner_connect_health:        { en: "Connect me with a Community Health Worker", es: "Conécteme con un Trabajador de Salud Comunitaria", zh: "帮我联系社区健康工作者", vi: "Kết nối tôi với Nhân viên y tế cộng đồng", tl: "Ikonekta mo ako sa Manggagawa sa Kalusugan" },
   partner_connect_immigration:   { en: "Connect me with Immigration Legal Aid", es: "Conécteme con Ayuda Legal de Inmigración", zh: "帮我联系移民法律援助", vi: "Kết nối tôi với Trợ giúp Pháp lý Di trú", tl: "Ikonekta mo ako sa Legal na Tulong sa Imigrasyon" },
   partner_connect_benefits:      { en: "Connect me with a Benefits Caseworker", es: "Conécteme con un Trabajador de Beneficios", zh: "帮我联系福利申办员", vi: "Kết nối tôi với một Nhân viên Phúc lợi", tl: "Ikonekta mo ako sa Caseworker ng Benepisyo" },
+
+  // LiveMagnifier scanner UI
+  scanner_title:    { en: "📷 Scanner", es: "📷 Escáner", zh: "📷 扫描", vi: "📷 Máy quét", tl: "📷 Scanner" },
+  mic_off_short:    { en: "🎙 off", es: "🎙 apagado", zh: "🎙 关", vi: "🎙 tắt", tl: "🎙 naka-off" },
+  voice_label_on:   { en: "🎙 Voice ON", es: "🎙 Voz ACTIVADA", zh: "🎙 语音 开", vi: "🎙 Giọng nói BẬT", tl: "🎙 Boses NAKA-ON" },
+  voice_label_off:  { en: "🎙 Voice OFF", es: "🎙 Voz APAGADA", zh: "🎙 语音 关", vi: "🎙 Giọng nói TẮT", tl: "🎙 Boses NAKA-OFF" },
+  camera_unavailable:{ en: "I can't open the camera.", es: "No puedo abrir la cámara.", zh: "我打不开相机。", vi: "Tôi không mở được máy ảnh.", tl: "Hindi ko mabuksan ang camera." },
+  allow_camera:     { en: "Please allow camera access in your browser.", es: "Permita el acceso a la cámara en su navegador.", zh: "请在浏览器中允许使用相机。", vi: "Vui lòng cho phép truy cập máy ảnh trong trình duyệt.", tl: "Pakipayagan ang access sa camera sa iyong browser." },
+  enable_voice:     { en: "🎙 Tap to enable voice", es: "🎙 Toque para activar la voz", zh: "🎙 点击开启语音", vi: "🎙 Nhấn để bật giọng nói", tl: "🎙 Pindutin para i-on ang boses" },
+  capture_now_btn:  { en: "📸 Capture now", es: "📸 Capturar ahora", zh: "📸 现在拍照", vi: "📸 Chụp ngay", tl: "📸 Kunan ngayon" },
+  hint_too_dark:    { en: "💡 Too dark — move to better light", es: "💡 Demasiado oscuro — busque mejor luz", zh: "💡 太暗了 — 换到光线更好的地方", vi: "💡 Quá tối — di chuyển đến nơi sáng hơn", tl: "💡 Masyadong madilim — lumipat sa mas maliwanag" },
+  hint_empty:       { en: "📄 Fit your paper inside the frame", es: "📄 Coloque su papel dentro del marco", zh: "📄 把纸放进框里", vi: "📄 Đặt giấy vào khung", tl: "📄 Ilagay ang papel sa frame" },
+  hint_face:        { en: "🙂 That looks like a face, not a document", es: "🙂 Eso parece una cara, no un documento", zh: "🙂 那看起来像脸,不是文件", vi: "🙂 Cái đó trông giống khuôn mặt, không phải tài liệu", tl: "🙂 Mukhang mukha iyan, hindi dokumento" },
+  hint_closer:      { en: "↕ Move a little closer", es: "↕ Acérquese un poco", zh: "↕ 再靠近一点", vi: "↕ Lại gần hơn một chút", tl: "↕ Lumapit nang kaunti" },
+  hint_hold:        { en: "✋ Hold still", es: "✋ Quédese quieto", zh: "✋ 请保持不动", vi: "✋ Giữ yên", tl: "✋ Huwag gumalaw" },
+  hint_checking:    { en: "🔍 Checking your document…", es: "🔍 Revisando su documento…", zh: "🔍 正在检查您的文件…", vi: "🔍 Đang kiểm tra tài liệu của bạn…", tl: "🔍 Sinusuri ang iyong dokumento…" },
+  hint_unreadable:  { en: "🔎 Move closer and hold still", es: "🔎 Acérquese y quédese quieto", zh: "🔎 靠近一点并保持不动", vi: "🔎 Lại gần hơn và giữ yên", tl: "🔎 Lumapit at huwag gumalaw" },
+  hint_say_yes:     { en: '📸 Say "yes" or tap Capture when ready', es: '📸 Diga "sí" o toque Capturar cuando esté listo', zh: '📸 准备好就说「好」或点拍照', vi: '📸 Khi sẵn sàng, nói "có" hoặc chạm Chụp', tl: '📸 Sabihin mong "oo" o pindutin ang Kunan kapag handa na' },
 };
 
 export function t(key: string, lang: Lang = _lang): string {
