@@ -6,12 +6,23 @@ type Props = {
   onCancel: () => void;
 };
 
-type Guidance = "init" | "no-doc" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
+type Guidance =
+  | "init"
+  | "no-doc"
+  | "not-face"
+  | "not-object"
+  | "move-closer"
+  | "hold-still"
+  | "corners"
+  | "blurry"
+  | "detected";
 type DetectionBox = { x: number; y: number; w: number; h: number };
 
 const GUIDANCE_TEXT: Record<Guidance, string> = {
   init: "Point the camera at your paper.",
   "no-doc": "I don't see a document — point the camera at your paper.",
+  "not-face": "I see a face — please point the camera at your paper.",
+  "not-object": "That doesn't look like a document — point the camera at your paper.",
   "move-closer": "Move a little closer.",
   "hold-still": "Hold still…",
   corners: "Put all four corners inside the frame.",
@@ -130,6 +141,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         const paperMask = new Uint8Array(width * height);
         let lumSum = 0;
         let paperCount = 0;
+        let skinCount = 0;
+        let otherCount = 0;
 
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
           const r = data[i];
@@ -143,9 +156,13 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
 
           lum[p] = y;
           lumSum += y;
-          if (y > 145 && sat < 0.2 && !skinTone) {
+          if (skinTone) {
+            skinCount++;
+          } else if (y > 145 && sat < 0.2) {
             paperMask[p] = 1;
             paperCount++;
+          } else if (y > 90) {
+            otherCount++;
           }
         }
 
@@ -248,7 +265,15 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         let next: Guidance;
         if (!hasDocumentRegion) {
           emptyStreak++;
-          next = emptyStreak >= 5 ? "no-doc" : "init";
+          const skinFrac = skinCount / (width * height);
+          const otherFrac = otherCount / (width * height);
+          if (emptyStreak >= 5) {
+            if (skinFrac > 0.06) next = "not-face";
+            else if (otherFrac > 0.10) next = "not-object";
+            else next = "no-doc";
+          } else {
+            next = "init";
+          }
         } else {
           emptyStreak = 0;
           if (meanLum < 70) next = "init";
