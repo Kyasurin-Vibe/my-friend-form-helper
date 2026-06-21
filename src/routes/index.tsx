@@ -20,7 +20,7 @@ import {
 import { getResources, getAccountablePartner, normalizeSpokenEmail } from "@/lib/resources";
 import { cancelSpeech, startRecording, transcribeAudio, type VoiceAction } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
-import { LANG_LABELS, type Lang, setLang, t, onLangChange, aiText } from "@/lib/i18n";
+import { LANG_LABELS, type Lang, setLang, t, onLangChange, onTranslate, aiText } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => ({
