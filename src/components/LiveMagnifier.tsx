@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { DemoServices, type VoiceCommand } from "@/lib/services";
 import type { DocumentBounds } from "@/lib/cases";
+import { speakWarm } from "@/lib/cases";
 import { supabase } from "@/integrations/supabase/client";
-import { translateAsync, translateSync, getLang, getBCP47, t, onLangChange } from "@/lib/i18n";
+import { getLang, t, onLangChange } from "@/lib/i18n";
+import { useVoiceLoop } from "@/lib/voice-loop";
 
 
 type CaptureResult = {
@@ -30,27 +31,6 @@ type Hint =
   | "aiReady"
   | "aiUnavailable";
 
-
-function speak(text: string, onDone?: () => void) {
-  if (typeof window === "undefined") return;
-  const synth = window.speechSynthesis;
-  if (!synth) { onDone?.(); return; }
-  synth.cancel();
-  const lang = getLang();
-  const startSpeak = (final: string) => {
-    const utterance = new SpeechSynthesisUtterance(final);
-    utterance.rate = 0.95;
-    utterance.pitch = 1.05;
-    try { utterance.lang = getBCP47(); } catch { /* noop */ }
-    utterance.onend = () => onDone?.();
-    utterance.onerror = () => onDone?.();
-    synth.speak(utterance);
-  };
-  if (lang === "en") { startSpeak(text); return; }
-  const cached = translateSync(text, lang);
-  if (cached !== text) { startSpeak(cached); return; }
-  translateAsync(text, lang).then((tr) => startSpeak(tr || text)).catch(() => startSpeak(text));
-}
 
 
 const GUIDE_WIDTH_PCT = 78;
@@ -82,8 +62,6 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const confirmedRef = useRef(false);
-  const speakingRef = useRef(false);
-  const shouldListenRef = useRef(false);
   const introSpokenRef = useRef(false);
 
   // Detection state (in refs so the analysis loop doesn't trigger re-renders)
@@ -103,10 +81,6 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const [ready, setReady] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [autoCapture] = useState(true);
-  const [listening, setListening] = useState(false);
-  const [voiceArmed, setVoiceArmed] = useState(false);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [heard, setHeard] = useState("");
   const [hint, setHint] = useState<Hint>("starting");
   const [, _bumpLang] = useState(0);
   useEffect(() => onLangChange(() => _bumpLang((n) => n + 1)), []);
@@ -141,7 +115,6 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           await videoRef.current.play().catch(() => undefined);
         }
         setReady(true);
-        setVoiceArmed(true);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Camera unavailable");
       }
@@ -156,14 +129,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   useEffect(() => {
     if (!ready || introSpokenRef.current) return;
     introSpokenRef.current = true;
-    speakingRef.current = true;
-    speak(
-      "Fit your paper inside the frame. Say \"yes\" or tap the red button when ready.",
-      () => {
-        speakingRef.current = false;
-        if (shouldListenRef.current) startVoice();
-      },
-    );
+    void speakWarm(t("scan_hint"), { skipTranslate: true });
   }, [ready]);
 
   // ===== Lightweight per-frame analysis: 64x48 downsample, ~5 Hz =====
@@ -313,23 +279,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, autoCapture, countdown]);
 
-  // Speak hints (throttled to changes, not every frame)
+  // Hint debounce — voice prompts are spoken by the global PersistentVoice.
   useEffect(() => {
-    if (!ready || speakingRef.current) return;
+    if (!ready) return;
     if (hint === lastSpokenHintRef.current) return;
-    const messages: Partial<Record<Hint, string>> = {
-      tooDark: "Too dark. Move to better light.",
-      possibleFace: "That looks like a face, not a document.",
-      empty: "I don't see paper yet.",
-      moveCloser: "Move a little closer.",
-      holdStill: "Hold still.",
-      documentDetected: "Document detected.",
-    };
-    const msg = messages[hint];
-    if (msg) {
-      lastSpokenHintRef.current = hint;
-      // Keep TTS short and don't spam — small delay debounce via ref above.
-    }
+    lastSpokenHintRef.current = hint;
   }, [hint, ready]);
 
   // ===== Claude polling (~1.5s) for auto-capture decisions =====
@@ -420,66 +374,14 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   }, [aiStatus, autoCapture]);
 
   function startCountdown() {
-
     if (confirmedRef.current || countdown > 0) return;
     setCountdown(3);
-    speakingRef.current = true;
-    try { DemoServices.voice.stop(); } catch { /* noop */ }
-    speak("Hold still… 3, 2, 1", () => {
-      speakingRef.current = false;
-      if (shouldListenRef.current) startVoice();
-    });
     const id = window.setInterval(() => {
       setCountdown((c) => {
         if (c <= 1) { window.clearInterval(id); doCapture(); return 0; }
         return c - 1;
       });
     }, 1000);
-  }
-
-  // Voice
-  useEffect(() => {
-    if (!voiceArmed) return;
-    shouldListenRef.current = true;
-    startVoice();
-    return () => {
-      shouldListenRef.current = false;
-      try { DemoServices.voice.stop(); } catch { /* noop */ }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceArmed]);
-
-  function startVoice() {
-    const service = DemoServices.voice;
-    if (!service.available()) {
-      setVoiceError("Voice not supported in this browser. Use the buttons.");
-      return;
-    }
-    if (speakingRef.current) return;
-    try {
-      service.start({
-        onStart: () => { setListening(true); setVoiceError(null); },
-        onEnd: () => {
-          setListening(false);
-          if (shouldListenRef.current && !speakingRef.current) {
-            window.setTimeout(() => startVoice(), 250);
-          }
-        },
-        onError: (err) => {
-          setListening(false);
-          if (err === "not-allowed" || err === "service-not-allowed") {
-            setVoiceError("Mic blocked. Allow microphone in your browser.");
-            shouldListenRef.current = false;
-          } else if (err !== "no-speech" && err !== "aborted") {
-            setVoiceError(err);
-          }
-        },
-        onTranscript: (t) => setHeard(t),
-        onCommand: (cmd) => handleVoiceCommand(cmd),
-      });
-    } catch (e: unknown) {
-      setVoiceError(e instanceof Error ? e.message : "could not start mic");
-    }
   }
 
   function captureAndCrop(): CaptureResult | undefined {
@@ -526,31 +428,24 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   function doCapture() {
     if (confirmedRef.current) return;
     confirmedRef.current = true;
-    shouldListenRef.current = false;
-    try { DemoServices.voice.stop(); } catch { /* noop */ }
     const result = captureAndCrop();
     window.setTimeout(() => onConfirm(result), 0);
   }
 
-  function handleVoiceCommand(cmd: VoiceCommand) {
-    switch (cmd) {
-      case "yes": doCapture(); break;
-      case "no":
-        setCountdown(0);
-        consecutiveReadyRef.current = 0;
-        break;
-
-      case "read":
-        speakingRef.current = true;
-        try { DemoServices.voice.stop(); } catch { /* noop */ }
-        speak("Point the camera at your paper. Fit all four corners inside the frame.", () => {
-          speakingRef.current = false;
-          if (shouldListenRef.current) startVoice();
-        });
-        break;
-      default: break;
-    }
-  }
+  // Voice — single shared loop. STT + interpret-intent + TTS owned by PersistentVoice.
+  useVoiceLoop({
+    screen: "scanner",
+    language: getLang(),
+    enabled: true,
+    actions: {
+      capture: doCapture,
+      retake: () => { setCountdown(0); consecutiveReadyRef.current = 0; },
+      back: onCancel,
+      home: onCancel,
+    },
+  });
+  // Suppress unused-variable warning for the countdown helper kept for future wiring.
+  void startCountdown;
 
   const hintText: Record<Hint, string> = {
     starting: t("starting_camera"),
@@ -590,11 +485,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           color: "var(--color-elder-primary)", borderRadius: 14, padding: "8px 14px", fontSize: 15,
         }}>{t("back")}</button>
         <span className="font-extrabold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>{t("scanner_title")}</span>
-        <span style={{
-          fontSize: 13, fontWeight: 700,
-          color: listening ? "#16a34a" : "#8a7d6f",
-          minWidth: 64, textAlign: "right",
-        }}>{listening ? t("listening") : t("mic_off_short")}</span>
+        <span style={{ minWidth: 64 }} aria-hidden />
       </div>
 
       <div className="mx-4 rounded-2xl overflow-hidden relative" style={{
@@ -652,43 +543,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         <p className="text-center" style={{ fontSize: 14, color: "#6b5d52", minHeight: 20 }}>
           {t("scan_hint")}
         </p>
-        {heard && listening && (
-          <p className="text-center" style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}>
-            &quot;{heard}&quot;
-          </p>
-        )}
-        {voiceError && (
-          <div className="text-center mt-1">
-            <p style={{ fontSize: 13, color: "#b91c1c", fontWeight: 700 }}>{voiceError}</p>
-            <button onClick={() => {
-              shouldListenRef.current = true; setVoiceArmed(true); setVoiceError(null); startVoice();
-            }} style={{
-              marginTop: 6, background: "var(--color-elder-primary)", color: "#fff", border: 0,
-              borderRadius: 12, padding: "8px 14px", fontWeight: 800, fontSize: 14,
-            }}>{t("enable_voice")}</button>
-          </div>
-        )}
       </div>
 
-      <div className="px-4 pt-2 flex justify-center gap-2 flex-wrap">
-        {/* Auto-capture toggle removed — capture only fires on voice "yes" or tapping Capture */}
-        <button onClick={() => {
-          if (voiceArmed) {
-            shouldListenRef.current = false;
-            try { DemoServices.voice.stop(); } catch { /* noop */ }
-            setVoiceArmed(false); setListening(false);
-          } else {
-            setVoiceError(null); setVoiceArmed(true);
-          }
-        }} aria-pressed={voiceArmed} style={{
-          background: voiceArmed ? (listening ? "#16a34a" : "var(--color-elder-primary)") : "#fff",
-          color: voiceArmed ? "#fff" : "var(--color-elder-ink)",
-          border: "2px solid var(--color-elder-primary)",
-          borderRadius: 999, padding: "8px 14px", fontWeight: 800, fontSize: 14,
-          boxShadow: voiceArmed && listening ? "0 0 0 6px rgba(34,197,94,0.18)" : "none",
-          transition: "all 0.2s",
-        }}>{voiceArmed ? t("voice_label_on") : t("voice_label_off")}</button>
-      </div>
 
       <div className="px-4 pt-3 pb-5 mt-auto">
         <button onClick={doCapture} disabled={!!error}
