@@ -297,7 +297,7 @@ function ElderApp() {
               <RetakeScreen
                 analysis={analysis}
                 onRetry={() => setPhase("magnifier")}
-                onSendAnyway={handleSend}
+                onSendAnyway={() => setPhase("choose")}
                 sending={sending}
                 speech={speech}
               />
@@ -307,8 +307,15 @@ function ElderApp() {
                 analysis={analysis}
                 sending={sending}
                 analyzeError={analyzeError}
-                onSend={handleSend}
+                onSend={() => setPhase("choose")}
                 onRetake={() => setPhase("magnifier")}
+                speech={speech}
+              />
+            ) : phase === "choose" ? (
+              <ChooseRecipientScreen
+                sending={sending}
+                onBack={() => setPhase(analysis ? "review" : "retake")}
+                onPick={(r) => handleSend(r)}
                 speech={speech}
               />
             ) : (
@@ -320,6 +327,7 @@ function ElderApp() {
                 onRestart={restart}
               />
             )}
+
            </VoiceOnContext.Provider>
           </CaptionsContext.Provider>
 
