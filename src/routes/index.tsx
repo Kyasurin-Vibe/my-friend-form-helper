@@ -46,7 +46,13 @@ type Phase =
   | "analyzing"
   | "retake"
   | "review"
+  | "choose"
   | "sent";
+
+export type Recipient =
+  | { kind: "center" }
+  | { kind: "trusted"; name: string; relationship: string };
+
 
 const CaptionsContext = createContext<boolean>(true);
 const VoiceOnContext = createContext<boolean>(true);
