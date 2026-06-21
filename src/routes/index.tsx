@@ -957,8 +957,10 @@ function TrustedPersonForm({
   sending,
   name,
   relationship,
+  email,
   onChangeName,
   onChangeRelationship,
+  onChangeEmail,
   onBack,
   onSend,
   canSend,
@@ -967,8 +969,10 @@ function TrustedPersonForm({
   sending: boolean;
   name: string;
   relationship: string;
+  email: string;
   onChangeName: (v: string) => void;
   onChangeRelationship: (v: string) => void;
+  onChangeEmail: (v: string) => void;
   onBack: () => void;
   onSend: () => void;
   canSend: boolean;
