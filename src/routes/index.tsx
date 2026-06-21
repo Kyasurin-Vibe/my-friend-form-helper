@@ -7,6 +7,7 @@ import { useSpeech } from "@/lib/useSpeech";
 import {
   analyzeDocument,
   cropToBounds,
+  detectDocumentBounds,
   sendToCenter,
   speakWarm,
   type AnalysisResult,
