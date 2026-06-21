@@ -78,10 +78,16 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
 
   // Detection state (in refs so the analysis loop doesn't trigger re-renders)
   const smoothBoxRef = useRef<DocumentBounds | null>(null);
-  const stableSinceRef = useRef<number | null>(null);
-  const stableBoxRef = useRef<DocumentBounds | null>(null);
   const smoothBrightnessRef = useRef(1);
   const lastSpokenHintRef = useRef<Hint | null>(null);
+  const meanLumRef = useRef(0);
+  const sharpRef = useRef(0);
+
+  // Claude polling state
+  const inFlightRef = useRef(false);
+  const consecutiveReadyRef = useRef(0);
+  const lastPollAtRef = useRef(0);
+  const aiUnavailableRef = useRef(false);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -92,9 +98,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [heard, setHeard] = useState("");
   const [hint, setHint] = useState<Hint>("starting");
+  const [aiStatus, setAiStatus] = useState<"idle" | "checking" | "no_doc" | "unreadable" | "ready" | "unavailable">("idle");
   const [overlayBox, setOverlayBox] = useState<DocumentBounds | null>(null);
   const [zoom, setZoom] = useState<{ scale: number; ox: number; oy: number }>({ scale: 1, ox: 50, oy: 50 });
   const [brightnessFilter, setBrightnessFilter] = useState(1);
+
 
   // Camera
   useEffect(() => {
