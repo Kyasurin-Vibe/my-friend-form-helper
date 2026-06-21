@@ -105,10 +105,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
             width: { ideal: 1920 },
             height: { ideal: 1080 },
           },
-          audio: true,
         });
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
-        stream.getAudioTracks().forEach((t) => t.stop());
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
