@@ -14,7 +14,7 @@ import {
   type DocumentBounds,
   type SendResult,
 } from "@/lib/cases";
-import { getResources, getAccountablePartner } from "@/lib/resources";
+import { getResources, getAccountablePartner, normalizeSpokenEmail } from "@/lib/resources";
 import { cancelSpeech, startRecording, transcribeAudio, type VoiceAction } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
@@ -51,7 +51,7 @@ type Phase =
 
 export type Recipient =
   | { kind: "center" }
-  | { kind: "trusted"; name: string; relationship: string };
+  | { kind: "trusted"; name: string; relationship: string; email?: string };
 
 
 const CaptionsContext = createContext<boolean>(true);
@@ -875,6 +875,7 @@ function ChooseRecipientScreen({
   const [mode, setMode] = useState<"pick" | "trusted">("pick");
   const [name, setName] = useState("");
   const [relationship, setRelationship] = useState("");
+  const [email, setEmail] = useState("");
   const partner = getAccountablePartner(analysis?.resourceCategory);
 
   if (mode === "pick") {
@@ -938,11 +939,13 @@ function ChooseRecipientScreen({
       sending={sending}
       name={name}
       relationship={relationship}
+      email={email}
       onChangeName={setName}
       onChangeRelationship={setRelationship}
+      onChangeEmail={setEmail}
       onBack={() => setMode("pick")}
       onSend={() =>
-        canSend && onPick({ kind: "trusted", name: name.trim(), relationship: relationship.trim() })
+        canSend && onPick({ kind: "trusted", name: name.trim(), relationship: relationship.trim(), email: email.trim() || undefined })
       }
       canSend={canSend}
       speech={speech}
@@ -954,8 +957,10 @@ function TrustedPersonForm({
   sending,
   name,
   relationship,
+  email,
   onChangeName,
   onChangeRelationship,
+  onChangeEmail,
   onBack,
   onSend,
   canSend,
@@ -964,8 +969,10 @@ function TrustedPersonForm({
   sending: boolean;
   name: string;
   relationship: string;
+  email: string;
   onChangeName: (v: string) => void;
   onChangeRelationship: (v: string) => void;
+  onChangeEmail: (v: string) => void;
   onBack: () => void;
   onSend: () => void;
   canSend: boolean;
@@ -975,7 +982,7 @@ function TrustedPersonForm({
   useEffect(() => {
     if (voiceOn) {
       speakWarm(
-        "Who do you trust with this? Tap the microphone and say their name, then tell me how you know them.",
+        "Who do you trust with this? Tap the microphone and say their name, their email or phone, then tell me how you know them.",
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1019,6 +1026,19 @@ function TrustedPersonForm({
         placeholder="e.g. my attorney, my daughter, my pastor"
         ariaLabel="How do you know them"
       />
+      <label
+        className="font-bold mt-3"
+        style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
+      >
+        Their email or phone
+      </label>
+      <VoiceField
+        value={email}
+        onChange={onChangeEmail}
+        placeholder="e.g. jane@gmail.com"
+        ariaLabel="Their email or phone"
+        normalize={normalizeSpokenEmail}
+      />
       <div className="space-y-2 mt-auto pt-4">
         <BigButton variant="danger" onClick={onSend}>
           {sending ? "Sending…" : `📨 Send to ${name.trim() || "this person"}`}
@@ -1034,11 +1054,13 @@ function VoiceField({
   onChange,
   placeholder,
   ariaLabel,
+  normalize,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   ariaLabel: string;
+  normalize?: (v: string) => string;
 }) {
   const [recording, setRecording] = useState(false);
   const [working, setWorking] = useState(false);
@@ -1065,7 +1087,8 @@ function VoiceField({
       if (!blob) return;
       const transcript = (await transcribeAudio(blob)).trim();
       if (transcript) {
-        const cleaned = transcript.replace(/[.。!?！？]+$/g, "").trim();
+        let cleaned = transcript.replace(/[.。!?！？]+$/g, "").trim();
+        if (normalize) cleaned = normalize(cleaned);
         onChange(cleaned);
       }
     } finally {

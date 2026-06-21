@@ -48,3 +48,17 @@ export function getAccountablePartner(category?: string | null): { name: string;
   };
   return map[key] ?? map.general;
 }
+
+/** Convert spoken-email dictation into a real email-ish string.
+ *  e.g. "harry potter at gmail dot com" → "harrypotter@gmail.com"
+ */
+export function normalizeSpokenEmail(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/\bat\b/gi, "@")
+    .replace(/\bdot\b/gi, ".")
+    .replace(/\bdash\b/gi, "-")
+    .replace(/\bunderscore\b/gi, "_")
+    .replace(/\s+/g, "")
+    .replace(/[.。!?！？]+$/g, "");
+}

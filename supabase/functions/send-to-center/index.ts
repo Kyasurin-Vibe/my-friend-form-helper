@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
       initials?: string;
       recipient?:
         | { kind: "center"; partnerName?: string }
-        | { kind: "trusted"; name?: string; relationship?: string };
+        | { kind: "trusted"; name?: string; relationship?: string; email?: string };
     };
     const { analysis, initials } = body;
     const originalImage = body.originalImage ?? body.image;
@@ -95,6 +95,7 @@ Deno.serve(async (req) => {
     let recipientKind: "center" | "trusted" = "center";
     let trustedName = "";
     let trustedRel = "";
+    let trustedEmail = "";
     let centerName = DEFAULT_CENTER_NAME;
     if (rawRecipient && rawRecipient.kind === "trusted") {
       const n = String(rawRecipient.name ?? "").trim();
@@ -103,6 +104,7 @@ Deno.serve(async (req) => {
         recipientKind = "trusted";
         trustedName = n.slice(0, 80);
         trustedRel = r.slice(0, 80);
+        trustedEmail = String(rawRecipient.email ?? "").trim().slice(0, 120);
       }
     } else if (rawRecipient && rawRecipient.kind === "center") {
       const pn = String(rawRecipient.partnerName ?? "").trim();
@@ -110,7 +112,7 @@ Deno.serve(async (req) => {
     }
     const recipientLabel =
       recipientKind === "trusted"
-        ? `trusted contact (${trustedName} — ${trustedRel})`
+        ? `trusted contact (${trustedName} — ${trustedRel}${trustedEmail ? ` — ${trustedEmail}` : ""})`
         : centerName;
 
     const supabase = createClient(
@@ -164,7 +166,7 @@ Deno.serve(async (req) => {
       time: stamp(),
       text:
         recipientKind === "trusted"
-          ? `Elder chose to send to a trusted contact they picked themselves: ${trustedName} (${trustedRel}). NOT auto-filled.`
+          ? `Elder chose to send to a trusted contact they picked themselves: ${trustedName} (${trustedRel})${trustedEmail ? ` — ${trustedEmail}` : ""}. NOT auto-filled.`
           : `Elder chose to send to ${centerName} (default, institutional accountable partner for need: ${needCategory}).`,
     });
     audit.push({
