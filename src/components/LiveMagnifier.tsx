@@ -6,41 +6,6 @@ type Props = {
   onCancel: () => void;
 };
 
-type Guidance =
-  | "init"
-  | "no-doc"
-  | "not-face"
-  | "not-object"
-  | "move-closer"
-  | "hold-still"
-  | "corners"
-  | "blurry"
-  | "detected";
-type DetectionBox = { x: number; y: number; w: number; h: number };
-
-const GUIDANCE_TEXT: Record<Guidance, string> = {
-  init: "Point the camera at your paper.",
-  "no-doc": "I don't see a document — point the camera at your paper.",
-  "not-face": "I see a face — please point the camera at your paper.",
-  "not-object": "That doesn't look like a document — point the camera at your paper.",
-  "move-closer": "Move a little closer.",
-  "hold-still": "Hold still…",
-  corners: "Put all four corners inside the frame.",
-  blurry: "The picture is too blurry. Please try again.",
-  detected: "Looks clear. Capturing automatically…",
-};
-
-const ADJACENT_OFFSETS = [
-  { dx: -1, dy: 0 },
-  { dx: 1, dy: 0 },
-  { dx: 0, dy: -1 },
-  { dx: 0, dy: 1 },
-];
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
 function speak(text: string, onDone?: () => void) {
   if (typeof window === "undefined") return;
   const synth = window.speechSynthesis;
@@ -60,24 +25,22 @@ function speak(text: string, onDone?: () => void) {
 export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const autoRef = useRef({ zoom: 1.25, brightness: 1, contrast: 1 });
   const confirmedRef = useRef(false);
   const speakingRef = useRef(false);
   const shouldListenRef = useRef(false);
+  const autoStableRef = useRef(0);
+  const introSpokenRef = useRef(false);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [zoom, setZoom] = useState(1.25);
-  const [brightness, setBrightness] = useState(1);
-  const [contrast, setContrast] = useState(1);
-  const [guidance, setGuidance] = useState<Guidance>("init");
-  const [detectionBox, setDetectionBox] = useState<DetectionBox | null>(null);
   const [countdown, setCountdown] = useState(0);
+  const [autoCapture, setAutoCapture] = useState(true);
   const [listening, setListening] = useState(false);
   const [voiceArmed, setVoiceArmed] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [heard, setHeard] = useState("");
 
+  // Open camera
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -117,249 +80,86 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     };
   }, []);
 
+  // Speak intro once camera is ready
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || introSpokenRef.current) return;
+    introSpokenRef.current = true;
+    speakingRef.current = true;
+    speak(
+      "Point the camera at your paper. Fit it inside the frame. I'll capture it when it looks clear, or tap the red button.",
+      () => {
+        speakingRef.current = false;
+        if (shouldListenRef.current) startVoice();
+      },
+    );
+  }, [ready]);
+
+  // Lightweight auto-capture: tiny sharpness-only check, ~1 Hz.
+  useEffect(() => {
+    if (!ready || !autoCapture) return;
     const video = videoRef.current;
     if (!video) return;
 
-    const width = 128;
-    const height = 96;
+    const w = 64;
+    const h = 48;
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
 
-    let detectedStreak = 0;
-    let emptyStreak = 0;
     const id = window.setInterval(() => {
-      if (confirmedRef.current || !video.videoWidth) return;
+      if (confirmedRef.current || countdown > 0 || !video.videoWidth) return;
       try {
-        ctx.drawImage(video, 0, 0, width, height);
-        const data = ctx.getImageData(0, 0, width, height).data;
-        const lum = new Float32Array(width * height);
-        const paperMask = new Uint8Array(width * height);
+        ctx.drawImage(video, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h).data;
         let lumSum = 0;
-        let paperCount = 0;
-        let skinCount = 0;
-        let otherCount = 0;
-
+        const lum = new Float32Array(w * h);
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          const y = 0.299 * r + 0.587 * g + 0.114 * b;
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          const sat = max === 0 ? 0 : (max - min) / max;
-          const skinTone = r > 95 && g > 45 && b > 30 && r > g && r > b && r - b > 20 && sat > 0.12;
-
+          const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
           lum[p] = y;
           lumSum += y;
-          if (skinTone) {
-            skinCount++;
-          } else if (y > 145 && sat < 0.2) {
-            paperMask[p] = 1;
-            paperCount++;
-          } else if (y > 90) {
-            otherCount++;
-          }
         }
-
-        const meanLum = lumSum / (width * height);
-        const paperFrac = paperCount / (width * height);
+        const meanLum = lumSum / (w * h);
         let edgeSum = 0;
         let edgeN = 0;
-        for (let y = 1; y < height - 1; y++) {
-          for (let x = 1; x < width - 1; x++) {
-            const p = y * width + x;
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const p = y * w + x;
             edgeSum +=
-              Math.abs(lum[p + 1] - lum[p - 1]) + Math.abs(lum[p + width] - lum[p - width]);
+              Math.abs(lum[p + 1] - lum[p - 1]) + Math.abs(lum[p + w] - lum[p - w]);
             edgeN++;
           }
         }
         const sharp = edgeSum / edgeN;
-
-        const visited = new Uint8Array(width * height);
-        const queue = new Uint16Array(width * height);
-        let best = { count: 0, minX: width, maxX: -1, minY: height, maxY: -1 };
-
-        for (let start = 0; start < paperMask.length; start++) {
-          if (!paperMask[start] || visited[start]) continue;
-          let head = 0;
-          let tail = 0;
-          let count = 0;
-          let minX = width;
-          let maxX = -1;
-          let minY = height;
-          let maxY = -1;
-          queue[tail++] = start;
-          visited[start] = 1;
-
-          while (head < tail) {
-            const p = queue[head++];
-            const x = p % width;
-            const y = Math.floor(p / width);
-            count++;
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-
-            for (const { dx, dy } of ADJACENT_OFFSETS) {
-              const nx = x + dx;
-              const ny = y + dy;
-              if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
-              const n = ny * width + nx;
-              if (visited[n] || !paperMask[n]) continue;
-              visited[n] = 1;
-              queue[tail++] = n;
-            }
-          }
-
-          if (count > best.count) best = { count, minX, maxX, minY, maxY };
-        }
-
-        const boxW = Math.max(0, best.maxX - best.minX + 1);
-        const boxH = Math.max(0, best.maxY - best.minY + 1);
-        const boxArea = boxW * boxH;
-        const bandX = Math.max(2, Math.floor(boxW * 0.12));
-        const bandY = Math.max(2, Math.floor(boxH * 0.12));
-        let topPaper = 0;
-        let bottomPaper = 0;
-        let leftPaper = 0;
-        let rightPaper = 0;
-
-        if (boxArea > 0) {
-          for (let y = best.minY; y <= best.maxY; y++) {
-            for (let x = best.minX; x <= best.maxX; x++) {
-              if (!paperMask[y * width + x]) continue;
-              if (y < best.minY + bandY) topPaper++;
-              if (y > best.maxY - bandY) bottomPaper++;
-              if (x < best.minX + bandX) leftPaper++;
-              if (x > best.maxX - bandX) rightPaper++;
-            }
-          }
-        }
-
-        const boxAreaFrac = boxArea / (width * height);
-        const boxDensity = boxArea > 0 ? best.count / boxArea : 0;
-        const topFill = boxW * bandY > 0 ? topPaper / (boxW * bandY) : 0;
-        const bottomFill = boxW * bandY > 0 ? bottomPaper / (boxW * bandY) : 0;
-        const leftFill = boxH * bandX > 0 ? leftPaper / (boxH * bandX) : 0;
-        const rightFill = boxH * bandX > 0 ? rightPaper / (boxH * bandX) : 0;
-        const edgeFill = (topFill + bottomFill + leftFill + rightFill) / 4;
-        const rectangularEnough =
-          [topFill, bottomFill, leftFill, rightFill].filter((v) => v >= 0.34).length >= 3 &&
-          edgeFill >= 0.44;
-        const aspect = boxH > 0 ? boxW / boxH : 0;
-        const hasDocumentRegion =
-          meanLum >= 75 &&
-          paperFrac >= 0.3 &&
-          boxAreaFrac >= 0.38 &&
-          boxDensity >= 0.62 &&
-          rectangularEnough &&
-          aspect >= 0.48 &&
-          aspect <= 1.9;
-
-        let next: Guidance;
-        if (!hasDocumentRegion) {
-          emptyStreak++;
-          const skinFrac = skinCount / (width * height);
-          const otherFrac = otherCount / (width * height);
-          if (emptyStreak >= 5) {
-            if (skinFrac > 0.06) next = "not-face";
-            else if (otherFrac > 0.10) next = "not-object";
-            else next = "no-doc";
-          } else {
-            next = "init";
+        const stable = meanLum > 80 && sharp > 5.5;
+        if (stable) {
+          autoStableRef.current++;
+          if (autoStableRef.current >= 3) {
+            autoStableRef.current = 0;
+            startCountdown();
           }
         } else {
-          emptyStreak = 0;
-          if (meanLum < 70) next = "init";
-          else if (paperFrac < 0.45 || boxAreaFrac < 0.48) next = "corners";
-          else if (sharp < 5.5) next = "blurry";
-          else next = "detected";
+          autoStableRef.current = 0;
         }
-
-        setDetectionBox(
-          hasDocumentRegion
-            ? {
-                x: clamp(best.minX / width, 0.04, 0.86),
-                y: clamp(best.minY / height, 0.04, 0.86),
-                w: clamp(boxW / width, 0.12, 0.92),
-                h: clamp(boxH / height, 0.12, 0.92),
-              }
-            : null,
-        );
-
-        if (next === "detected") {
-          detectedStreak++;
-          if (detectedStreak < 2) next = "hold-still";
-        } else {
-          detectedStreak = 0;
-        }
-
-        setGuidance((prev) => (prev === next ? prev : next));
-
-        const targetBrightness = clamp(165 / Math.max(60, meanLum), 0.9, 1.45);
-        const targetContrast = clamp(1 + (8 - Math.min(sharp, 8)) * 0.04, 1, 1.35);
-        const targetZoom =
-          hasDocumentRegion && boxAreaFrac >= 0.5 ? 1.85 : hasDocumentRegion ? 1.6 : 1.15;
-        const current = autoRef.current;
-        current.brightness += (targetBrightness - current.brightness) * 0.18;
-        current.contrast += (targetContrast - current.contrast) * 0.18;
-        current.zoom += (targetZoom - current.zoom) * 0.18;
-
-        setBrightness((value) =>
-          Math.abs(value - current.brightness) > 0.03 ? +current.brightness.toFixed(2) : value,
-        );
-        setContrast((value) =>
-          Math.abs(value - current.contrast) > 0.03 ? +current.contrast.toFixed(2) : value,
-        );
-        setZoom((value) =>
-          Math.abs(value - current.zoom) > 0.04 ? +current.zoom.toFixed(2) : value,
-        );
       } catch {
-        // Keep scanning; transient frame read failures are common on camera startup.
+        // transient
       }
-    }, 450);
+    }, 700);
 
     return () => window.clearInterval(id);
-  }, [ready]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, autoCapture, countdown]);
 
-  useEffect(() => {
-    if (guidance === "init" || guidance === "hold-still") return;
-    const text =
-      guidance === "detected"
-        ? "Looks clear. Capturing now."
-        : guidance === "blurry"
-          ? "The picture is too blurry. Please try again."
-          : GUIDANCE_TEXT[guidance];
+  function startCountdown() {
+    if (confirmedRef.current || countdown > 0) return;
+    setCountdown(3);
     speakingRef.current = true;
     try {
       DemoServices.voice.stop();
     } catch {
       // no-op
     }
-    speak(text, () => {
-      speakingRef.current = false;
-      if (shouldListenRef.current) startVoice();
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guidance]);
-
-  useEffect(() => {
-    if (guidance !== "detected") {
-      setCountdown(0);
-      return;
-    }
-    if (confirmedRef.current) return;
-
-    setCountdown(3);
-    // Speak "Hold still… 3, 2, 1" once when countdown begins.
-    speakingRef.current = true;
-    try { DemoServices.voice.stop(); } catch { /* no-op */ }
     speak("Hold still… 3, 2, 1", () => {
       speakingRef.current = false;
       if (shouldListenRef.current) startVoice();
@@ -374,11 +174,9 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         return current - 1;
       });
     }, 1000);
+  }
 
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guidance]);
-
+  // Voice listener
   useEffect(() => {
     if (!voiceArmed) return;
     shouldListenRef.current = true;
@@ -434,7 +232,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   function captureFrame(): string | undefined {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return undefined;
-    const scale = Math.min(1, 1280 / video.videoWidth);
+    const scale = Math.min(1, 1600 / video.videoWidth);
     const width = Math.round(video.videoWidth * scale);
     const height = Math.round(video.videoHeight * scale);
     const canvas = document.createElement("canvas");
@@ -444,7 +242,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     if (!ctx) return undefined;
     ctx.drawImage(video, 0, 0, width, height);
     try {
-      return canvas.toDataURL("image/jpeg", 0.85);
+      return canvas.toDataURL("image/jpeg", 0.9);
     } catch {
       return undefined;
     }
@@ -469,44 +267,32 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         doCapture();
         break;
       case "no":
-        setDetectionBox(null);
         setCountdown(0);
-        setGuidance("corners");
-        break;
-      case "zoom":
-        autoRef.current.zoom = Math.min(2.6, autoRef.current.zoom + 0.3);
-        setZoom(+autoRef.current.zoom.toFixed(2));
-        break;
-      case "brighter":
-        autoRef.current.brightness = Math.min(1.7, autoRef.current.brightness + 0.15);
-        setBrightness(+autoRef.current.brightness.toFixed(2));
-        break;
-      case "contrast":
-        autoRef.current.contrast = Math.min(1.7, autoRef.current.contrast + 0.15);
-        setContrast(+autoRef.current.contrast.toFixed(2));
+        autoStableRef.current = 0;
         break;
       case "read":
-        readDocAloud();
+        speakingRef.current = true;
+        try {
+          DemoServices.voice.stop();
+        } catch {
+          // no-op
+        }
+        speak("Point the camera at your paper. Fit all four corners inside the frame.", () => {
+          speakingRef.current = false;
+          if (shouldListenRef.current) startVoice();
+        });
         break;
       case "unknown":
+      case "zoom":
+      case "brighter":
+      case "contrast":
         break;
     }
   }
 
-  function readDocAloud() {
-    speakingRef.current = true;
-    try {
-      DemoServices.voice.stop();
-    } catch {
-      // no-op
-    }
-    speak("Point the camera at your paper. I'll capture it when it looks clear.", () => {
-      speakingRef.current = false;
-      if (shouldListenRef.current) startVoice();
-    });
-  }
-
-  const filter = `brightness(${brightness}) contrast(${contrast})`;
+  // A4 portrait ratio = 1 : 1.4142
+  const guideWidthPct = 78;
+  const guideAspect = 1.4142;
 
   return (
     <div className="flex-1 flex flex-col" style={{ background: "var(--color-elder-bg)" }}>
@@ -526,7 +312,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           ← Back
         </button>
         <span className="font-extrabold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>
-          🔍 Magnifier
+          📷 Scanner
         </span>
         <span
           title={listening ? "Listening" : "Mic off"}
@@ -546,7 +332,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         className="mx-4 rounded-2xl overflow-hidden relative"
         style={{
           background: "#111",
-          height: 320,
+          height: 360,
           boxShadow: "0 10px 24px rgba(0,0,0,0.25)",
         }}
       >
@@ -571,35 +357,48 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
               ref={videoRef}
               muted
               playsInline
-              className="absolute inset-0 w-full h-full object-fill"
-              style={{
-                transform: `scale(${zoom})`,
-                transformOrigin: "center",
-                filter,
-                transition: "filter 0.15s, transform 0.15s",
-              }}
+              className="absolute inset-0 w-full h-full object-cover"
             />
-            {detectionBox && (
-              <div
-                className="absolute pointer-events-none"
-                style={{
-                  left: `${detectionBox.x * 100}%`,
-                  top: `${detectionBox.y * 100}%`,
-                  width: `${detectionBox.w * 100}%`,
-                  height: `${detectionBox.h * 100}%`,
-                  border: `5px solid ${guidance === "detected" ? "#22c55e" : "#fbbf24"}`,
-                  borderRadius: 12,
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.18)",
-                  transition: "all 0.18s ease-out",
-                }}
-              />
-            )}
+            {/* A4 portrait guide frame */}
+            <div
+              aria-hidden
+              className="absolute pointer-events-none"
+              style={{
+                left: "50%",
+                top: "50%",
+                width: `${guideWidthPct}%`,
+                aspectRatio: `1 / ${guideAspect}`,
+                transform: "translate(-50%, -50%)",
+                border: "3px dashed rgba(255,255,255,0.85)",
+                borderRadius: 12,
+                boxShadow: "0 0 0 9999px rgba(0,0,0,0.28)",
+              }}
+            >
+              {/* Corner ticks */}
+              {[
+                { top: -4, left: -4, borderTop: 4, borderLeft: 4 },
+                { top: -4, right: -4, borderTop: 4, borderRight: 4 },
+                { bottom: -4, left: -4, borderBottom: 4, borderLeft: 4 },
+                { bottom: -4, right: -4, borderBottom: 4, borderRight: 4 },
+              ].map((s, i) => (
+                <span
+                  key={i}
+                  style={{
+                    position: "absolute",
+                    width: 28,
+                    height: 28,
+                    borderColor: "#fff",
+                    borderStyle: "solid",
+                    borderWidth: 0,
+                    ...s,
+                  }}
+                />
+              ))}
+            </div>
             {countdown > 0 && (
               <div
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                style={{
-                  background: "rgba(0,0,0,0.35)",
-                }}
+                style={{ background: "rgba(0,0,0,0.35)" }}
               >
                 <div
                   key={countdown}
@@ -630,15 +429,14 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
 
       <div className="px-4 pt-3">
         <p
-          key={guidance}
-          className="text-center font-bold animate-fade-up"
+          className="text-center font-bold"
           style={{
-            fontSize: 20,
-            color: guidance === "detected" ? "var(--color-elder-teal)" : "var(--color-elder-ink)",
-            minHeight: 56,
+            fontSize: 18,
+            color: "var(--color-elder-ink)",
+            minHeight: 48,
           }}
         >
-          {GUIDANCE_TEXT[guidance]}
+          Fit your paper inside the frame. {autoCapture ? "I'll capture automatically." : "Tap the red button when ready."}
         </p>
         {heard && listening && (
           <p
@@ -675,7 +473,25 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         )}
       </div>
 
-      <div className="px-4 pt-3 flex justify-center">
+      <div className="px-4 pt-2 flex justify-center gap-2 flex-wrap">
+        <button
+          onClick={() => {
+            setAutoCapture((v) => !v);
+            autoStableRef.current = 0;
+          }}
+          aria-pressed={autoCapture}
+          style={{
+            background: autoCapture ? "var(--color-elder-teal)" : "#fff",
+            color: autoCapture ? "#fff" : "var(--color-elder-ink)",
+            border: "2px solid var(--color-elder-teal)",
+            borderRadius: 999,
+            padding: "8px 14px",
+            fontWeight: 800,
+            fontSize: 14,
+          }}
+        >
+          ⏱ Auto-capture {autoCapture ? "ON" : "OFF"}
+        </button>
         <button
           onClick={() => {
             if (voiceArmed) {
@@ -689,24 +505,19 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
             }
           }}
           aria-pressed={voiceArmed}
-          aria-label={voiceArmed ? "Turn voice control off" : "Turn voice control on"}
           style={{
             background: voiceArmed ? (listening ? "#16a34a" : "var(--color-elder-primary)") : "#fff",
             color: voiceArmed ? "#fff" : "var(--color-elder-ink)",
             border: "2px solid var(--color-elder-primary)",
             borderRadius: 999,
-            padding: "10px 18px",
+            padding: "8px 14px",
             fontWeight: 800,
-            fontSize: 15,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
+            fontSize: 14,
             boxShadow: voiceArmed && listening ? "0 0 0 6px rgba(34,197,94,0.18)" : "none",
             transition: "all 0.2s",
           }}
         >
-          <span style={{ fontSize: 18 }}>🎙</span>
-          {voiceArmed ? (listening ? "Listening… say \u201Cyes\u201D to capture" : "Voice on") : "Tap for voice control"}
+          🎙 Voice {voiceArmed ? "ON" : "OFF"}
         </button>
       </div>
 

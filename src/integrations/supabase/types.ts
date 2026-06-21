@@ -22,10 +22,13 @@ export type Database = {
           created_at: string
           doc_name: string | null
           doc_type: string | null
+          document_bounds: Json | null
           id: string
           image_url: string | null
           initials: string | null
+          original_image_url: string | null
           possible_missing_fields: Json
+          processed_image_url: string | null
           status: string
           tracking_id: string
           updated_at: string
@@ -37,10 +40,13 @@ export type Database = {
           created_at?: string
           doc_name?: string | null
           doc_type?: string | null
+          document_bounds?: Json | null
           id?: string
           image_url?: string | null
           initials?: string | null
+          original_image_url?: string | null
           possible_missing_fields?: Json
+          processed_image_url?: string | null
           status?: string
           tracking_id: string
           updated_at?: string
@@ -52,10 +58,13 @@ export type Database = {
           created_at?: string
           doc_name?: string | null
           doc_type?: string | null
+          document_bounds?: Json | null
           id?: string
           image_url?: string | null
           initials?: string | null
+          original_image_url?: string | null
           possible_missing_fields?: Json
+          processed_image_url?: string | null
           status?: string
           tracking_id?: string
           updated_at?: string

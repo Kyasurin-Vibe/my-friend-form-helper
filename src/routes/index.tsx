@@ -6,6 +6,7 @@ import { VoiceBar } from "@/components/VoiceBar";
 import { useSpeech } from "@/lib/useSpeech";
 import {
   analyzeDocument,
+  cropToBounds,
   sendToCenter,
   speakWarm,
   type AnalysisResult,
@@ -52,6 +53,7 @@ function ElderApp() {
   const [phase, setPhase] = useState<Phase>("find");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
+  const [processedImage, setProcessedImage] = useState<string | undefined>(undefined);
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
   const [sending, setSending] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -79,12 +81,14 @@ function ElderApp() {
     setAnalysis(null);
     setSendResult(null);
     setCapturedImage(undefined);
+    setProcessedImage(undefined);
     setAnalyzeError(null);
     speech.cancel();
   };
 
   async function handleCapture(image?: string) {
     setCapturedImage(image);
+    setProcessedImage(image);
     if (!image) {
       setAnalysis(null);
       setPhase("review");
@@ -107,6 +111,10 @@ function ElderApp() {
     const minDisplay = 1200;
     try {
       const result = await analyzeDocument(image);
+      // Crop to AI-returned bounds (or full frame if null).
+      const cropped = await cropToBounds(image, result.documentBounds, 0.03);
+      setProcessedImage(cropped);
+
       const elapsed = Date.now() - startedAt;
       if (elapsed < minDisplay) {
         await new Promise((r) => setTimeout(r, minDisplay - elapsed));
@@ -146,7 +154,8 @@ function ElderApp() {
     setSending(true);
     try {
       const result = await sendToCenter({
-        image: capturedImage,
+        originalImage: capturedImage,
+        processedImage: processedImage ?? capturedImage,
         analysis:
           analysis ?? {
             readable: false,
@@ -157,6 +166,7 @@ function ElderApp() {
             possibleMissingFields: ["Automated analysis unavailable"],
             recommendedAction: "human_review",
             elderMessage: "Sent for human review.",
+            documentBounds: null,
           },
       });
       setSendResult(result);

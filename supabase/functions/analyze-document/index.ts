@@ -1,4 +1,5 @@
-// Claude vision: identify document, flag visible blank/incomplete fields.
+// Claude vision: identify document, flag visible blank/incomplete fields,
+// AND return normalized bounding box of the document within the photo.
 // Senior-friendly intake. AI only describes what it sees — rules (in app) decide action.
 
 const CORS = {
@@ -22,11 +23,15 @@ Rules:
   set "readable" to false and explain plainly.
 - elderMessage must be ONE short sentence, warm, no legal jargon, max 22 words,
   suitable for an 80-year-old user listening on a phone.
-- plainEnglishSummary is for a reviewer: one sentence describing what the document appears to be.`;
+- plainEnglishSummary is for a reviewer: one sentence describing what the document appears to be.
+- documentBounds: the tight bounding box of the paper document within the image, expressed
+  as NORMALIZED FRACTIONS of the image dimensions (x and y are top-left; x+width<=1, y+height<=1).
+  Be tight — include only the document, not background. If you cannot clearly see a single
+  document, set documentBounds to null.`;
 
 const TOOL = {
   name: "report_document",
-  description: "Return a structured description of the photographed document.",
+  description: "Return a structured description of the photographed document plus its bounding box.",
   input_schema: {
     type: "object",
     additionalProperties: false,
@@ -38,6 +43,7 @@ const TOOL = {
       "plainEnglishSummary",
       "possibleMissingFields",
       "elderMessage",
+      "documentBounds",
     ],
     properties: {
       readable: { type: "boolean" },
@@ -51,6 +57,20 @@ const TOOL = {
         description: "Short phrases like 'signature area appears blank'. Empty if none.",
       },
       elderMessage: { type: "string", description: "ONE short sentence read aloud to the elder." },
+      documentBounds: {
+        type: ["object", "null"],
+        description:
+          "Normalized bounding box of the document in the image, or null if not clearly visible.",
+        required: ["x", "y", "width", "height", "confidence"],
+        additionalProperties: false,
+        properties: {
+          x: { type: "number", minimum: 0, maximum: 1 },
+          y: { type: "number", minimum: 0, maximum: 1 },
+          width: { type: "number", minimum: 0, maximum: 1 },
+          height: { type: "number", minimum: 0, maximum: 1 },
+          confidence: { type: "number", minimum: 0, maximum: 1 },
+        },
+      },
     },
   },
 } as const;
@@ -72,6 +92,7 @@ function fallback(readable = false) {
         possibleMissingFields: [] as string[],
         recommendedAction: "human_review" as const,
         elderMessage: "I couldn't check this clearly. I can send it to the Legal Aid Center for a person to review.",
+        documentBounds: null,
       }
     : {
         readable: false,
@@ -82,6 +103,7 @@ function fallback(readable = false) {
         possibleMissingFields: [] as string[],
         recommendedAction: "retake" as const,
         elderMessage: "This picture is too blurry. Please move closer, keep all four corners inside the frame, and try again.",
+        documentBounds: null,
       };
 }
 
@@ -93,6 +115,32 @@ function decide(a: {
   if (!a.readable) return "retake";
   if ((a.possibleMissingFields?.length ?? 0) > 0 || a.confidence < 0.75) return "human_review";
   return "confirm_send";
+}
+
+function sanitizeBounds(b: unknown):
+  | { x: number; y: number; width: number; height: number; confidence: number }
+  | null {
+  if (!b || typeof b !== "object") return null;
+  const o = b as Record<string, unknown>;
+  const x = Number(o.x);
+  const y = Number(o.y);
+  const width = Number(o.width);
+  const height = Number(o.height);
+  const confidence = Number(o.confidence);
+  if (![x, y, width, height].every((n) => Number.isFinite(n))) return null;
+  if (width <= 0 || height <= 0) return null;
+  const cx = Math.max(0, Math.min(1, x));
+  const cy = Math.max(0, Math.min(1, y));
+  const cw = Math.max(0, Math.min(1 - cx, width));
+  const ch = Math.max(0, Math.min(1 - cy, height));
+  if (cw <= 0 || ch <= 0) return null;
+  return {
+    x: cx,
+    y: cy,
+    width: cw,
+    height: ch,
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.5,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -107,8 +155,7 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
       console.warn("ANTHROPIC_API_KEY missing — returning fallback");
-      const r = fallback(false);
-      return Response.json(r, { headers: CORS });
+      return Response.json(fallback(false), { headers: CORS });
     }
 
     const parsed = parseDataUrl(image);
@@ -148,8 +195,7 @@ Deno.serve(async (req) => {
     if (!claudeRes.ok) {
       const errText = await claudeRes.text();
       console.error("Claude error", claudeRes.status, errText);
-      const r = fallback(false);
-      return Response.json({ ...r, _error: `claude_${claudeRes.status}` }, { headers: CORS });
+      return Response.json({ ...fallback(false), _error: `claude_${claudeRes.status}` }, { headers: CORS });
     }
 
     const payload = await claudeRes.json();
@@ -160,8 +206,7 @@ Deno.serve(async (req) => {
 
     if (!ai || typeof ai !== "object") {
       console.error("Claude returned no tool_use block", payload);
-      const r = fallback(false);
-      return Response.json(r, { headers: CORS });
+      return Response.json(fallback(false), { headers: CORS });
     }
 
     const recommendedAction = decide({
@@ -180,6 +225,7 @@ Deno.serve(async (req) => {
         possibleMissingFields: Array.isArray(ai.possibleMissingFields) ? ai.possibleMissingFields : [],
         recommendedAction,
         elderMessage: String(ai.elderMessage || ""),
+        documentBounds: sanitizeBounds(ai.documentBounds),
       },
       { headers: CORS },
     );

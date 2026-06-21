@@ -6,6 +6,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type Branch = "missing" | "complete";
 
+export type DocumentBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+};
+
 export type AnalysisResult = {
   readable: boolean;
   documentType: string;
@@ -15,6 +23,7 @@ export type AnalysisResult = {
   possibleMissingFields: string[];
   recommendedAction: "retake" | "confirm_send" | "human_review";
   elderMessage: string;
+  documentBounds: DocumentBounds | null;
 };
 
 export type SendResult = {
@@ -34,6 +43,9 @@ export type CaseRow = {
   possible_missing_fields: string[];
   confidence: number | null;
   image_url: string | null;
+  original_image_url: string | null;
+  processed_image_url: string | null;
+  document_bounds: DocumentBounds | null;
   initials: string | null;
   audit_trail: { time: string; text: string }[];
   created_at: string;
@@ -49,8 +61,50 @@ export async function analyzeDocument(imageDataUrl: string, userGoal?: string): 
   return data as AnalysisResult;
 }
 
+/**
+ * Crop a captured image to the AI-returned bounds with ~3% padding.
+ * Returns the original data URL if bounds are null or cropping fails.
+ */
+export async function cropToBounds(
+  imageDataUrl: string,
+  bounds: DocumentBounds | null,
+  paddingFrac = 0.03,
+): Promise<string> {
+  if (!bounds) return imageDataUrl;
+  if (typeof window === "undefined") return imageDataUrl;
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = imageDataUrl;
+    });
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    const x0 = Math.max(0, bounds.x - paddingFrac);
+    const y0 = Math.max(0, bounds.y - paddingFrac);
+    const x1 = Math.min(1, bounds.x + bounds.width + paddingFrac);
+    const y1 = Math.min(1, bounds.y + bounds.height + paddingFrac);
+    const sx = Math.round(x0 * iw);
+    const sy = Math.round(y0 * ih);
+    const sw = Math.max(1, Math.round((x1 - x0) * iw));
+    const sh = Math.max(1, Math.round((y1 - y0) * ih));
+    const canvas = document.createElement("canvas");
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return imageDataUrl;
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    return canvas.toDataURL("image/jpeg", 0.9);
+  } catch (e) {
+    console.warn("cropToBounds failed", e);
+    return imageDataUrl;
+  }
+}
+
 export async function sendToCenter(opts: {
-  image?: string;
+  originalImage?: string;
+  processedImage?: string;
   analysis: AnalysisResult;
   initials?: string;
 }): Promise<SendResult> {
