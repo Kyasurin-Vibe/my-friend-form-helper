@@ -141,6 +141,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         const paperMask = new Uint8Array(width * height);
         let lumSum = 0;
         let paperCount = 0;
+        let skinCount = 0;
+        let otherCount = 0;
 
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
           const r = data[i];
@@ -154,9 +156,13 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
 
           lum[p] = y;
           lumSum += y;
-          if (y > 145 && sat < 0.2 && !skinTone) {
+          if (skinTone) {
+            skinCount++;
+          } else if (y > 145 && sat < 0.2) {
             paperMask[p] = 1;
             paperCount++;
+          } else if (y > 90) {
+            otherCount++;
           }
         }
 
