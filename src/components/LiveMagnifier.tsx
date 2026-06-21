@@ -460,6 +460,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     moveCloser: "↕ Move a little closer",
     holdStill: "✋ Hold still…",
     documentDetected: "✅ Document detected — hold still",
+    aiChecking: "🔍 Checking your document…",
+    aiNoDoc: "📄 Point the camera at your paper",
+    aiUnreadable: "🔎 Move closer and hold still",
+    aiReady: "✅ Document detected — hold still",
+    aiUnavailable: "📸 You can tap Capture when ready",
   };
   const hintColor: Record<Hint, string> = {
     starting: "#6b5d52",
@@ -469,7 +474,13 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     moveCloser: "#2563eb",
     holdStill: "#2563eb",
     documentDetected: "#16a34a",
+    aiChecking: "#6b5d52",
+    aiNoDoc: "#6b5d52",
+    aiUnreadable: "#2563eb",
+    aiReady: "#16a34a",
+    aiUnavailable: "#6b5d52",
   };
+
 
   return (
     <div className="flex-1 flex flex-col" style={{ background: "var(--color-elder-bg)" }}>
