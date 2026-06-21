@@ -865,6 +865,7 @@ function ReviewScreen({
         <BigButton variant="danger" onClick={onSend}>
           {sending ? "Sending…" : "🤝 Connect me with a person"}
         </BigButton>
+        <DoneButton onClick={onDone} />
         <VoiceBar
           speakableText={speakableForPhase("review", {
             analysis,
