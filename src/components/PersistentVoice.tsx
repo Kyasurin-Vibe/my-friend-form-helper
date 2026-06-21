@@ -23,6 +23,8 @@ export type PersistentVoiceProps = {
   helpHint?: string;
   /** Universal "back" intent. */
   onBack?: () => void;
+  /** Universal "I'm done / no thank you" intent — warm exit to home. */
+  onDone?: () => void;
   /** Per-screen intent handler. Return true if you handled the transcript. */
   onCommand?: (transcript: string, helpers: { confirm: (msg: string) => void }) => boolean;
   /** Current screen id passed to the AI interpreter. */
