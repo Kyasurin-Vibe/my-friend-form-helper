@@ -51,7 +51,7 @@ type Phase =
 
 export type Recipient =
   | { kind: "center" }
-  | { kind: "trusted"; name: string; relationship: string };
+  | { kind: "trusted"; name: string; relationship: string; email?: string };
 
 
 const CaptionsContext = createContext<boolean>(true);
