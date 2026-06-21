@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
       time: stamp(),
       text:
         recipientKind === "trusted"
-          ? `Elder chose to send to a trusted contact they picked themselves: ${trustedName} (${trustedRel}). NOT auto-filled.`
+          ? `Elder chose to send to a trusted contact they picked themselves: ${trustedName} (${trustedRel})${trustedEmail ? ` — ${trustedEmail}` : ""}. NOT auto-filled.`
           : `Elder chose to send to ${centerName} (default, institutional accountable partner for need: ${needCategory}).`,
     });
     audit.push({
