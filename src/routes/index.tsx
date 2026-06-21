@@ -443,12 +443,45 @@ function FindDocGate({
 }
 
 
+function AnalyzingScreen() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+      <Mascot mode="speaking" size={150} />
+      <h2 className="mt-4 font-extrabold" style={{ fontSize: 26, color: "var(--color-elder-ink)" }}>
+        Let me look at this…
+      </h2>
+      <p className="mt-2" style={{ fontSize: 17, color: "#6b5d52" }}>
+        Reading your paper carefully. This takes just a few seconds.
+      </p>
+      <div className="mt-6 flex gap-2">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="inline-block rounded-full"
+            style={{
+              width: 14,
+              height: 14,
+              background: "var(--color-elder-primary)",
+              animation: `pulse 1.2s ${i * 0.15}s infinite ease-in-out`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ScreenRouter({
   step,
   setStep,
   branch,
   speech,
   showCaptions,
+  analysis,
+  sendResult,
+  sending,
+  analyzeError,
+  onSend,
   onGoCenter,
 }: {
   step: Step;
@@ -456,6 +489,11 @@ function ScreenRouter({
   branch: Branch;
   speech: ReturnType<typeof useSpeech>;
   showCaptions: boolean;
+  analysis: AnalysisResult | null;
+  sendResult: SendResult | null;
+  sending: boolean;
+  analyzeError: string | null;
+  onSend: () => void;
   onGoCenter: () => void;
 }) {
   const next = (n: Step) => setStep(n);
@@ -473,13 +511,24 @@ function ScreenRouter({
             return (
               <Screen4
                 branch={branch}
-                onSendToCenter={() => next(5)}
+                analysis={analysis}
+                sending={sending}
+                analyzeError={analyzeError}
+                onSendToCenter={onSend}
                 onFixSelf={() => setStep(1)}
                 speech={speech}
               />
             );
           case 5:
-            return <Screen5 branch={branch} onGoCenter={onGoCenter} speech={speech} />;
+            return (
+              <Screen5
+                branch={branch}
+                sendResult={sendResult}
+                analysis={analysis}
+                onGoCenter={onGoCenter}
+                speech={speech}
+              />
+            );
           case 6:
             return <Screen6 />;
         }
@@ -487,6 +536,7 @@ function ScreenRouter({
     </CaptionsCtx>
   );
 }
+
 
 // ===== Shared building blocks =====
 
