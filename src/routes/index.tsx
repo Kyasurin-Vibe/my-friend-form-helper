@@ -293,7 +293,21 @@ function ElderApp() {
                 analysis,
               })
             }
+            screenId={phase}
+            actions={getPhaseActions(phase)}
+            onAction={(id, { confirm }) =>
+              runPhaseAction(id, confirm, {
+                phase,
+                setPhase,
+                confirmPreview,
+                navigate,
+                restart,
+                handleSend,
+                analysis,
+              })
+            }
           />
+
 
           <CaptionsContext.Provider value={showCaptions}>
            <VoiceOnContext.Provider value={voiceOn}>
@@ -1621,3 +1635,77 @@ function handlePhaseCommand(
   }
 }
 
+
+// ===== AI-interpreted action catalog per phase =====
+
+function getPhaseActions(phase: Phase): { id: string; description: string }[] {
+  switch (phase) {
+    case "home":
+      return [
+        { id: "magnifier", description: "Open the magnifier to make things bigger and easier to see (use when the user wants help seeing, reading, or looking at something)" },
+        { id: "scan", description: "Scan a paper or document because the user has a question about it" },
+      ];
+    case "find":
+      return [
+        { id: "open_camera", description: "Open the camera to take a picture of the document now" },
+      ];
+    case "preview":
+      return [
+        { id: "use_photo", description: "Use this photo and continue (the picture looks clear / good / fine)" },
+        { id: "retake", description: "Retake the photo because it is blurry or unclear" },
+      ];
+    case "retake":
+      return [
+        { id: "try_again", description: "Try taking a new photo" },
+        { id: "connect_person", description: "Skip retaking and connect with a real person for help" },
+      ];
+    case "review":
+      return [
+        { id: "send", description: "Send / connect with a real person who can help" },
+        { id: "retake", description: "Retake the photo instead" },
+      ];
+    case "choose":
+      return [
+        { id: "center", description: "Send to the recommended center / institution / partner / legal aid / social worker" },
+        { id: "trusted", description: "Send to someone the user personally trusts, like family, daughter, son, attorney" },
+      ];
+    case "sent":
+      return [
+        { id: "restart", description: "Start over with a new document" },
+        { id: "open_center", description: "Open the staff / center dashboard view" },
+      ];
+    default:
+      return [];
+  }
+}
+
+function runPhaseAction(
+  id: string,
+  confirm: (msg: string) => void,
+  ctx: {
+    phase: Phase;
+    setPhase: (p: Phase) => void;
+    confirmPreview: () => void;
+    navigate: ReturnType<typeof useNavigate>;
+    restart: () => void;
+    handleSend: (r: Recipient) => void | Promise<void>;
+    analysis: AnalysisResult | null;
+  },
+): void {
+  const { setPhase, confirmPreview, navigate, restart, handleSend } = ctx;
+  switch (id) {
+    case "magnifier": confirm("Opening the magnifier."); setPhase("viewer"); return;
+    case "scan": confirm("Okay — let's scan it."); setPhase("find"); return;
+    case "open_camera": confirm("Opening the camera."); setPhase("magnifier"); return;
+    case "use_photo": confirm("Okay — using this."); confirmPreview(); return;
+    case "retake": confirm("Okay — retake."); setPhase("magnifier"); return;
+    case "try_again": confirm("Okay — try again."); setPhase("magnifier"); return;
+    case "connect_person": confirm("Sending to a person."); setPhase("choose"); return;
+    case "send": confirm("Sending now."); setPhase("choose"); return;
+    case "center": confirm("Sending to the center."); void handleSend({ kind: "center" }); return;
+    case "trusted": confirm("Okay — your trusted person."); return;
+    case "restart": confirm("Starting over."); restart(); return;
+    case "open_center": confirm("Opening the center."); navigate({ to: "/center" }); return;
+    default: return;
+  }
+}

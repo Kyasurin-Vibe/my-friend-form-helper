@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DemoServices } from "@/lib/services";
 import { cancelSpeech } from "@/lib/voice";
 import { speakWarm } from "@/lib/cases";
+import { interpretIntent, type IntentAction } from "@/lib/intent";
 
 export type PersistentVoiceProps = {
   /** Pause continuous listening (e.g. while another screen owns the mic). */
@@ -24,6 +25,12 @@ export type PersistentVoiceProps = {
   onBack?: () => void;
   /** Per-screen intent handler. Return true if you handled the transcript. */
   onCommand?: (transcript: string, helpers: { confirm: (msg: string) => void }) => boolean;
+  /** Current screen id passed to the AI interpreter. */
+  screenId?: string;
+  /** Available semantic actions for this screen — for AI fallback. */
+  actions?: IntentAction[];
+  /** Dispatcher for an AI-resolved action id. */
+  onAction?: (id: string, helpers: { confirm: (msg: string) => void }) => void;
 };
 
 export function PersistentVoice({
@@ -33,6 +40,9 @@ export function PersistentVoice({
   helpHint,
   onBack,
   onCommand,
+  screenId,
+  actions,
+  onAction,
 }: PersistentVoiceProps) {
   const [userOn, setUserOn] = useState(true);
   const [listening, setListening] = useState(false);
@@ -47,11 +57,18 @@ export function PersistentVoice({
   const onCommandRef = useRef(onCommand);
   const onBackRef = useRef(onBack);
   const helpRef = useRef(helpHint);
+  const screenRef = useRef(screenId);
+  const actionsRef = useRef(actions);
+  const onActionRef = useRef(onAction);
+  const interpretingRef = useRef(false);
 
   useEffect(() => { speakableRef.current = speakable; }, [speakable]);
   useEffect(() => { onCommandRef.current = onCommand; }, [onCommand]);
   useEffect(() => { onBackRef.current = onBack; }, [onBack]);
   useEffect(() => { helpRef.current = helpHint; }, [helpHint]);
+  useEffect(() => { screenRef.current = screenId; }, [screenId]);
+  useEffect(() => { actionsRef.current = actions; }, [actions]);
+  useEffect(() => { onActionRef.current = onAction; }, [onAction]);
 
   const active = enabledFromMode && userOn && !paused;
 
@@ -106,9 +123,27 @@ export function PersistentVoice({
       return;
     }
 
-    // Per-screen
+    // Per-screen fast local match
     const handled = onCommandRef.current?.(t, { confirm: speakConfirm });
-    if (handled) lastCmdAtRef.current = now;
+    if (handled) { lastCmdAtRef.current = now; return; }
+
+    // AI-interpreted fallback for natural phrasing
+    const scr = screenRef.current;
+    const acts = actionsRef.current;
+    const dispatch = onActionRef.current;
+    if (!scr || !acts || acts.length === 0 || !dispatch) return;
+    if (interpretingRef.current) return;
+    interpretingRef.current = true;
+    lastCmdAtRef.current = now;
+    void interpretIntent(t, scr, acts)
+      .then(({ action, confidence }) => {
+        if (action && action !== "none" && confidence >= 0.5) {
+          dispatch(action, { confirm: speakConfirm });
+        } else {
+          speakConfirm("Sorry, I didn't catch that — you can tap a button.");
+        }
+      })
+      .finally(() => { interpretingRef.current = false; });
   }, [speakConfirm]);
 
   const startLoop = useCallback(() => {
