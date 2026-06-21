@@ -336,6 +336,7 @@ function ElderApp() {
               <HomeScreen
                 onMagnifier={() => setPhase("viewer")}
                 onScanner={() => setPhase("find")}
+                onChangeLang={() => setPhase("language")}
               />
             ) : phase === "viewer" ? (
               <SimpleMagnifier
