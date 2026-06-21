@@ -11,14 +11,16 @@ type Props = {
   onHandoff: () => void;
 };
 
-type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
+type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "blurry" | "more-light" | "too-bright" | "detected";
 
 const GUIDANCE_TEXT: Record<Guidance, string> = {
   init: "Point the camera at your paper.",
   "move-closer": "Move a little closer.",
   "hold-still": "Hold still…",
   corners: "Put all four corners inside the frame.",
-  blurry: "The picture is too blurry. Please try again.",
+  blurry: "Hold steady — the picture is blurry.",
+  "more-light": "It's too dark. Find more light.",
+  "too-bright": "Too much glare. Tilt the paper.",
   detected: "Looks clear. Capturing automatically…",
 };
 
