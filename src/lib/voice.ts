@@ -8,7 +8,7 @@ export type VoiceIntent = "confirm" | "cancel" | "repeat" | "unknown";
 export function classifyIntent(raw: string): VoiceIntent {
   const t = (raw || "").toLowerCase().trim();
   if (!t) return "unknown";
-  if (/\b(yes|yeah|yep|yup|sure|send( it)?|okay|ok|go ahead|do it|confirm|next)\b/.test(t))
+  if (/\b(yes|yeah|yep|yup|sure|send( it)?|okay|ok|go ahead|do it|confirm|next|scan|ready|open|start|go|capture|snap|take it)\b/.test(t))
     return "confirm";
   if (/\b(no|nope|not yet|wait|stop|cancel|back|keep looking|retake|try again)\b/.test(t))
     return "cancel";
