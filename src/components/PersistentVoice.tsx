@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DemoServices } from "@/lib/services";
 import { cancelSpeech } from "@/lib/voice";
 import { speakWarm } from "@/lib/cases";
+import { interpretIntent, type IntentAction } from "@/lib/intent";
 
 export type PersistentVoiceProps = {
   /** Pause continuous listening (e.g. while another screen owns the mic). */
@@ -24,6 +25,12 @@ export type PersistentVoiceProps = {
   onBack?: () => void;
   /** Per-screen intent handler. Return true if you handled the transcript. */
   onCommand?: (transcript: string, helpers: { confirm: (msg: string) => void }) => boolean;
+  /** Current screen id passed to the AI interpreter. */
+  screenId?: string;
+  /** Available semantic actions for this screen — for AI fallback. */
+  actions?: IntentAction[];
+  /** Dispatcher for an AI-resolved action id. */
+  onAction?: (id: string, helpers: { confirm: (msg: string) => void }) => void;
 };
 
 export function PersistentVoice({
