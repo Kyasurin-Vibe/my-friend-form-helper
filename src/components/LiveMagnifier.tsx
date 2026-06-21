@@ -47,10 +47,10 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   // Auto-driven — no manual controls. Smoothed via EMA in the analysis loop.
-  const [zoom, setZoom] = useState(1.4);
+  const [zoom, setZoom] = useState(1.25);
   const [brightness, setBrightness] = useState(1);
   const [contrast, setContrast] = useState(1);
-  const autoRef = useRef({ zoom: 1.4, brightness: 1, contrast: 1 });
+  const autoRef = useRef({ zoom: 1.25, brightness: 1, contrast: 1 });
   const [guidance, setGuidance] = useState<Guidance>("init");
   const [detectionBox, setDetectionBox] = useState<DetectionBox | null>(null);
   const [countdown, setCountdown] = useState(0); // seconds remaining
@@ -109,7 +109,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     if (!ready) return;
     const v = videoRef.current;
     if (!v) return;
-    const W = 96, H = 72;
+    const W = 128, H = 96;
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
@@ -220,7 +220,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         const targetContrast = Math.max(1, Math.min(1.35, 1 + (8 - Math.min(sharp, 8)) * 0.04));
         // Target zoom: tighter once a document fills the frame.
         const targetZoom =
-          hasDocumentRegion && boxAreaFrac >= 0.5 ? 1.85 : hasDocumentRegion ? 1.6 : 1.25;
+          hasDocumentRegion && boxAreaFrac >= 0.5 ? 1.85 : hasDocumentRegion ? 1.6 : 1.15;
 
         const a = 0.18; // EMA alpha — slow enough to avoid flicker
         const cur = autoRef.current;
