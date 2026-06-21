@@ -272,8 +272,36 @@ export function PersistentVoice({
     return () => window.clearInterval(iv);
   }, [active, startLoop, isTTSPlaying]);
 
+  // Barge-in via TAP: any pointer interaction while the app is talking
+  // cancels TTS immediately and resumes listening — never make the user wait.
+  useEffect(() => {
+    if (!active) return;
+    const onPointer = () => {
+      if (!speakingRef.current && !isTTSPlaying()) return;
+      cancelAllTTS();
+      setConfirmation("");
+      if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 120);
+    };
+    window.addEventListener("pointerdown", onPointer, true);
+    return () => window.removeEventListener("pointerdown", onPointer, true);
+  }, [active, cancelAllTTS, isTTSPlaying, startLoop]);
+
   // When voice is enabled and not running because mode says off, hide everything.
   if (!enabledFromMode) return null;
+
+  const statusLabel = !userOn
+    ? "🎙 Voice off"
+    : speaking
+      ? "🔊 Speaking…"
+      : listening
+        ? "🎙 Listening"
+        : "🎙 Voice on";
+  const dotColor = !userOn ? "#9ca3af" : speaking ? "#3b82f6" : listening ? "#22c55e" : "#f59e0b";
+  const dotGlow = speaking
+    ? "0 0 0 4px rgba(59,130,246,0.25)"
+    : listening
+      ? "0 0 0 4px rgba(34,197,94,0.25)"
+      : "none";
 
   return (
     <div
@@ -294,14 +322,12 @@ export function PersistentVoice({
           aria-hidden
           style={{
             width: 8, height: 8, borderRadius: 999,
-            background: listening ? "#22c55e" : userOn ? "#f59e0b" : "#9ca3af",
-            boxShadow: listening ? "0 0 0 4px rgba(34,197,94,0.25)" : "none",
+            background: dotColor,
+            boxShadow: dotGlow,
             transition: "all 150ms",
           }}
         />
-        <span>
-          {paused ? "🎙 Screen voice" : userOn ? (listening ? "🎙 Listening" : "🎙 Voice on") : "🎙 Voice off"}
-        </span>
+        <span>{statusLabel}</span>
         <button
           type="button"
           onClick={() => setUserOn((v) => !v)}
