@@ -420,7 +420,7 @@ function ElderApp() {
         className="mt-4 text-sm underline"
         style={{ color: "var(--color-elder-primary)", fontFamily: "var(--font-center)" }}
       >
-        Open staff dashboard →
+        {t("staff_dashboard")}
       </Link>
     </div>
   );
