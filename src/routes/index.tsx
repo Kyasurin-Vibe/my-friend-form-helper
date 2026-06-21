@@ -989,7 +989,7 @@ function ReviewScreen({
           className="text-xs uppercase font-bold tracking-wide mb-2"
           style={{ color: "#6b5d52" }}
         >
-          Here&apos;s help available for you
+          {t("help_available")}
         </p>
         {(() => {
           const resources = getResources(analysis.resourceCategory);
