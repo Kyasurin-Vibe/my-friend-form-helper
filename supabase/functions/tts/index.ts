@@ -62,7 +62,12 @@ Deno.serve(async (req) => {
     if (!r.ok) {
       const errText = await r.text();
       console.error("elevenlabs error", r.status, errText);
-      return Response.json({ error: `elevenlabs_${r.status}` }, { status: 502, headers: CORS });
+      // Return 200 with a fallback marker so the client gracefully uses
+      // browser speechSynthesis instead of surfacing a runtime error.
+      return Response.json(
+        { fallback: true, reason: `elevenlabs_${r.status}` },
+        { status: 200, headers: CORS },
+      );
     }
 
     const audio = await r.arrayBuffer();
