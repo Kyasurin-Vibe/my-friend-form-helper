@@ -1707,9 +1707,22 @@ function getPhaseActions(phase: Phase, chooseMode: "pick" | "trusted" = "pick"):
         { id: "magnifier", description: "Open the magnifier to make things bigger and easier to see (use when the user wants help seeing, reading, or looking at something)" },
         { id: "scan", description: "Scan a paper or document because the user has a question about it" },
       ];
+    case "viewer":
+      return [
+        { id: "viewer_bigger", description: "Zoom in / make the live magnifier bigger or closer" },
+        { id: "viewer_smaller", description: "Zoom out / make the live magnifier smaller" },
+        { id: "viewer_brighter", description: "Make the magnifier brighter or add more light" },
+        { id: "viewer_dimmer", description: "Make the magnifier dimmer, darker, less bright, or reduce light" },
+        { id: "viewer_question", description: "The user has a question about a paper/document and wants to scan it" },
+      ];
     case "find":
       return [
         { id: "open_camera", description: "Open the camera to take a picture of the document now" },
+      ];
+    case "magnifier":
+      return [
+        { id: "capture_now", description: "Capture / take the photo now because the document is ready" },
+        { id: "keep_looking", description: "Do not capture yet; keep looking or wait" },
       ];
     case "preview":
       return [
@@ -1764,7 +1777,14 @@ function runPhaseAction(
   switch (id) {
     case "magnifier": confirm("Opening the magnifier."); setPhase("viewer"); return;
     case "scan": confirm("Okay — let's scan it."); setPhase("find"); return;
+    case "viewer_bigger": confirm("Okay — bigger."); dispatchSimpleMagnifierCommand("bigger"); return;
+    case "viewer_smaller": confirm("Smaller."); dispatchSimpleMagnifierCommand("smaller"); return;
+    case "viewer_brighter": confirm("Brighter now."); dispatchSimpleMagnifierCommand("brighter"); return;
+    case "viewer_dimmer": confirm("Dimmer."); dispatchSimpleMagnifierCommand("dimmer"); return;
+    case "viewer_question": confirm("Okay — let's scan it."); setPhase("find"); return;
     case "open_camera": confirm("Opening the camera."); setPhase("magnifier"); return;
+    case "capture_now": confirm("Okay — capture now."); dispatchScannerCommand("capture"); return;
+    case "keep_looking": confirm("Okay — keep looking."); dispatchScannerCommand("wait"); return;
     case "use_photo": confirm("Okay — using this."); confirmPreview(); return;
     case "retake": confirm("Okay — retake."); setPhase("magnifier"); return;
     case "try_again": confirm("Okay — try again."); setPhase("magnifier"); return;
