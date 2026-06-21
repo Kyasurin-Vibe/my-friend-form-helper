@@ -420,7 +420,7 @@ function ElderApp() {
         className="mt-4 text-sm underline"
         style={{ color: "var(--color-elder-primary)", fontFamily: "var(--font-center)" }}
       >
-        Open staff dashboard →
+        {t("staff_dashboard")}
       </Link>
     </div>
   );
@@ -633,10 +633,10 @@ function HomeScreen({
       <div className="flex-1 flex flex-col items-center justify-center w-full">
         <Mascot mode="idle" size={130} />
         <h1 className="mt-3 font-extrabold" style={{ fontSize: 30, color: "var(--color-elder-ink)" }}>
-          {t("home.title")}
+          {t("app_name")}
         </h1>
         <p className="mt-1 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
-          {t("home.subtitle")}
+          {t("home_question")}
         </p>
         <div className="w-full space-y-4">
           <button
@@ -653,7 +653,7 @@ function HomeScreen({
               boxShadow: "0 8px 22px rgba(47,111,176,0.14)",
             }}
           >
-            <div style={{ fontSize: 26 }}>{t("home.see")}</div>
+            <div style={{ fontSize: 26 }}>{t("choice_see")}</div>
             <div style={{ fontSize: 15, color: "#6b5d52", fontWeight: 600, marginTop: 4 }}>
               {t("home.see.sub")}
             </div>
@@ -672,7 +672,7 @@ function HomeScreen({
               boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
             }}
           >
-            <div style={{ fontSize: 26 }}>{t("home.scan")}</div>
+            <div style={{ fontSize: 26 }}>{t("choice_question")}</div>
             <div style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", fontWeight: 600, marginTop: 4 }}>
               {t("home.scan.sub")}
             </div>
@@ -700,10 +700,10 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
       <div className="flex-1 flex flex-col items-center justify-center">
         <Mascot mode="idle" size={130} />
         <h2 className="mt-3 font-extrabold" style={{ fontSize: 28, color: "var(--color-elder-ink)" }}>
-          Have a question, my friend?
+          {t("question_friend")}
         </h2>
         <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
-          I will open your camera, so I can help you.
+          {t("open_camera_hint")}
         </p>
         <button
           onClick={() => { cancelSpeech(); onOpenMagnifier(); }}
@@ -719,7 +719,7 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
             boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
           }}
         >
-          🔍 Open Scanner
+          {t("open_scanner")}
         </button>
         <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
           The magnifier uses your camera only on this device.
@@ -745,7 +745,7 @@ function AnalyzingScreen() {
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
       <Mascot mode="speaking" size={150} />
       <h2 className="mt-4 font-extrabold" style={{ fontSize: 26, color: "var(--color-elder-ink)" }}>
-        Reading your document… one moment
+        {t("reading_doc")}
       </h2>
       <div
         className="mt-6"
@@ -760,7 +760,7 @@ function AnalyzingScreen() {
         }}
       />
       <div className="sr-only" role="status">
-        Reading your document… one moment
+        {t("reading_doc")}
       </div>
       <div className="w-full max-w-sm mt-6">
         <VoiceBar
@@ -816,9 +816,9 @@ function RetakeScreen({
         </ul>
       </div>
       <div className="space-y-2 mt-auto">
-        <BigButton variant="danger" onClick={onRetry}>📷 Try again</BigButton>
+        <BigButton variant="danger" onClick={onRetry}>📷 {t("retake")}</BigButton>
         <BigButton variant="ghost" onClick={onSendAnyway}>
-          {sending ? "Sending…" : "🤝 Connect me with a person"}
+          {sending ? t("sending") : t("connect_person")}
         </BigButton>
         <DoneButton onClick={onDone} />
         <VoiceBar
@@ -900,9 +900,9 @@ function ReviewScreen({
           )}
         </div>
         <div className="space-y-2 mt-auto">
-          <BigButton variant="ghost" onClick={onRetake}>📷 Retake</BigButton>
+          <BigButton variant="ghost" onClick={onRetake}>📷 {t("retake")}</BigButton>
           <BigButton variant="danger" onClick={onSend}>
-            {sending ? "Sending…" : "🤝 Connect me with a person"}
+            {sending ? t("sending") : t("connect_person")}
           </BigButton>
           <DoneButton onClick={onDone} />
           <VoiceBar
@@ -989,7 +989,7 @@ function ReviewScreen({
           className="text-xs uppercase font-bold tracking-wide mb-2"
           style={{ color: "#6b5d52" }}
         >
-          Here&apos;s help available for you
+          {t("help_available")}
         </p>
         {(() => {
           const resources = getResources(analysis.resourceCategory);
@@ -1036,10 +1036,10 @@ function ReviewScreen({
       </div>
       <div className="space-y-2 mt-auto">
         <BigButton variant="ghost" onClick={onRetake}>
-          📷 Retake
+          📷 {t("retake")}
         </BigButton>
         <BigButton variant="danger" onClick={onSend}>
-          {sending ? "Sending…" : "🤝 Connect me with a person"}
+          {sending ? t("sending") : t("connect_person")}
         </BigButton>
         <DoneButton onClick={onDone} />
         <VoiceBar
@@ -1225,7 +1225,7 @@ function ChooseRecipientScreen({
           >
             Someone YOU pick — your own attorney or a family member you trust.
           </p>
-          <BigButton variant="ghost" onClick={onBack}>← Go back</BigButton>
+          <BigButton variant="ghost" onClick={onBack}>{t("back")}</BigButton>
           <VoiceBar
             speakableText={speakableForPhase("choose", { analysis, sendResult: null, analyzeError: null })}
             voiceOn={voiceOn}
@@ -1306,7 +1306,7 @@ function TrustedPersonForm({
         className="text-center font-extrabold mt-2 mb-1"
         style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
       >
-        Who do you trust with this?
+        {t("who_trust")}
       </h2>
       <p
         className="text-center mb-4"
@@ -1318,7 +1318,7 @@ function TrustedPersonForm({
         className="font-bold"
         style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
       >
-        Their name
+        {t("their_name")}
       </label>
       <VoiceField
         value={name}
@@ -1330,7 +1330,7 @@ function TrustedPersonForm({
         className="font-bold mt-3"
         style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
       >
-        How do you know them?
+        {t("how_know")}
       </label>
       <VoiceField
         value={relationship}
@@ -1353,9 +1353,9 @@ function TrustedPersonForm({
       />
       <div className="space-y-2 mt-auto pt-4">
         <BigButton variant="danger" onClick={onSend}>
-          {sending ? "Sending…" : `📨 Send to ${name.trim() || "this person"}`}
+          {sending ? t("sending") : `📨 ${t("send_person")}`}
         </BigButton>
-        <BigButton variant="ghost" onClick={onBack}>← Back</BigButton>
+        <BigButton variant="ghost" onClick={onBack}>{t("back")}</BigButton>
       </div>
     </div>
   );
@@ -1485,7 +1485,7 @@ function PreviewScreen({
         className="text-center font-extrabold mt-2 mb-3"
         style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
       >
-        Is this clear enough?
+        {t("clear_enough")}
       </h2>
       <div
         className="rounded-2xl overflow-hidden mb-4"
@@ -1507,8 +1507,8 @@ function PreviewScreen({
         )}
       </div>
       <div className="space-y-2 mt-auto">
-        <BigButton variant="danger" onClick={onUse}>✅ Yes, use this</BigButton>
-        <BigButton variant="ghost" onClick={onRetake}>🔄 Retake</BigButton>
+        <BigButton variant="danger" onClick={onUse}>{t("yes_use")}</BigButton>
+        <BigButton variant="ghost" onClick={onRetake}>{t("retake")}</BigButton>
         <VoiceBar
           speakableText={speakableForPhase("preview", { analysis: null, sendResult: null, analyzeError: null })}
           voiceOn={voiceOn}
@@ -1929,7 +1929,7 @@ function DoneButton({ onClick }: { onClick: () => void }) {
       }}
       aria-label="No thanks, I'm done"
     >
-      👋 No thanks — I&apos;m done
+      {t("no_thanks")}
     </button>
   );
 }

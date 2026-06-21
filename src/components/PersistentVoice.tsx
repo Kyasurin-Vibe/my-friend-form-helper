@@ -6,12 +6,12 @@
 // - Buttons remain primary; voice is purely additive. If the mic is blocked,
 //   a gentle note is shown and the screen still works via taps.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { DemoServices } from "@/lib/services";
 import { cancelSpeech } from "@/lib/voice";
 import { speakWarm } from "@/lib/cases";
 import { interpretIntent, type IntentAction } from "@/lib/intent";
-import { getBCP47, getLang, translateAsync, translateSync } from "@/lib/i18n";
+import { getBCP47, getLang, translateAsync, translateSync, useT } from "@/lib/i18n";
 
 export type PersistentVoiceProps = {
   /** Pause continuous listening (e.g. while another screen owns the mic). */
@@ -300,13 +300,47 @@ export function PersistentVoice({
   // When voice is enabled and not running because mode says off, hide everything.
   if (!enabledFromMode) return null;
 
+  // i18n labels (hooks must be unconditional — early-return above is allowed since
+  // enabledFromMode is stable from the parent's perspective for a given mount).
+  return <PersistentVoiceStatus
+    userOn={userOn}
+    speaking={speaking}
+    listening={listening}
+    setUserOn={setUserOn}
+    blocked={blocked}
+    active={active}
+    transcript={transcript}
+    confirmation={confirmation}
+  />;
+}
+
+function PersistentVoiceStatus({
+  userOn, speaking, listening, setUserOn, blocked, active, transcript, confirmation,
+}: {
+  userOn: boolean;
+  speaking: boolean;
+  listening: boolean;
+  setUserOn: Dispatch<SetStateAction<boolean>>;
+  blocked: boolean;
+  active: boolean;
+  transcript: string;
+  confirmation: string;
+}) {
+  const lblVoiceOff = useT("voice_off");
+  const lblSpeaking = useT("speaking");
+  const lblListening = useT("listening");
+  const lblVoiceOn = useT("voice_on");
+  const lblTurnOn = useT("turn_on");
+  const lblTurnOff = useT("turn_off");
+  const lblMicBlocked = useT("mic_blocked");
+
   const statusLabel = !userOn
-    ? "🎙 Voice off"
+    ? lblVoiceOff
     : speaking
-      ? "🔊 Speaking…"
+      ? lblSpeaking
       : listening
-        ? "🎙 Listening"
-        : "🎙 Voice on";
+        ? lblListening
+        : lblVoiceOn;
   const dotColor = !userOn ? "#9ca3af" : speaking ? "#3b82f6" : listening ? "#22c55e" : "#f59e0b";
   const dotGlow = speaking
     ? "0 0 0 4px rgba(59,130,246,0.25)"
@@ -352,7 +386,7 @@ export function PersistentVoice({
           aria-pressed={userOn}
           aria-label="Toggle voice"
         >
-          {userOn ? "Turn off" : "Turn on"}
+          {userOn ? lblTurnOff : lblTurnOn}
         </button>
       </div>
       {blocked && active && (
@@ -366,7 +400,7 @@ export function PersistentVoice({
             border: "1px solid #F5DDA8",
           }}
         >
-          Mic is blocked — the buttons still work.
+          {lblMicBlocked}
         </div>
       )}
       {(transcript || confirmation) && (

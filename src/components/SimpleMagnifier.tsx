@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DemoServices } from "@/lib/services";
-import { translateAsync, translateSync, getLang, getBCP47, useTranslated } from "@/lib/i18n";
+import { translateAsync, translateSync, getLang, getBCP47, useTranslated, useT } from "@/lib/i18n";
 
 type Props = {
   onBack: () => void;
@@ -52,9 +52,9 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [brightness, setBrightness] = useState(1);
-  const lblStarting = useTranslated("Starting camera…");
-  const lblQuestion = useTranslated("I have a question");
-  const lblBackHome = useTranslated("Back to home");
+  const lblStarting = useT("starting_camera");
+  const lblQuestion = useT("i_have_question");
+  const lblBackHome = useT("back_home");
 
   const zoomRef = useRef(zoom);
   const brightRef = useRef(brightness);

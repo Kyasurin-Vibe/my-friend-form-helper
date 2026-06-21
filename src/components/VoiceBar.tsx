@@ -15,6 +15,7 @@ import {
   type VoiceIntent,
 } from "@/lib/voice";
 import { speakWarm } from "@/lib/cases";
+import { useT } from "@/lib/i18n";
 
 type Props = {
   speakableText: string;
@@ -40,6 +41,9 @@ export function VoiceBar({
   const [working, setWorking] = useState(false);
   const [hint, setHint] = useState<string>("");
   const stopRef = useRef<null | (() => Promise<Blob | null>)>(null);
+  const lblReadAgain = useT("read_again");
+  const lblHoldToTalk = useT("hold_to_talk");
+  const lblListening = useT("listening");
 
   const reSpeak = () => {
     cancelSpeech();
@@ -133,7 +137,7 @@ export function VoiceBar({
             minHeight: 52,
           }}
         >
-          🔊 Read this again
+          {lblReadAgain}
         </button>
         {!hideMic && (
           <button
@@ -155,7 +159,7 @@ export function VoiceBar({
             }}
             aria-label="Hold to talk"
           >
-            {working ? "…" : recording ? "● Listening" : "🎙 Hold to talk"}
+            {working ? "…" : recording ? lblListening : lblHoldToTalk}
           </button>
         )}
       </div>
