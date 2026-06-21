@@ -19,6 +19,7 @@ import {
 import { getResources, getAccountablePartner, normalizeSpokenEmail } from "@/lib/resources";
 import { cancelSpeech, startRecording, transcribeAudio, type VoiceAction } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
+import { LANG_LABELS, type Lang, getLang, setLang, t, onLangChange } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => ({
