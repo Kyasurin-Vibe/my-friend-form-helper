@@ -317,18 +317,27 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number; skipT
     spoken = out.join("");
   }
   const timeoutMs = opts?.timeoutMs ?? 1500;
-  const w = window as unknown as { __mfTtsAudio?: HTMLAudioElement };
+  const w = window as unknown as {
+    __mfTtsAudio?: HTMLAudioElement;
+    __mfTtsSeq?: number;
+    __mfTtsInFlight?: Promise<unknown> | null;
+  };
   try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
   try { w.__mfTtsAudio?.pause(); } catch { /* noop */ }
   w.__mfTtsAudio = undefined;
 
+  // Serialize: bump sequence; only the latest call may play.
+  const mySeq = (w.__mfTtsSeq ?? 0) + 1;
+  w.__mfTtsSeq = mySeq;
+  const isStale = () => w.__mfTtsSeq !== mySeq;
+
   const fallback = () => {
+    if (isStale()) return;
     try {
       const u = new SpeechSynthesisUtterance(spoken);
       u.rate = 0.95;
       u.pitch = 1.05;
       u.lang = getBCP47();
-      // Pick a voice matching the language if available.
       try {
         const voices = window.speechSynthesis.getVoices();
         const match = voices.find((v) => v.lang?.toLowerCase().startsWith(u.lang.toLowerCase().slice(0, 2)));
@@ -338,39 +347,48 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number; skipT
     } catch { /* noop */ }
   };
 
-  // Deepgram Aura v1 is English-only — for other languages use the browser
-  // voice with the matching lang code.
   if (!ttsSupportsDeepgram()) {
     fallback();
     return;
   }
 
-  try {
-    const fetchPromise = supabase.functions.invoke("tts", {
-      body: { text: spoken, voice: getTTSVoice(), language: getLang() },
-      // @ts-expect-error supabase-js supports responseType: 'blob' at runtime
-      responseType: "blob",
-    });
-    const timeout = new Promise<{ data: null; error: Error }>((resolve) =>
-      setTimeout(() => resolve({ data: null, error: new Error("tts_timeout") }), timeoutMs),
-    );
-    const { data, error } = (await Promise.race([fetchPromise, timeout])) as {
-      data: Blob | null;
-      error: unknown;
-    };
-    if (error || !data || !(data instanceof Blob) || data.size < 200) {
+  // Wait for any prior ElevenLabs request to finish (avoid concurrent_limit 429).
+  const prior = w.__mfTtsInFlight;
+  const run = (async () => {
+    try { if (prior) await prior; } catch { /* noop */ }
+    if (isStale()) return;
+    try {
+      const fetchPromise = supabase.functions.invoke("tts", {
+        body: { text: spoken, voice: getTTSVoice(), language: getLang() },
+        // @ts-expect-error supabase-js supports responseType: 'blob' at runtime
+        responseType: "blob",
+      });
+      const timeout = new Promise<{ data: null; error: Error }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: new Error("tts_timeout") }), timeoutMs),
+      );
+      const { data, error } = (await Promise.race([fetchPromise, timeout])) as {
+        data: Blob | null;
+        error: unknown;
+      };
+      if (isStale()) return;
+      if (error || !data || !(data instanceof Blob) || data.size < 200) {
+        fallback();
+        return;
+      }
+      const url = URL.createObjectURL(data);
+      const audio = new Audio(url);
+      w.__mfTtsAudio = audio;
+      audio.onended = () => URL.revokeObjectURL(url);
+      audio.onerror = () => { URL.revokeObjectURL(url); fallback(); };
+      await audio.play();
+    } catch {
       fallback();
-      return;
     }
-    const url = URL.createObjectURL(data);
-    const audio = new Audio(url);
-    w.__mfTtsAudio = audio;
-    audio.onended = () => URL.revokeObjectURL(url);
-    audio.onerror = () => { URL.revokeObjectURL(url); fallback(); };
-    await audio.play();
-  } catch {
-    fallback();
-  }
+  })();
+  w.__mfTtsInFlight = run.finally(() => {
+    if (w.__mfTtsInFlight === run) w.__mfTtsInFlight = null;
+  });
+  await run;
 }
 
 
