@@ -1,5 +1,5 @@
-// Insert a case row into public.cases, optionally upload the image to Storage.
-// Generates a unique tracking ID. Never blocks on storage failure.
+// Insert a case row into public.cases. Uploads ORIGINAL (full frame) and
+// PROCESSED (cropped) images separately for audit + dashboard preview.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -11,6 +11,7 @@ const CORS = {
 
 const CENTER_NAME = "Legal Aid Center";
 
+type Bounds = { x: number; y: number; width: number; height: number; confidence: number };
 type Analysis = {
   readable: boolean;
   documentType?: string;
@@ -20,10 +21,10 @@ type Analysis = {
   possibleMissingFields?: string[];
   recommendedAction?: "retake" | "confirm_send" | "human_review";
   elderMessage?: string;
+  documentBounds?: Bounds | null;
 };
 
 function genTrackingId() {
-  // MF- + timestamp tail + random — collision-resistant across demo runs.
   const t = Date.now().toString(36).slice(-4).toUpperCase();
   const r = Math.floor(Math.random() * 36 ** 3).toString(36).toUpperCase().padStart(3, "0");
   return `MF-${t}${r}`;
@@ -40,16 +41,46 @@ function parseDataUrl(dataUrl: string): { ext: string; bytes: Uint8Array } | nul
   return { ext, bytes };
 }
 
+async function uploadImage(
+  supabase: ReturnType<typeof createClient>,
+  trackingId: string,
+  suffix: string,
+  dataUrl: string,
+): Promise<string | null> {
+  const parsed = parseDataUrl(dataUrl);
+  if (!parsed) return null;
+  const path = `${trackingId}-${suffix}.${parsed.ext}`;
+  const { error: upErr } = await supabase.storage
+    .from("case-images")
+    .upload(path, parsed.bytes, {
+      contentType: `image/${parsed.ext === "jpg" ? "jpeg" : parsed.ext}`,
+      upsert: true,
+    });
+  if (upErr) {
+    console.warn(`storage upload failed (${suffix}):`, upErr.message);
+    return null;
+  }
+  const { data: signed } = await supabase.storage
+    .from("case-images")
+    .createSignedUrl(path, 60 * 60 * 24 * 7);
+  return signed?.signedUrl ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: CORS });
 
   try {
-    const { image, analysis, initials } = (await req.json()) as {
-      image?: string;
+    const body = (await req.json()) as {
+      image?: string; // legacy fallback (single image)
+      originalImage?: string;
+      processedImage?: string;
       analysis: Analysis;
       initials?: string;
     };
+    const { analysis, initials } = body;
+    const originalImage = body.originalImage ?? body.image;
+    const processedImage = body.processedImage ?? body.image;
 
     if (!analysis || typeof analysis !== "object") {
       return Response.json({ error: "analysis required" }, { status: 400, headers: CORS });
@@ -72,6 +103,15 @@ Deno.serve(async (req) => {
       time: stamp(),
       text: `Claude analyzed document — type: ${analysis.documentType ?? "unknown"}, confidence: ${(analysis.confidence ?? 0).toFixed(2)}.`,
     });
+    if (analysis.documentBounds) {
+      const b = analysis.documentBounds;
+      audit.push({
+        time: stamp(),
+        text: `Claude returned document bounds x=${b.x.toFixed(2)}, y=${b.y.toFixed(2)}, w=${b.width.toFixed(2)}, h=${b.height.toFixed(2)} (conf ${b.confidence.toFixed(2)}). Cropped with 3% padding.`,
+      });
+    } else {
+      audit.push({ time: stamp(), text: "No clear document bounds — using full frame." });
+    }
     if ((analysis.possibleMissingFields?.length ?? 0) > 0) {
       audit.push({
         time: stamp(),
@@ -81,30 +121,12 @@ Deno.serve(async (req) => {
       audit.push({ time: stamp(), text: "No visible missing fields flagged." });
     }
 
-    // Try storage upload — never block on failure.
-    let imageUrl: string | null = null;
-    if (image && typeof image === "string") {
-      const parsed = parseDataUrl(image);
-      if (parsed) {
-        const path = `${trackingId}.${parsed.ext}`;
-        const { error: upErr } = await supabase.storage
-          .from("case-images")
-          .upload(path, parsed.bytes, {
-            contentType: `image/${parsed.ext === "jpg" ? "jpeg" : parsed.ext}`,
-            upsert: true,
-          });
-        if (upErr) {
-          console.warn("storage upload failed:", upErr.message);
-          audit.push({ time: stamp(), text: `storage_failed: ${upErr.message}` });
-        } else {
-          const { data: signed } = await supabase.storage
-            .from("case-images")
-            .createSignedUrl(path, 60 * 60 * 24 * 7);
-          imageUrl = signed?.signedUrl ?? null;
-          audit.push({ time: stamp(), text: "Image uploaded to secure storage." });
-        }
-      }
-    }
+    let originalUrl: string | null = null;
+    let processedUrl: string | null = null;
+    if (originalImage) originalUrl = await uploadImage(supabase, trackingId, "original", originalImage);
+    if (processedImage) processedUrl = await uploadImage(supabase, trackingId, "processed", processedImage);
+    if (originalUrl) audit.push({ time: stamp(), text: "Original image uploaded to secure storage." });
+    if (processedUrl) audit.push({ time: stamp(), text: "Cropped image uploaded to secure storage." });
 
     audit.push({
       time: stamp(),
@@ -122,7 +144,10 @@ Deno.serve(async (req) => {
       ai_summary: analysis.plainEnglishSummary ?? "",
       possible_missing_fields: analysis.possibleMissingFields ?? [],
       confidence: analysis.confidence ?? null,
-      image_url: imageUrl,
+      image_url: processedUrl ?? originalUrl, // legacy field — points to cropped preview
+      original_image_url: originalUrl,
+      processed_image_url: processedUrl,
+      document_bounds: analysis.documentBounds ?? null,
       initials: initials ?? null,
       audit_trail: audit,
     });
