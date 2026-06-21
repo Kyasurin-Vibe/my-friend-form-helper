@@ -42,6 +42,7 @@ export const Route = createFileRoute("/")({
 
 export type A11yMode = "voice" | "text" | "both";
 type Phase =
+  | "language"
   | "start"
   | "home"
   | "viewer"
