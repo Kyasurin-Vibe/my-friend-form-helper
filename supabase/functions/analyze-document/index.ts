@@ -14,14 +14,10 @@ Rules:
 - Use cautious wording: "looks like", "appears", "may be blank".
 - Identify VISIBLE blank/incomplete fields only (e.g. "signature area appears blank").
 - If the photo is blurry/dark/cropped/unreadable, set readable=false.
-- documentBounds: the TIGHT bounding box of the WHITE FORM/PAPER itself — the printed
-  document with the white background. Bound ONLY the white paper/form region.
-  EXCLUDE everything around it: hands, table, ceiling, background. AND if the document is
-  shown on a phone/tablet/computer screen, EXCLUDE the device's BLACK BEZEL, the screen
-  frame, the status bar, and any dark borders — wrap ONLY the white form content inside.
-  Treat the white background as the document boundary. Coordinates are fractions 0..1
-  (x,y = top-left of the white form; width,height = its size). If you cannot see a clear
-  white document, return x:0, y:0, width:1, height:1.
+- documentBounds: the TIGHT bounding box of the PAPER itself within the image, as fractions
+  0..1 (x,y = top-left corner of the paper; width,height = its size). EXCLUDE hands, table,
+  ceiling, and background — wrap the paper edges as tightly as possible. If you cannot see a
+  clear document, return x:0, y:0, width:1, height:1.
 - elderMessage: ONE short warm sentence (max 22 words), no legal jargon.`;
 
 const TOOL = {
@@ -47,10 +43,10 @@ const TOOL = {
         additionalProperties: false,
         required: ["x", "y", "width", "height"],
         properties: {
-          x: { type: "number", description: "left edge of white form, 0..1" },
-          y: { type: "number", description: "top edge of white form, 0..1" },
-          width: { type: "number", description: "white form width, 0..1" },
-          height: { type: "number", description: "white form height, 0..1" },
+          x: { type: "number", description: "left edge of paper, 0..1" },
+          y: { type: "number", description: "top edge of paper, 0..1" },
+          width: { type: "number", description: "paper width, 0..1" },
+          height: { type: "number", description: "paper height, 0..1" },
         },
       },
     },
@@ -67,14 +63,17 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
+// Validate Claude's bounds; reject garbage (full frame, zero-size, out of range).
 function sanitizeBounds(b: any): { x: number; y: number; width: number; height: number; confidence: number } | null {
   if (!b || typeof b !== "object") return null;
   let x = Number(b.x), y = Number(b.y), w = Number(b.width), h = Number(b.height);
   if ([x, y, w, h].some((v) => !Number.isFinite(v))) return null;
-  x = clamp01(x); y = clamp01(y); w = clamp01(w); h = clamp01(h);
-  if (w <= 0.05 || h <= 0.05) return null;
+  x = clamp01(x); y = clamp01(y);
+  w = clamp01(w); h = clamp01(h);
+  if (w <= 0.05 || h <= 0.05) return null;            // too small → ignore
   if (x + w > 1) w = 1 - x;
   if (y + h > 1) h = 1 - y;
+  // If it's basically the whole frame, treat as "no crop".
   if (x <= 0.02 && y <= 0.02 && w >= 0.96 && h >= 0.96) return null;
   return { x, y, width: w, height: h, confidence: 1 };
 }
@@ -136,7 +135,7 @@ Deno.serve(async (req) => {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: parsed.media_type, data: parsed.data } },
-            { type: "text", text: "Look at this photo and report what you see, with a tight documentBounds box around the WHITE form only." },
+            { type: "text", text: "Look at this photo and report what you see, including a tight documentBounds box around the paper." },
           ],
         }],
       }),
