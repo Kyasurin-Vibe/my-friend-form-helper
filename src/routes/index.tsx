@@ -1306,7 +1306,7 @@ function TrustedPersonForm({
         className="text-center font-extrabold mt-2 mb-1"
         style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
       >
-        Who do you trust with this?
+        {t("who_trust")}
       </h2>
       <p
         className="text-center mb-4"
@@ -1318,7 +1318,7 @@ function TrustedPersonForm({
         className="font-bold"
         style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
       >
-        Their name
+        {t("their_name")}
       </label>
       <VoiceField
         value={name}
@@ -1330,7 +1330,7 @@ function TrustedPersonForm({
         className="font-bold mt-3"
         style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
       >
-        How do you know them?
+        {t("how_know")}
       </label>
       <VoiceField
         value={relationship}
@@ -1353,9 +1353,9 @@ function TrustedPersonForm({
       />
       <div className="space-y-2 mt-auto pt-4">
         <BigButton variant="danger" onClick={onSend}>
-          {sending ? "Sending…" : `📨 Send to ${name.trim() || "this person"}`}
+          {sending ? t("sending") : `📨 ${t("send_person")}`}
         </BigButton>
-        <BigButton variant="ghost" onClick={onBack}>← Back</BigButton>
+        <BigButton variant="ghost" onClick={onBack}>{t("back")}</BigButton>
       </div>
     </div>
   );
