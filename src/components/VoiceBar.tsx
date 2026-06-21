@@ -15,6 +15,7 @@ import {
   type VoiceIntent,
 } from "@/lib/voice";
 import { speakWarm } from "@/lib/cases";
+import { useT } from "@/lib/i18n";
 
 type Props = {
   speakableText: string;
