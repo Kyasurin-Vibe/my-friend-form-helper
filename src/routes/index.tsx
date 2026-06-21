@@ -1929,7 +1929,7 @@ function DoneButton({ onClick }: { onClick: () => void }) {
       }}
       aria-label="No thanks, I'm done"
     >
-      👋 No thanks — I&apos;m done
+      {t("no_thanks")}
     </button>
   );
 }
