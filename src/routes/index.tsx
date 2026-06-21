@@ -722,7 +722,7 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
           {t("open_scanner")}
         </button>
         <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
-          The magnifier uses your camera only on this device.
+          {t("camera_only_device")}
         </p>
       </div>
       <VoiceBar
