@@ -459,6 +459,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   function captureFrame(): string | undefined {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return undefined;
+    // Try jscanify cropped+deskewed first (additive enhancement).
+    if (jscanRef.current) {
+      const cropped = extractPaperDataUrl(jscanRef.current, video, 1280);
+      if (cropped) return cropped;
+    }
     const scale = Math.min(1, 1280 / video.videoWidth);
     const width = Math.round(video.videoWidth * scale);
     const height = Math.round(video.videoHeight * scale);
