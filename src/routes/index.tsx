@@ -732,10 +732,8 @@ function SentScreen({
   const centerName = sendResult?.centerName ?? "Legal Aid Center";
   const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
   const missingCount = analysis?.possibleMissingFields.length ?? 0;
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onGoCenter();
-    else if (i === "cancel") onRestart();
-  };
+  // (voice actions wired below)
+
 
   const log = [
     "Photo captured on this device",
@@ -806,8 +804,16 @@ function SentScreen({
         <VoiceBar
           speakableText={speakableForPhase("sent", { analysis, sendResult, analyzeError: null })}
           voiceOn={voiceOn}
-          onIntent={handleIntent}
+          actions={[
+            { id: "restart", label: "Start over", description: "Scan another document from the beginning" },
+            { id: "center", label: "See the center's side", description: "Open the staff dashboard view" },
+          ]}
+          onAction={(id) => {
+            if (id === "restart") onRestart();
+            else if (id === "center") onGoCenter();
+          }}
         />
+
       </div>
 
     </div>
@@ -828,10 +834,7 @@ function PreviewScreen({
   onRetake: () => void;
 }) {
   const voiceOn = useContext(VoiceOnContext);
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onUse();
-    else if (i === "cancel") onRetake();
-  };
+
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} small face="smile" />
@@ -866,8 +869,16 @@ function PreviewScreen({
         <VoiceBar
           speakableText={speakableForPhase("preview", { analysis: null, sendResult: null, analyzeError: null })}
           voiceOn={voiceOn}
-          onIntent={handleIntent}
+          actions={[
+            { id: "use", label: "Yes, use this", description: "Accept this photo and analyze it" },
+            { id: "retake", label: "Retake", description: "Take a new photo" },
+          ]}
+          onAction={(id) => {
+            if (id === "use") onUse();
+            else if (id === "retake") onRetake();
+          }}
         />
+
       </div>
     </div>
   );
