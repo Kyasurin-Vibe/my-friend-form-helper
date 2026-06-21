@@ -1003,15 +1003,18 @@ function ChooseRecipientScreen({
   onBack,
   onPick,
   speech,
+  mode,
+  setMode,
 }: {
   sending: boolean;
   analysis: AnalysisResult | null;
   onBack: () => void;
   onPick: (r: Recipient) => void;
   speech: ReturnType<typeof useSpeech>;
+  mode: "pick" | "trusted";
+  setMode: (m: "pick" | "trusted") => void;
 }) {
   const voiceOn = useContext(VoiceOnContext);
-  const [mode, setMode] = useState<"pick" | "trusted">("pick");
   const [name, setName] = useState("");
   const [relationship, setRelationship] = useState("");
   const [email, setEmail] = useState("");
