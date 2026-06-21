@@ -374,66 +374,14 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   }, [aiStatus, autoCapture]);
 
   function startCountdown() {
-
     if (confirmedRef.current || countdown > 0) return;
     setCountdown(3);
-    speakingRef.current = true;
-    try { DemoServices.voice.stop(); } catch { /* noop */ }
-    speak("Hold still… 3, 2, 1", () => {
-      speakingRef.current = false;
-      if (shouldListenRef.current) startVoice();
-    });
     const id = window.setInterval(() => {
       setCountdown((c) => {
         if (c <= 1) { window.clearInterval(id); doCapture(); return 0; }
         return c - 1;
       });
     }, 1000);
-  }
-
-  // Voice
-  useEffect(() => {
-    if (!voiceArmed) return;
-    shouldListenRef.current = true;
-    startVoice();
-    return () => {
-      shouldListenRef.current = false;
-      try { DemoServices.voice.stop(); } catch { /* noop */ }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceArmed]);
-
-  function startVoice() {
-    const service = DemoServices.voice;
-    if (!service.available()) {
-      setVoiceError("Voice not supported in this browser. Use the buttons.");
-      return;
-    }
-    if (speakingRef.current) return;
-    try {
-      service.start({
-        onStart: () => { setListening(true); setVoiceError(null); },
-        onEnd: () => {
-          setListening(false);
-          if (shouldListenRef.current && !speakingRef.current) {
-            window.setTimeout(() => startVoice(), 250);
-          }
-        },
-        onError: (err) => {
-          setListening(false);
-          if (err === "not-allowed" || err === "service-not-allowed") {
-            setVoiceError("Mic blocked. Allow microphone in your browser.");
-            shouldListenRef.current = false;
-          } else if (err !== "no-speech" && err !== "aborted") {
-            setVoiceError(err);
-          }
-        },
-        onTranscript: (t) => setHeard(t),
-        onCommand: (cmd) => handleVoiceCommand(cmd),
-      });
-    } catch (e: unknown) {
-      setVoiceError(e instanceof Error ? e.message : "could not start mic");
-    }
   }
 
   function captureAndCrop(): CaptureResult | undefined {
@@ -480,31 +428,24 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   function doCapture() {
     if (confirmedRef.current) return;
     confirmedRef.current = true;
-    shouldListenRef.current = false;
-    try { DemoServices.voice.stop(); } catch { /* noop */ }
     const result = captureAndCrop();
     window.setTimeout(() => onConfirm(result), 0);
   }
 
-  function handleVoiceCommand(cmd: VoiceCommand) {
-    switch (cmd) {
-      case "yes": doCapture(); break;
-      case "no":
-        setCountdown(0);
-        consecutiveReadyRef.current = 0;
-        break;
-
-      case "read":
-        speakingRef.current = true;
-        try { DemoServices.voice.stop(); } catch { /* noop */ }
-        speak("Point the camera at your paper. Fit all four corners inside the frame.", () => {
-          speakingRef.current = false;
-          if (shouldListenRef.current) startVoice();
-        });
-        break;
-      default: break;
-    }
-  }
+  // Voice — single shared loop. STT + interpret-intent + TTS owned by PersistentVoice.
+  useVoiceLoop({
+    screen: "scanner",
+    language: getLang(),
+    enabled: true,
+    actions: {
+      capture: doCapture,
+      retake: () => { setCountdown(0); consecutiveReadyRef.current = 0; },
+      back: onCancel,
+      home: onCancel,
+    },
+  });
+  // Suppress unused-variable warning for the countdown helper kept for future wiring.
+  void startCountdown;
 
   const hintText: Record<Hint, string> = {
     starting: t("starting_camera"),
