@@ -129,11 +129,23 @@ Deno.serve(async (req) => {
         if (!ai || typeof ai !== "object") {
           return Response.json({ documentPresent: false, readable: false, confidence: 0, _error: "no_tool_use" }, { headers: CORS });
         }
+        const b = ai.documentBounds;
+        const bounds = b && typeof b === "object"
+          && Number.isFinite(Number(b.x)) && Number.isFinite(Number(b.y))
+          && Number.isFinite(Number(b.width)) && Number.isFinite(Number(b.height))
+          ? {
+              x: Math.max(0, Math.min(1, Number(b.x))),
+              y: Math.max(0, Math.min(1, Number(b.y))),
+              width: Math.max(0, Math.min(1, Number(b.width))),
+              height: Math.max(0, Math.min(1, Number(b.height))),
+            }
+          : null;
         return Response.json(
           {
             documentPresent: !!ai.documentPresent,
             readable: !!ai.readable,
             confidence: Math.max(0, Math.min(1, Number(ai.confidence) || 0)),
+            documentBounds: bounds,
           },
           { headers: CORS },
         );
