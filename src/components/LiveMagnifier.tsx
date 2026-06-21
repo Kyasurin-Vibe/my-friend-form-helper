@@ -98,21 +98,36 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     };
   }, []);
 
-  // === Guidance cycle → mock vision detection ===
+  // === Guidance cycle → real vision detection on a captured frame ===
   useEffect(() => {
     if (!ready) return;
     const seq: Guidance[] = ["move-closer", "hold-still", "corners", "hold-still"];
     let i = 0;
     let stopped = false;
+    const captureFrame = (): string | undefined => {
+      const v = videoRef.current;
+      if (!v || !v.videoWidth) return undefined;
+      const maxW = 1024;
+      const scale = Math.min(1, maxW / v.videoWidth);
+      const w = Math.round(v.videoWidth * scale);
+      const h = Math.round(v.videoHeight * scale);
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const ctx = c.getContext("2d");
+      if (!ctx) return undefined;
+      ctx.drawImage(v, 0, 0, w, h);
+      try { return c.toDataURL("image/jpeg", 0.82); } catch { return undefined; }
+    };
     const id = window.setInterval(() => {
       setGuidance(seq[i % seq.length]);
       i++;
       if (i >= seq.length) {
         window.clearInterval(id);
-        DemoServices.vision.detect().then((doc) => {
+        const frame = captureFrame();
+        DemoServices.vision.detect(frame).then((doc) => {
           if (stopped) return;
           setDetected(doc);
-          setGuidance("detected");
+          setGuidance(doc.confidence < 0.4 ? "blurry" : "detected");
         });
       }
     }, 1500);
@@ -121,6 +136,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
       window.clearInterval(id);
     };
   }, [ready]);
+
 
   // === Speak guidance prompts (and pause mic while TTS plays) ===
   useEffect(() => {
