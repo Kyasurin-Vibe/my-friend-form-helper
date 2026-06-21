@@ -103,14 +103,10 @@ export async function detectDocumentBounds(fullFrameDataUrl: string): Promise<De
   }
 }
 
-/**
- * Crop a captured image to the AI-returned bounds with ~3% padding.
- * Returns the original data URL if bounds are null or cropping fails.
- */
 export async function cropToBounds(
   imageDataUrl: string,
   bounds: DocumentBounds | null,
-  paddingFrac = 0.03,
+  paddingFrac = 0.015,
 ): Promise<string> {
   if (!bounds) return imageDataUrl;
   if (typeof window === "undefined") return imageDataUrl;
@@ -136,8 +132,11 @@ export async function cropToBounds(
     canvas.height = sh;
     const ctx = canvas.getContext("2d");
     if (!ctx) return imageDataUrl;
+    // Deterministic "clean document" look: brighten + boost contrast.
+    // NO AI redraw — only adjusts pixels, never changes any text or numbers.
+    ctx.filter = "brightness(1.08) contrast(1.2) saturate(0.85)";
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-    return canvas.toDataURL("image/jpeg", 0.9);
+    return canvas.toDataURL("image/jpeg", 0.92);
   } catch (e) {
     console.warn("cropToBounds failed", e);
     return imageDataUrl;
