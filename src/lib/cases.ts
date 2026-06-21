@@ -313,7 +313,7 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number }): Pr
 
   const fallback = () => {
     try {
-      const u = new SpeechSynthesisUtterance(text);
+      const u = new SpeechSynthesisUtterance(spoken);
       u.rate = 0.95;
       u.pitch = 1.05;
       u.lang = getBCP47();
@@ -336,7 +336,7 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number }): Pr
 
   try {
     const fetchPromise = supabase.functions.invoke("tts", {
-      body: { text, voice: getTTSVoice(), language: getLang() },
+      body: { text: spoken, voice: getTTSVoice(), language: getLang() },
       // @ts-expect-error supabase-js supports responseType: 'blob' at runtime
       responseType: "blob",
     });
