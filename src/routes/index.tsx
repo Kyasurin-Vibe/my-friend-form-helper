@@ -15,7 +15,7 @@ import {
   type SendResult,
 } from "@/lib/cases";
 import { getResources } from "@/lib/resources";
-import { cancelSpeech, type VoiceIntent } from "@/lib/voice";
+import { cancelSpeech, type VoiceAction, type VoiceIntent } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
 export const Route = createFileRoute("/")({
