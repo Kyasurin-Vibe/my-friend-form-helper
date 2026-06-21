@@ -320,7 +320,97 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     }
   }, [hint, ready]);
 
+  // ===== Claude polling (~1.5s) for auto-capture decisions =====
+  useEffect(() => {
+    if (!ready) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Small downscaled frame for the model
+    const W = 320;
+    const small = document.createElement("canvas");
+    const sctx = small.getContext("2d");
+    if (!sctx) return;
+
+    async function poll() {
+      if (confirmedRef.current || !video || !video.videoWidth) return;
+      if (inFlightRef.current) return;
+      if (!autoCapture) return;
+      if (countdown > 0) return;
+
+      // Local pre-check: skip obviously black/empty frames
+      if (meanLumRef.current > 0 && meanLumRef.current < 45) return;
+
+      const now = performance.now();
+      if (now - lastPollAtRef.current < 1400) return;
+      lastPollAtRef.current = now;
+
+      try {
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const sw = W;
+        const sh = Math.round((vh / vw) * W);
+        small.width = sw;
+        small.height = sh;
+        sctx!.drawImage(video, 0, 0, sw, sh);
+        const dataUrl = small.toDataURL("image/jpeg", 0.5);
+
+        inFlightRef.current = true;
+        setAiStatus((prev) => (prev === "ready" ? prev : "checking"));
+
+        const { data, error } = await supabase.functions.invoke("detect-document", {
+          body: { image: dataUrl },
+        });
+        if (confirmedRef.current) return;
+        if (error || !data) {
+          aiUnavailableRef.current = true;
+          setAiStatus("unavailable");
+          consecutiveReadyRef.current = 0;
+          return;
+        }
+        aiUnavailableRef.current = false;
+        const present = !!data.documentPresent;
+        const readable = !!data.readable;
+        const conf = Number(data.confidence) || 0;
+
+        if (present && readable && conf >= 0.65) {
+          consecutiveReadyRef.current += 1;
+          setAiStatus("ready");
+          if (consecutiveReadyRef.current >= 2 && autoCapture && countdown === 0 && !confirmedRef.current) {
+            startCountdown();
+          }
+        } else {
+          consecutiveReadyRef.current = 0;
+          if (!present) setAiStatus("no_doc");
+          else setAiStatus("unreadable");
+        }
+      } catch (e) {
+        aiUnavailableRef.current = true;
+        setAiStatus("unavailable");
+        consecutiveReadyRef.current = 0;
+      } finally {
+        inFlightRef.current = false;
+      }
+    }
+
+    const id = window.setInterval(poll, 500); // checks scheduling; actual call gated by lastPollAtRef
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, autoCapture, countdown]);
+
+  // Override visible hint with AI status when we have a meaningful signal
+  useEffect(() => {
+    if (!autoCapture) return;
+    if (meanLumRef.current > 0 && meanLumRef.current < 65) return; // tooDark wins
+    if (aiStatus === "checking") setHint("aiChecking");
+    else if (aiStatus === "no_doc") setHint("aiNoDoc");
+    else if (aiStatus === "unreadable") setHint("aiUnreadable");
+    else if (aiStatus === "ready") setHint("aiReady");
+    else if (aiStatus === "unavailable") setHint("aiUnavailable");
+  }, [aiStatus, autoCapture]);
+
   function startCountdown() {
+
     if (confirmedRef.current || countdown > 0) return;
     setCountdown(3);
     speakingRef.current = true;
