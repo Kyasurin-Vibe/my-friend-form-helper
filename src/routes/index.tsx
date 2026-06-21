@@ -351,6 +351,7 @@ function ElderApp() {
                 analysis={analysis}
                 onRetry={() => setPhase("magnifier")}
                 onSendAnyway={() => setPhase("choose")}
+                onDone={() => { speakWarm("Alright, have a good day."); setTimeout(() => { restart(); setPhase("home"); }, 1200); }}
                 sending={sending}
                 speech={speech}
               />
@@ -362,6 +363,7 @@ function ElderApp() {
                 analyzeError={analyzeError}
                 onSend={() => setPhase("choose")}
                 onRetake={() => setPhase("magnifier")}
+                onDone={() => { speakWarm("Alright, have a good day."); setTimeout(() => { restart(); setPhase("home"); }, 1200); }}
                 speech={speech}
               />
             ) : phase === "choose" ? (
