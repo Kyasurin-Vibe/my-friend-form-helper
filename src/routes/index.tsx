@@ -633,10 +633,10 @@ function HomeScreen({
       <div className="flex-1 flex flex-col items-center justify-center w-full">
         <Mascot mode="idle" size={130} />
         <h1 className="mt-3 font-extrabold" style={{ fontSize: 30, color: "var(--color-elder-ink)" }}>
-          {t("home.title")}
+          {t("app_name")}
         </h1>
         <p className="mt-1 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
-          {t("home.subtitle")}
+          {t("home_question")}
         </p>
         <div className="w-full space-y-4">
           <button
@@ -653,7 +653,7 @@ function HomeScreen({
               boxShadow: "0 8px 22px rgba(47,111,176,0.14)",
             }}
           >
-            <div style={{ fontSize: 26 }}>{t("home.see")}</div>
+            <div style={{ fontSize: 26 }}>{t("choice_see")}</div>
             <div style={{ fontSize: 15, color: "#6b5d52", fontWeight: 600, marginTop: 4 }}>
               {t("home.see.sub")}
             </div>
@@ -672,7 +672,7 @@ function HomeScreen({
               boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
             }}
           >
-            <div style={{ fontSize: 26 }}>{t("home.scan")}</div>
+            <div style={{ fontSize: 26 }}>{t("choice_question")}</div>
             <div style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", fontWeight: 600, marginTop: 4 }}>
               {t("home.scan.sub")}
             </div>
