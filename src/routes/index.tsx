@@ -281,8 +281,18 @@ function ElderApp() {
               <StartGate
                 onStart={(mode) => {
                   setA11yMode(mode);
-                  setPhase("find");
+                  setPhase("home");
                 }}
+              />
+            ) : phase === "home" ? (
+              <HomeScreen
+                onMagnifier={() => setPhase("viewer")}
+                onScanner={() => setPhase("find")}
+              />
+            ) : phase === "viewer" ? (
+              <SimpleMagnifier
+                onBack={() => setPhase("home")}
+                onQuestion={() => setPhase("find")}
               />
             ) : phase === "find" ? (
               <FindDocGate onOpenMagnifier={() => setPhase("magnifier")} />
