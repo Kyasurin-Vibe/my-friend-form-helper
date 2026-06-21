@@ -376,9 +376,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         if (present && readable && conf >= 0.65) {
           consecutiveReadyRef.current += 1;
           setAiStatus("ready");
-          if (consecutiveReadyRef.current >= 2 && autoCapture && countdown === 0 && !confirmedRef.current) {
-            startCountdown();
-          }
+          // Capture is NEVER auto-triggered — user must say "yes" or tap Capture.
         } else {
           consecutiveReadyRef.current = 0;
           if (!present) setAiStatus("no_doc");
