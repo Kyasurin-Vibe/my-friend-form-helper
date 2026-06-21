@@ -10,6 +10,7 @@ import {
   sendToCenter,
   speakWarm,
   type AnalysisResult,
+  type DocumentBounds,
   type SendResult,
 } from "@/lib/cases";
 import { cancelSpeech, type VoiceIntent } from "@/lib/voice";
