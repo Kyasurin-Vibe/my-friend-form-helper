@@ -816,9 +816,9 @@ function RetakeScreen({
         </ul>
       </div>
       <div className="space-y-2 mt-auto">
-        <BigButton variant="danger" onClick={onRetry}>📷 Try again</BigButton>
+        <BigButton variant="danger" onClick={onRetry}>📷 {t("retake")}</BigButton>
         <BigButton variant="ghost" onClick={onSendAnyway}>
-          {sending ? "Sending…" : "🤝 Connect me with a person"}
+          {sending ? t("sending") : t("connect_person")}
         </BigButton>
         <DoneButton onClick={onDone} />
         <VoiceBar
