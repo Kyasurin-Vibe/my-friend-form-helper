@@ -556,9 +556,10 @@ function ReviewScreen({
 }) {
   const missing = analysis?.possibleMissingFields ?? [];
   const voiceOn = useContext(VoiceOnContext);
+  const partner = getAccountablePartner(analysis?.resourceCategory);
   const reviewActions: VoiceAction[] = [
     { id: "retake", label: "Retake", description: "Take the photo again" },
-    { id: "connect", label: "Connect me with a person", description: "Send the document to a real human at the legal aid center" },
+    { id: "connect", label: "Connect me with a person", description: `Send the document to a real human (a ${partner.name})` },
   ];
   const onReviewAction = (id: string) => {
     if (id === "retake") onRetake();
