@@ -101,6 +101,7 @@ export function PersistentVoice({
     setConfirmation(msg);
     speakingRef.current = true;
     setSpeaking(true);
+    // Pause the mic while we talk so it doesn't hear our own voice.
     try { DemoServices.voice.stop(); } catch { /* noop */ }
     cancelSpeech();
     if (typeof window === "undefined") { speakingRef.current = false; setSpeaking(false); return; }
@@ -111,11 +112,15 @@ export function PersistentVoice({
     u.onend = () => {
       speakingRef.current = false;
       setSpeaking(false);
-      if (shouldRunRef.current) startLoop();
+      // Resume listening the MOMENT TTS ends.
+      if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 150);
     };
-    u.onerror = () => { speakingRef.current = false; setSpeaking(false); };
+    u.onerror = () => {
+      speakingRef.current = false;
+      setSpeaking(false);
+      if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 150);
+    };
     synth.speak(u);
-    // auto-clear caption after a moment
     window.setTimeout(() => setConfirmation((c) => (c === msg ? "" : c)), 2400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
