@@ -956,7 +956,7 @@ function speakableForPhase(
       const why = ctx.analysis?.elderMessage
         ? `${ctx.analysis.elderMessage} `
         : "";
-      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Send for human review to let a real person look at it, or say yes.`;
+      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Connect me with a person to let a real person look at it, or say yes.`;
     }
     case "review": {
       if (!ctx.analysis) {
