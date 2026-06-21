@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { DemoServices, type VoiceCommand } from "@/lib/services";
 import type { DocumentBounds } from "@/lib/cases";
+import { supabase } from "@/integrations/supabase/client";
+
 
 type CaptureResult = {
   processed: string; // cropped to detected (or guide) bounds
@@ -20,7 +22,13 @@ type Hint =
   | "possibleFace"
   | "moveCloser"
   | "holdStill"
-  | "documentDetected";
+  | "documentDetected"
+  | "aiChecking"
+  | "aiNoDoc"
+  | "aiUnreadable"
+  | "aiReady"
+  | "aiUnavailable";
+
 
 function speak(text: string, onDone?: () => void) {
   if (typeof window === "undefined") return;
@@ -70,10 +78,16 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
 
   // Detection state (in refs so the analysis loop doesn't trigger re-renders)
   const smoothBoxRef = useRef<DocumentBounds | null>(null);
-  const stableSinceRef = useRef<number | null>(null);
-  const stableBoxRef = useRef<DocumentBounds | null>(null);
   const smoothBrightnessRef = useRef(1);
   const lastSpokenHintRef = useRef<Hint | null>(null);
+  const meanLumRef = useRef(0);
+  const sharpRef = useRef(0);
+
+  // Claude polling state
+  const inFlightRef = useRef(false);
+  const consecutiveReadyRef = useRef(0);
+  const lastPollAtRef = useRef(0);
+  const aiUnavailableRef = useRef(false);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -84,9 +98,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [heard, setHeard] = useState("");
   const [hint, setHint] = useState<Hint>("starting");
+  const [aiStatus, setAiStatus] = useState<"idle" | "checking" | "no_doc" | "unreadable" | "ready" | "unavailable">("idle");
   const [overlayBox, setOverlayBox] = useState<DocumentBounds | null>(null);
   const [zoom, setZoom] = useState<{ scale: number; ox: number; oy: number }>({ scale: 1, ox: 50, oy: 50 });
   const [brightnessFilter, setBrightnessFilter] = useState(1);
+
 
   // Camera
   useEffect(() => {
@@ -262,7 +278,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           }));
         }
 
-        // Decide hint
+        // Cache for AI pre-check / fallback hints
+        meanLumRef.current = meanLum;
+        sharpRef.current = sharp;
+
+        // Local hint (visual feedback only; AUTO-CAPTURE is driven by Claude polling).
         let nextHint: Hint = "starting";
         if (meanLum < 65) nextHint = "tooDark";
         else if (skinFrac > 0.22 && paperFrac < 0.18) nextHint = "possibleFace";
@@ -272,27 +292,6 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         else nextHint = "documentDetected";
         setHint(nextHint);
 
-        // Stability tracking for auto-capture
-        const now = performance.now();
-        if (nextHint === "documentDetected" && smooth) {
-          const sb = stableBoxRef.current;
-          const drift = sb
-            ? Math.abs(sb.x - smooth.x) + Math.abs(sb.y - smooth.y) +
-              Math.abs(sb.width - smooth.width) + Math.abs(sb.height - smooth.height)
-            : 999;
-          if (drift < 0.08 && sb) {
-            if (stableSinceRef.current == null) stableSinceRef.current = now;
-            if (autoCapture && countdown === 0 && now - (stableSinceRef.current ?? now) > 800) {
-              startCountdown();
-            }
-          } else {
-            stableBoxRef.current = smooth;
-            stableSinceRef.current = now;
-          }
-        } else {
-          stableSinceRef.current = null;
-          stableBoxRef.current = null;
-        }
       } catch {
         // transient
       }
@@ -321,7 +320,97 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     }
   }, [hint, ready]);
 
+  // ===== Claude polling (~1.5s) for auto-capture decisions =====
+  useEffect(() => {
+    if (!ready) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Small downscaled frame for the model
+    const W = 320;
+    const small = document.createElement("canvas");
+    const sctx = small.getContext("2d");
+    if (!sctx) return;
+
+    async function poll() {
+      if (confirmedRef.current || !video || !video.videoWidth) return;
+      if (inFlightRef.current) return;
+      if (!autoCapture) return;
+      if (countdown > 0) return;
+
+      // Local pre-check: skip obviously black/empty frames
+      if (meanLumRef.current > 0 && meanLumRef.current < 45) return;
+
+      const now = performance.now();
+      if (now - lastPollAtRef.current < 1400) return;
+      lastPollAtRef.current = now;
+
+      try {
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const sw = W;
+        const sh = Math.round((vh / vw) * W);
+        small.width = sw;
+        small.height = sh;
+        sctx!.drawImage(video, 0, 0, sw, sh);
+        const dataUrl = small.toDataURL("image/jpeg", 0.5);
+
+        inFlightRef.current = true;
+        setAiStatus((prev) => (prev === "ready" ? prev : "checking"));
+
+        const { data, error } = await supabase.functions.invoke("detect-document", {
+          body: { image: dataUrl },
+        });
+        if (confirmedRef.current) return;
+        if (error || !data) {
+          aiUnavailableRef.current = true;
+          setAiStatus("unavailable");
+          consecutiveReadyRef.current = 0;
+          return;
+        }
+        aiUnavailableRef.current = false;
+        const present = !!data.documentPresent;
+        const readable = !!data.readable;
+        const conf = Number(data.confidence) || 0;
+
+        if (present && readable && conf >= 0.65) {
+          consecutiveReadyRef.current += 1;
+          setAiStatus("ready");
+          if (consecutiveReadyRef.current >= 2 && autoCapture && countdown === 0 && !confirmedRef.current) {
+            startCountdown();
+          }
+        } else {
+          consecutiveReadyRef.current = 0;
+          if (!present) setAiStatus("no_doc");
+          else setAiStatus("unreadable");
+        }
+      } catch (e) {
+        aiUnavailableRef.current = true;
+        setAiStatus("unavailable");
+        consecutiveReadyRef.current = 0;
+      } finally {
+        inFlightRef.current = false;
+      }
+    }
+
+    const id = window.setInterval(poll, 500); // checks scheduling; actual call gated by lastPollAtRef
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, autoCapture, countdown]);
+
+  // Override visible hint with AI status when we have a meaningful signal
+  useEffect(() => {
+    if (!autoCapture) return;
+    if (meanLumRef.current > 0 && meanLumRef.current < 65) return; // tooDark wins
+    if (aiStatus === "checking") setHint("aiChecking");
+    else if (aiStatus === "no_doc") setHint("aiNoDoc");
+    else if (aiStatus === "unreadable") setHint("aiUnreadable");
+    else if (aiStatus === "ready") setHint("aiReady");
+    else if (aiStatus === "unavailable") setHint("aiUnavailable");
+  }, [aiStatus, autoCapture]);
+
   function startCountdown() {
+
     if (confirmedRef.current || countdown > 0) return;
     setCountdown(3);
     speakingRef.current = true;
@@ -438,9 +527,9 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
       case "yes": doCapture(); break;
       case "no":
         setCountdown(0);
-        stableSinceRef.current = null;
-        stableBoxRef.current = null;
+        consecutiveReadyRef.current = 0;
         break;
+
       case "read":
         speakingRef.current = true;
         try { DemoServices.voice.stop(); } catch { /* noop */ }
@@ -461,6 +550,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     moveCloser: "↕ Move a little closer",
     holdStill: "✋ Hold still…",
     documentDetected: "✅ Document detected — hold still",
+    aiChecking: "🔍 Checking your document…",
+    aiNoDoc: "📄 Point the camera at your paper",
+    aiUnreadable: "🔎 Move closer and hold still",
+    aiReady: "✅ Document detected — hold still",
+    aiUnavailable: "📸 You can tap Capture when ready",
   };
   const hintColor: Record<Hint, string> = {
     starting: "#6b5d52",
@@ -470,7 +564,13 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     moveCloser: "#2563eb",
     holdStill: "#2563eb",
     documentDetected: "#16a34a",
+    aiChecking: "#6b5d52",
+    aiNoDoc: "#6b5d52",
+    aiUnreadable: "#2563eb",
+    aiReady: "#16a34a",
+    aiUnavailable: "#6b5d52",
   };
+
 
   return (
     <div className="flex-1 flex flex-col" style={{ background: "var(--color-elder-bg)" }}>
@@ -577,9 +677,9 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
       <div className="px-4 pt-2 flex justify-center gap-2 flex-wrap">
         <button onClick={() => {
           setAutoCapture((v) => !v);
-          stableSinceRef.current = null;
-          stableBoxRef.current = null;
+          consecutiveReadyRef.current = 0;
         }} aria-pressed={autoCapture} style={{
+
           background: autoCapture ? "var(--color-elder-teal)" : "#fff",
           color: autoCapture ? "#fff" : "var(--color-elder-ink)",
           border: "2px solid var(--color-elder-teal)",
