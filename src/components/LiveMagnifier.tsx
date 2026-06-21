@@ -42,10 +42,11 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  // Auto-driven — no manual controls. Smoothed via EMA in the analysis loop.
   const [zoom, setZoom] = useState(1.4);
   const [brightness, setBrightness] = useState(1);
   const [contrast, setContrast] = useState(1);
-  const [highContrast, setHighContrast] = useState(false);
+  const autoRef = useRef({ zoom: 1.4, brightness: 1, contrast: 1 });
   const [guidance, setGuidance] = useState<Guidance>("init");
   const [detected, setDetected] = useState<DetectedDoc | null>(null);
   const [countdown, setCountdown] = useState(0); // seconds remaining
@@ -160,6 +161,26 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         }
 
         setGuidance((prev) => (prev === next ? prev : next));
+
+        // === Auto-enhance (EMA-smoothed, subtle, no flicker) ===
+        // Target brightness: lift dark frames, leave bright ones alone.
+        const targetBrightness = Math.max(0.9, Math.min(1.45, 165 / Math.max(60, meanLum)));
+        // Target contrast: bump a touch when the frame is flat (low edges).
+        const targetContrast = Math.max(1, Math.min(1.35, 1 + (8 - Math.min(sharp, 8)) * 0.04));
+        // Target zoom: tighter once a document fills the frame.
+        const targetZoom =
+          paperFrac >= 0.5 ? 1.85 : paperFrac >= 0.35 ? 1.6 : 1.4;
+
+        const a = 0.18; // EMA alpha — slow enough to avoid flicker
+        const cur = autoRef.current;
+        cur.brightness = cur.brightness + (targetBrightness - cur.brightness) * a;
+        cur.contrast = cur.contrast + (targetContrast - cur.contrast) * a;
+        cur.zoom = cur.zoom + (targetZoom - cur.zoom) * a;
+
+        // Only commit when change is meaningful — keeps DOM stable.
+        setBrightness((b) => (Math.abs(b - cur.brightness) > 0.03 ? +cur.brightness.toFixed(2) : b));
+        setContrast((c) => (Math.abs(c - cur.contrast) > 0.03 ? +cur.contrast.toFixed(2) : c));
+        setZoom((z) => (Math.abs(z - cur.zoom) > 0.04 ? +cur.zoom.toFixed(2) : z));
       } catch { /* noop */ }
     }, 450);
     return () => window.clearInterval(id);
@@ -287,13 +308,16 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         setGuidance("corners");
         break;
       case "zoom":
-        setZoom((z) => Math.min(3, +(z + 0.3).toFixed(2)));
+        autoRef.current.zoom = Math.min(2.6, autoRef.current.zoom + 0.3);
+        setZoom(+autoRef.current.zoom.toFixed(2));
         break;
       case "brighter":
-        setBrightness((b) => Math.min(1.6, +(b + 0.15).toFixed(2)));
+        autoRef.current.brightness = Math.min(1.7, autoRef.current.brightness + 0.15);
+        setBrightness(+autoRef.current.brightness.toFixed(2));
         break;
       case "contrast":
-        setContrast((c) => Math.min(1.8, +(c + 0.15).toFixed(2)));
+        autoRef.current.contrast = Math.min(1.7, autoRef.current.contrast + 0.15);
+        setContrast(+autoRef.current.contrast.toFixed(2));
         break;
       case "read":
         readDocAloud();
@@ -313,13 +337,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     );
   }
 
-  const filter = [
-    `brightness(${brightness})`,
-    `contrast(${highContrast ? contrast * 1.6 : contrast})`,
-    highContrast ? "grayscale(1)" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const filter = `brightness(${brightness}) contrast(${contrast})`;
 
   return (
     <div className="flex-1 flex flex-col" style={{ background: "var(--color-elder-bg)" }}>
@@ -493,68 +511,8 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         )}
       </div>
 
-      {/* Controls */}
-      <div className="px-4 mt-1 space-y-2">
-        <SliderRow
-          label="🔍 Zoom"
-          value={zoom}
-          min={1}
-          max={3}
-          step={0.1}
-          onChange={setZoom}
-          display={`${zoom.toFixed(1)}×`}
-        />
-        <SliderRow
-          label="☀️ Brightness"
-          value={brightness}
-          min={0.6}
-          max={1.6}
-          step={0.05}
-          onChange={setBrightness}
-          display={`${Math.round(brightness * 100)}%`}
-        />
-        <SliderRow
-          label="🌗 Contrast"
-          value={contrast}
-          min={0.6}
-          max={1.8}
-          step={0.05}
-          onChange={setContrast}
-          display={`${Math.round(contrast * 100)}%`}
-        />
-        <button
-          onClick={() => setHighContrast((v) => !v)}
-          className="w-full font-bold"
-          style={{
-            background: highContrast ? "var(--color-elder-ink)" : "#fff",
-            color: highContrast ? "#fff" : "var(--color-elder-ink)",
-            border: "2px solid var(--color-elder-ink)",
-            borderRadius: 14,
-            padding: "10px",
-            fontSize: 16,
-          }}
-        >
-          {highContrast ? "✓ High contrast on" : "High contrast"}
-        </button>
-      </div>
-
-      {/* Actions */}
-      <div className="px-4 pt-3 pb-5 space-y-2">
-        <button
-          onClick={readDocAloud}
-          className="w-full font-extrabold"
-          style={{
-            background: "#fff",
-            color: "var(--color-elder-primary)",
-            border: "2px solid var(--color-elder-sky)",
-            borderRadius: 22,
-            padding: "18px",
-            fontSize: 22,
-            minHeight: 70,
-          }}
-        >
-          🔊 Read this
-        </button>
+      {/* Single fallback action — the app drives, the user follows. */}
+      <div className="px-4 pt-4 pb-5 mt-auto space-y-2">
         <button
           onClick={doCapture}
           disabled={!!error}
@@ -570,7 +528,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
             opacity: error ? 0.5 : 1,
           }}
         >
-          📸 Capture & check
+          📸 Capture now
         </button>
         <button
           onClick={onHandoff}
@@ -580,8 +538,8 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
             color: "var(--color-elder-ink)",
             border: "2px solid #e7ddd0",
             borderRadius: 18,
-            padding: "14px",
-            fontSize: 17,
+            padding: "12px",
+            fontSize: 15,
           }}
         >
           🤝 Not sure — send to a person
@@ -591,43 +549,3 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   );
 }
 
-function SliderRow({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-  display,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (n: number) => void;
-  display: string;
-}) {
-  return (
-    <div
-      className="flex items-center gap-3 px-3 py-2 rounded-2xl"
-      style={{ background: "#fff", border: "1px solid #e7ddd0" }}
-    >
-      <span className="font-bold" style={{ fontSize: 15, minWidth: 110, color: "var(--color-elder-ink)" }}>
-        {label}
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        style={{ flex: 1, accentColor: "var(--color-elder-primary)", height: 32 }}
-      />
-      <span className="font-bold" style={{ fontSize: 14, minWidth: 48, textAlign: "right", color: "#6b5d52" }}>
-        {display}
-      </span>
-    </div>
-  );
-}
