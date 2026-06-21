@@ -531,7 +531,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
               ref={videoRef}
               muted
               playsInline
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-fill"
               style={{
                 transform: `scale(${zoom})`,
                 transformOrigin: "center",
