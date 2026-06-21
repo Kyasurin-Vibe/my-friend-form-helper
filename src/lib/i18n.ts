@@ -99,6 +99,36 @@ function persistCache() {
 
 function cacheKey(text: string, lang: Lang) { return `${lang}:${text}`; }
 
+// AI content sentinel. AI-generated content (elderMessage, summaries,
+// resource lines) is ALREADY in the selected language — wrap such segments
+// with aiText() when embedding them inside otherwise-English UI copy.
+// speakWarm will skip translation for these segments.
+export const AI_OPEN = "\u0001AI\u0001";
+export const AI_CLOSE = "\u0001/AI\u0001";
+export function aiText(s: string | null | undefined): string {
+  if (!s) return "";
+  return `${AI_OPEN}${s}${AI_CLOSE}`;
+}
+export function stripAiMarkers(s: string): string {
+  if (!s) return s;
+  return s.split(AI_OPEN).join("").split(AI_CLOSE).join("");
+}
+export function splitAiSegments(s: string): { ai: boolean; text: string }[] {
+  if (!s) return [];
+  const out: { ai: boolean; text: string }[] = [];
+  let i = 0;
+  while (i < s.length) {
+    const open = s.indexOf(AI_OPEN, i);
+    if (open === -1) { if (i < s.length) out.push({ ai: false, text: s.slice(i) }); break; }
+    if (open > i) out.push({ ai: false, text: s.slice(i, open) });
+    const close = s.indexOf(AI_CLOSE, open + AI_OPEN.length);
+    if (close === -1) { out.push({ ai: true, text: s.slice(open + AI_OPEN.length) }); break; }
+    out.push({ ai: true, text: s.slice(open + AI_OPEN.length, close) });
+    i = close + AI_CLOSE.length;
+  }
+  return out;
+}
+
 /** Synchronous lookup — returns cached translation or original text. */
 export function translateSync(text: string, lang: Lang = _lang): string {
   if (!text || lang === "en") return text;
