@@ -49,6 +49,7 @@ export function PersistentVoice({
 }: PersistentVoiceProps) {
   const [userOn, setUserOn] = useState(true);
   const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [blocked, setBlocked] = useState(false);
@@ -75,25 +76,51 @@ export function PersistentVoice({
   useEffect(() => { actionsRef.current = actions; }, [actions]);
   useEffect(() => { onActionRef.current = onAction; }, [onAction]);
 
-  const active = enabledFromMode && userOn && !paused;
+  // Voice is active on EVERY screen whenever the user keeps it on.
+  // `paused` is accepted for compatibility but does not stop listening — the
+  // big tap buttons still own each screen and voice runs alongside.
+  void paused;
+  const active = enabledFromMode && userOn;
+
+  const cancelAllTTS = useCallback(() => {
+    try { DemoServices.voice.stop(); } catch { /* noop */ }
+    cancelSpeech();
+    if (typeof window !== "undefined") {
+      try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+      try {
+        const w = window as unknown as { __mfTtsAudio?: HTMLAudioElement };
+        const a = w.__mfTtsAudio;
+        if (a && !a.paused) { a.pause(); a.currentTime = 0; }
+      } catch { /* noop */ }
+    }
+    speakingRef.current = false;
+    setSpeaking(false);
+  }, []);
 
   const speakConfirm = useCallback((msg: string) => {
     setConfirmation(msg);
     speakingRef.current = true;
+    setSpeaking(true);
+    // Pause the mic while we talk so it doesn't hear our own voice.
     try { DemoServices.voice.stop(); } catch { /* noop */ }
     cancelSpeech();
-    if (typeof window === "undefined") { speakingRef.current = false; return; }
+    if (typeof window === "undefined") { speakingRef.current = false; setSpeaking(false); return; }
     const synth = window.speechSynthesis;
-    if (!synth) { speakingRef.current = false; return; }
+    if (!synth) { speakingRef.current = false; setSpeaking(false); return; }
     const u = new SpeechSynthesisUtterance(msg);
     u.rate = 0.95; u.pitch = 1.05;
     u.onend = () => {
       speakingRef.current = false;
-      if (shouldRunRef.current) startLoop();
+      setSpeaking(false);
+      // Resume listening the MOMENT TTS ends.
+      if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 150);
     };
-    u.onerror = () => { speakingRef.current = false; };
+    u.onerror = () => {
+      speakingRef.current = false;
+      setSpeaking(false);
+      if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 150);
+    };
     synth.speak(u);
-    // auto-clear caption after a moment
     window.setTimeout(() => setConfirmation((c) => (c === msg ? "" : c)), 2400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -245,8 +272,36 @@ export function PersistentVoice({
     return () => window.clearInterval(iv);
   }, [active, startLoop, isTTSPlaying]);
 
+  // Barge-in via TAP: any pointer interaction while the app is talking
+  // cancels TTS immediately and resumes listening — never make the user wait.
+  useEffect(() => {
+    if (!active) return;
+    const onPointer = () => {
+      if (!speakingRef.current && !isTTSPlaying()) return;
+      cancelAllTTS();
+      setConfirmation("");
+      if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 120);
+    };
+    window.addEventListener("pointerdown", onPointer, true);
+    return () => window.removeEventListener("pointerdown", onPointer, true);
+  }, [active, cancelAllTTS, isTTSPlaying, startLoop]);
+
   // When voice is enabled and not running because mode says off, hide everything.
   if (!enabledFromMode) return null;
+
+  const statusLabel = !userOn
+    ? "🎙 Voice off"
+    : speaking
+      ? "🔊 Speaking…"
+      : listening
+        ? "🎙 Listening"
+        : "🎙 Voice on";
+  const dotColor = !userOn ? "#9ca3af" : speaking ? "#3b82f6" : listening ? "#22c55e" : "#f59e0b";
+  const dotGlow = speaking
+    ? "0 0 0 4px rgba(59,130,246,0.25)"
+    : listening
+      ? "0 0 0 4px rgba(34,197,94,0.25)"
+      : "none";
 
   return (
     <div
@@ -267,14 +322,12 @@ export function PersistentVoice({
           aria-hidden
           style={{
             width: 8, height: 8, borderRadius: 999,
-            background: listening ? "#22c55e" : userOn ? "#f59e0b" : "#9ca3af",
-            boxShadow: listening ? "0 0 0 4px rgba(34,197,94,0.25)" : "none",
+            background: dotColor,
+            boxShadow: dotGlow,
             transition: "all 150ms",
           }}
         />
-        <span>
-          {paused ? "🎙 Screen voice" : userOn ? (listening ? "🎙 Listening" : "🎙 Voice on") : "🎙 Voice off"}
-        </span>
+        <span>{statusLabel}</span>
         <button
           type="button"
           onClick={() => setUserOn((v) => !v)}
