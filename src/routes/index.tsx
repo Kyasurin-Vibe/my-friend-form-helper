@@ -1041,11 +1041,13 @@ function VoiceField({
   onChange,
   placeholder,
   ariaLabel,
+  normalize,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   ariaLabel: string;
+  normalize?: (v: string) => string;
 }) {
   const [recording, setRecording] = useState(false);
   const [working, setWorking] = useState(false);
