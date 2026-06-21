@@ -41,6 +41,9 @@ export function VoiceBar({
   const [working, setWorking] = useState(false);
   const [hint, setHint] = useState<string>("");
   const stopRef = useRef<null | (() => Promise<Blob | null>)>(null);
+  const lblReadAgain = useT("read_again");
+  const lblHoldToTalk = useT("hold_to_talk");
+  const lblListening = useT("listening");
 
   const reSpeak = () => {
     cancelSpeech();
