@@ -1557,9 +1557,10 @@ function handlePhaseCommand(
     restart: () => void;
     handleSend: (r: Recipient) => void | Promise<void>;
     analysis: AnalysisResult | null;
+    setChooseMode: (m: "pick" | "trusted") => void;
   },
 ): boolean {
-  const { phase, setPhase, confirmPreview, navigate, restart, handleSend } = ctx;
+  const { phase, setPhase, confirmPreview, navigate, restart, handleSend, setChooseMode } = ctx;
 
   const yes = /\b(yes|yeah|yep|yup|sure|okay|ok|do it|go ahead|use this|use it|it's clear|its clear|looks good|good|send|send it|capture|take it|snap|take the picture|take the photo|connect me)\b/;
   const no = /\b(no|nope|nah|not yet|wait|keep looking|don't|dont)\b/;
