@@ -1485,7 +1485,7 @@ function PreviewScreen({
         className="text-center font-extrabold mt-2 mb-3"
         style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
       >
-        Is this clear enough?
+        {t("clear_enough")}
       </h2>
       <div
         className="rounded-2xl overflow-hidden mb-4"
@@ -1507,8 +1507,8 @@ function PreviewScreen({
         )}
       </div>
       <div className="space-y-2 mt-auto">
-        <BigButton variant="danger" onClick={onUse}>✅ Yes, use this</BigButton>
-        <BigButton variant="ghost" onClick={onRetake}>🔄 Retake</BigButton>
+        <BigButton variant="danger" onClick={onUse}>{t("yes_use")}</BigButton>
+        <BigButton variant="ghost" onClick={onRetake}>{t("retake")}</BigButton>
         <VoiceBar
           speakableText={speakableForPhase("preview", { analysis: null, sendResult: null, analyzeError: null })}
           voiceOn={voiceOn}
