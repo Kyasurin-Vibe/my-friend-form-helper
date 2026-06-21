@@ -825,6 +825,8 @@ function speakableForPhase(
       return "Ready to find your document? I'll open the magnifier so you can see clearly first. Nothing is uploaded yet. Tap the red Open Magnifier button when you're ready, or say yes.";
     case "magnifier":
       return "Point the camera at your paper. Keep the corners inside the frame. I'll capture it when it looks clear.";
+    case "preview":
+      return "Is this clear enough? Tap Yes use this to read the document, or say yes. Tap Retake to take another photo, or say no.";
     case "analyzing":
       return "Let me read this for you. Reading your document. One moment.";
     case "retake": {
