@@ -151,8 +151,8 @@ export type DetectedDoc = {
 };
 
 export interface VisionService {
-  // Frame is optional for now (mock). Real impl will accept an ImageBitmap / Blob.
-  detect(frame?: Blob): Promise<DetectedDoc>;
+  // Real impl accepts a data URL (jpeg/png) captured from the video frame.
+  detect(frame?: string | Blob): Promise<DetectedDoc>;
   name: string;
 }
 
@@ -178,15 +178,27 @@ export function createMockVisionService(): VisionService {
   };
 }
 
-// Claude vision placeholder. Will POST a frame to a server function
-// that calls Anthropic with the multimodal message format.
-export function createClaudeVisionService(): VisionService {
+// Lovable AI Gateway vision (Gemini multimodal). Server function handles the API key.
+export function createLovableVisionService(): VisionService {
   return {
-    name: "claude",
+    name: "lovable-ai",
     async detect(frame) {
-      // TODO: server function call.
-      void frame;
-      return createMockVisionService().detect();
+      if (typeof frame !== "string" || !frame.startsWith("data:")) {
+        return createMockVisionService().detect();
+      }
+      try {
+        const { analyzeDocumentImage } = await import("./vision.functions");
+        const r = await analyzeDocumentImage({ data: { imageDataUrl: frame } });
+        return {
+          code: r.code,
+          title: r.title,
+          confidence: r.confidence,
+          fields: r.fields,
+        };
+      } catch (e) {
+        console.warn("[vision] AI call failed, falling back to mock:", e);
+        return createMockVisionService().detect();
+      }
     },
   };
 }
@@ -229,6 +241,7 @@ export function createMockUploadService(): UploadService {
 
 export const DemoServices = {
   voice: pickVoiceService(),
-  vision: createMockVisionService(),
+  vision: createLovableVisionService(),
   upload: createMockUploadService(),
 };
+
