@@ -260,7 +260,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
         />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center text-white text-lg">
-            {error ?? "Starting camera…"}
+            {error ?? useTranslated("Starting camera…")}
           </div>
         )}
         <div
@@ -294,7 +294,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
             boxShadow: "0 10px 24px rgba(0,0,0,0.35)",
           }}
         >
-          ❓ I have a question
+          ❓ {useTranslated("I have a question")}
         </button>
         <button
           onClick={onBack}
@@ -309,7 +309,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
             minHeight: 72,
           }}
         >
-          ↩ Back to home
+          ↩ {useTranslated("Back to home")}
         </button>
       </div>
     </div>
