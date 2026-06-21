@@ -98,7 +98,7 @@ export function PersistentVoice({
     setSpeaking(false);
   }, []);
 
-  const speakConfirm = useCallback((msg: string) => {
+  const speakConfirmCore = useCallback((msg: string, preTranslated: boolean) => {
     setConfirmation(msg);
     speakingRef.current = true;
     setSpeaking(true);
@@ -125,7 +125,7 @@ export function PersistentVoice({
       };
       synth.speak(u);
     };
-    if (lang === "en") {
+    if (preTranslated || lang === "en") {
       startSpeak(msg);
     } else {
       const cached = translateSync(msg, lang);
@@ -135,6 +135,9 @@ export function PersistentVoice({
     window.setTimeout(() => setConfirmation((c) => (c === msg ? "" : c)), 2400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const speakConfirm = useCallback((msg: string) => speakConfirmCore(msg, false), [speakConfirmCore]);
+  const speakLocalized = useCallback((msg: string) => speakConfirmCore(msg, true), [speakConfirmCore]);
 
   const isTTSPlaying = useCallback((): boolean => {
     if (typeof window === "undefined") return false;
