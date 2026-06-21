@@ -38,6 +38,7 @@ type Phase =
   | "start"
   | "find"
   | "magnifier"
+  | "preview"
   | "analyzing"
   | "retake"
   | "review"
