@@ -309,18 +309,22 @@ export function PersistentVoice({
     setUserOn={setUserOn}
     blocked={blocked}
     active={active}
+    transcript={transcript}
+    confirmation={confirmation}
   />;
 }
 
 function PersistentVoiceStatus({
-  userOn, speaking, listening, setUserOn, blocked, active,
+  userOn, speaking, listening, setUserOn, blocked, active, transcript, confirmation,
 }: {
   userOn: boolean;
   speaking: boolean;
   listening: boolean;
-  setUserOn: (fn: (v: boolean) => boolean) => void;
+  setUserOn: React.Dispatch<React.SetStateAction<boolean>>;
   blocked: boolean;
   active: boolean;
+  transcript: string;
+  confirmation: string;
 }) {
   const lblVoiceOff = useT("voice_off");
   const lblSpeaking = useT("speaking");
