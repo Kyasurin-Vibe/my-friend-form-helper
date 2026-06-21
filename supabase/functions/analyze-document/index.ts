@@ -18,6 +18,10 @@ Rules:
   0..1 (x,y = top-left corner of the paper; width,height = its size). EXCLUDE hands, table,
   ceiling, and background — wrap the paper edges as tightly as possible. If you cannot see a
   clear document, return x:0, y:0, width:1, height:1.
+- resourceCategory: classify what KIND of help this document relates to, ONE of:
+  "legal", "benefits", "housing", "healthcare", "immigration", "general", or "none".
+  Use "none" if it is NOT something a person needs help with (an ad, flyer, poster, or
+  unrelated photo). Base it on what the document actually is.
 - elderMessage: ONE short warm sentence (max 22 words), no legal jargon.`;
 
 const TOOL = {
@@ -29,6 +33,7 @@ const TOOL = {
     required: [
       "readable", "documentType", "documentName", "confidence",
       "plainEnglishSummary", "possibleMissingFields", "elderMessage", "documentBounds",
+      "resourceCategory",
     ],
     properties: {
       readable: { type: "boolean" },
@@ -48,6 +53,10 @@ const TOOL = {
           width: { type: "number", description: "paper width, 0..1" },
           height: { type: "number", description: "paper height, 0..1" },
         },
+      },
+      resourceCategory: {
+        type: "string",
+        enum: ["legal", "benefits", "housing", "healthcare", "immigration", "general", "none"],
       },
     },
   },
@@ -100,6 +109,7 @@ function fallback(readable = false) {
       ? "I couldn't check this clearly. I can send it to the Legal Aid Center for a person to review."
       : "This picture is too blurry. Please move closer, keep all four corners inside the frame, and try again.",
     documentBounds: null as null,
+    resourceCategory: "general",
   };
 }
 
@@ -167,6 +177,7 @@ Deno.serve(async (req) => {
       recommendedAction: decide({ readable, confidence, possibleMissingFields }),
       elderMessage: String(ai.elderMessage || ""),
       documentBounds: sanitizeBounds(ai.documentBounds),
+      resourceCategory: typeof ai.resourceCategory === "string" ? ai.resourceCategory : "general",
     }, { headers: CORS });
   } catch (e) {
     console.error("analyze-document fatal", e);

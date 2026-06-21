@@ -1,73 +1,36 @@
-// Curated, deterministic resource lists keyed by document type.
-// Demo-safe: NO live search. Claude identifies the doc type; this maps it to real help.
+// Curated, deterministic resource lists keyed by resource category.
+// Demo-safe: NO live search. Claude classifies the document; this maps it to real help.
 
-export type Resource = {
-  name: string;
-  helpsWith: string;
-  contact?: string;
+export type Resource = { name: string; helpsWith: string; contact?: string };
+
+const RESOURCES_BY_CATEGORY: Record<string, Resource[]> = {
+  legal: [
+    { name: "Local Legal Aid Center", helpsWith: "Free legal help for low-income residents", contact: "Call 211" },
+    { name: "Court Self-Help Center", helpsWith: "Walk-in help with court paperwork", contact: "courts.ca.gov/selfhelp" },
+    { name: "Fee Waiver — Form FW-001", helpsWith: "Skip court filing fees if you can't afford them" },
+  ],
+  benefits: [
+    { name: "Benefits Enrollment Help (211)", helpsWith: "Apply for food, cash aid, and Medi-Cal", contact: "Call 211" },
+    { name: "County Social Services", helpsWith: "In-person help with public benefits" },
+  ],
+  housing: [
+    { name: "Housing Assistance (211)", helpsWith: "Rent help and eviction prevention", contact: "Call 211" },
+    { name: "Tenant Rights Hotline", helpsWith: "Free advice on your rights as a renter" },
+  ],
+  healthcare: [
+    { name: "Community Health Clinic", helpsWith: "Low-cost or free medical care", contact: "Call 211" },
+    { name: "Medi-Cal Enrollment Help", helpsWith: "Apply for free or low-cost health coverage" },
+  ],
+  immigration: [
+    { name: "Nonprofit Immigration Legal Aid", helpsWith: "Trusted, low-cost immigration help", contact: "Call 211" },
+  ],
+  general: [
+    { name: "211 Help Line", helpsWith: "Connects you to local help for almost anything", contact: "Call 211" },
+  ],
+  none: [],
 };
 
-const RESOURCES_BY_DOC: Record<string, Resource[]> = {
-  "FL-142": [
-    {
-      name: "Local Legal Aid Center",
-      helpsWith: "Free help completing your divorce financial forms",
-      contact: "Call 211",
-    },
-    {
-      name: "Court Self-Help Center",
-      helpsWith: "Walk-in help with family law paperwork",
-      contact: "courts.ca.gov/selfhelp",
-    },
-    {
-      name: "Fee Waiver — Form FW-001",
-      helpsWith: "Skip court filing fees if you can't afford them",
-    },
-  ],
-  "FL-150": [
-    {
-      name: "Local Legal Aid Center",
-      helpsWith: "Free help with your income & expense declaration",
-      contact: "Call 211",
-    },
-    {
-      name: "Court Self-Help Center",
-      helpsWith: "Walk-in help with family law paperwork",
-      contact: "courts.ca.gov/selfhelp",
-    },
-    {
-      name: "Fee Waiver — Form FW-001",
-      helpsWith: "Skip court filing fees if you can't afford them",
-    },
-  ],
-  "DV-100": [
-    {
-      name: "Domestic Violence Legal Aid",
-      helpsWith: "Confidential help with restraining orders",
-      contact: "Call 211",
-    },
-    {
-      name: "Court Self-Help Center",
-      helpsWith: "Walk-in help filing protective orders",
-      contact: "courts.ca.gov/selfhelp",
-    },
-  ],
-  default: [
-    {
-      name: "Local Legal Aid Center",
-      helpsWith: "Free legal help for low-income residents",
-      contact: "Call 211",
-    },
-    {
-      name: "Court Self-Help Center",
-      helpsWith: "Walk-in help understanding court paperwork",
-      contact: "courts.ca.gov/selfhelp",
-    },
-  ],
-};
-
-export function getResources(documentType?: string | null): Resource[] {
-  if (!documentType) return RESOURCES_BY_DOC.default;
-  const key = documentType.toUpperCase().trim();
-  return RESOURCES_BY_DOC[key] ?? RESOURCES_BY_DOC.default;
+export function getResources(category?: string | null): Resource[] {
+  const key = (category ?? "general").toLowerCase().trim();
+  return RESOURCES_BY_CATEGORY[key] ?? RESOURCES_BY_CATEGORY.general;
 }
