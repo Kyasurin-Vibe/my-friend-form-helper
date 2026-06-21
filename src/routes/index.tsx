@@ -168,6 +168,7 @@ function ElderApp() {
           }}
         >
           <CaptionsContext.Provider value={showCaptions}>
+           <VoiceOnContext.Provider value={voiceOn}>
             {phase === "start" ? (
               <StartGate
                 onStart={(mode) => {
@@ -214,7 +215,9 @@ function ElderApp() {
                 onRestart={restart}
               />
             )}
+           </VoiceOnContext.Provider>
           </CaptionsContext.Provider>
+
         </div>
       </div>
 
