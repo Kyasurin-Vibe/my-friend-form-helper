@@ -374,6 +374,11 @@ function RetakeScreen({
   useEffect(() => {
     playWarning();
   }, []);
+  const voiceOn = useContext(VoiceOnContext);
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onSendAnyway();
+    else if (i === "cancel") onRetry();
+  };
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} face="x" />
@@ -400,10 +405,16 @@ function RetakeScreen({
         <BigButton variant="ghost" onClick={onSendAnyway}>
           {sending ? "Sending…" : "🤝 Send for human review"}
         </BigButton>
+        <VoiceBar
+          speakableText={speakableForPhase("retake", { analysis, sendResult: null, analyzeError: null })}
+          voiceOn={voiceOn}
+          onIntent={handleIntent}
+        />
       </div>
     </div>
   );
 }
+
 
 function ReviewScreen({
   analysis,
@@ -421,9 +432,15 @@ function ReviewScreen({
   speech: ReturnType<typeof useSpeech>;
 }) {
   const missing = analysis?.possibleMissingFields ?? [];
+  const voiceOn = useContext(VoiceOnContext);
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onSend();
+    else if (i === "cancel") onRetake();
+  };
   useEffect(() => {
     if (missing.length > 0) playWarning();
   }, [missing.length]);
+
 
   // No analysis available — show honest fallback, do NOT fake check rows.
   if (!analysis) {
@@ -451,7 +468,13 @@ function ReviewScreen({
           <BigButton variant="danger" onClick={onSend}>
             {sending ? "Sending…" : "🤝 Send for review"}
           </BigButton>
+          <VoiceBar
+            speakableText={speakableForPhase("review", { analysis: null, sendResult: null, analyzeError })}
+            voiceOn={voiceOn}
+            onIntent={handleIntent}
+          />
         </div>
+
       </div>
     );
   }
@@ -520,7 +543,13 @@ function ReviewScreen({
         <BigButton variant="danger" onClick={onSend}>
           {sending ? "Sending…" : "🤝 Send it"}
         </BigButton>
+        <VoiceBar
+          speakableText={speakableForPhase("review", { analysis, sendResult: null, analyzeError: null })}
+          voiceOn={voiceOn}
+          onIntent={handleIntent}
+        />
       </div>
+
     </div>
   );
 }
@@ -538,10 +567,15 @@ function SentScreen({
   onGoCenter: () => void;
   onRestart: () => void;
 }) {
+  const voiceOn = useContext(VoiceOnContext);
   const trackingId = sendResult?.trackingId ?? "—";
   const centerName = sendResult?.centerName ?? "Legal Aid Center";
   const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
   const missingCount = analysis?.possibleMissingFields.length ?? 0;
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onGoCenter();
+    else if (i === "cancel") onRestart();
+  };
 
   const log = [
     "Photo captured on this device",
@@ -551,6 +585,7 @@ function SentScreen({
       : "No obvious missing fields",
     `Sent to ${centerName}`,
   ];
+
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto">
       <MascotHeader speech={speech} small face={isReview ? "x" : "smile"} />
@@ -608,7 +643,13 @@ function SentScreen({
       <div className="space-y-2 mt-auto">
         <BigButton variant="ghost" onClick={onRestart}>↻ Start over</BigButton>
         <BigButton variant="danger" onClick={onGoCenter}>See the center's side →</BigButton>
+        <VoiceBar
+          speakableText={speakableForPhase("sent", { analysis, sendResult, analyzeError: null })}
+          voiceOn={voiceOn}
+          onIntent={handleIntent}
+        />
       </div>
+
     </div>
   );
 }
@@ -662,9 +703,11 @@ function BigButton({
   return (
     <button
       onClick={() => {
+        cancelSpeech();
         if ("vibrate" in navigator) navigator.vibrate(35);
         onClick();
       }}
+
       className={`w-full font-extrabold transition active:scale-[0.96] ${danger ? "animate-button-pop-red" : "animate-button-pop"}`}
       style={{
         background: danger ? "var(--color-elder-red)" : primary ? "var(--color-elder-primary)" : "#fff",
