@@ -644,16 +644,19 @@ function RetakeScreen({
         <BigButton variant="ghost" onClick={onSendAnyway}>
           {sending ? "Sending…" : "🤝 Connect me with a person"}
         </BigButton>
+        <DoneButton onClick={onDone} />
         <VoiceBar
           speakableText={speakableForPhase("retake", { analysis, sendResult: null, analyzeError: null })}
           voiceOn={voiceOn}
           actions={[
             { id: "retry", label: "Try again", description: "Retake the photo" },
             { id: "send", label: "Connect me with a person", description: `Send the photo to a real human (a ${partner.name})` },
+            { id: "done", label: "No thanks — I'm done", description: "Politely exit and go home" },
           ]}
           onAction={(id) => {
             if (id === "retry") onRetry();
             else if (id === "send") onSendAnyway();
+            else if (id === "done") onDone();
           }}
         />
       </div>
