@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getLang, getBCP47, getTTSVoice, ttsSupportsDeepgram } from "@/lib/i18n";
+import { getLang, getBCP47, getTTSVoice, ttsSupportsDeepgram, translateAsync, translateSync } from "@/lib/i18n";
 
 
 export type Branch = "missing" | "complete";
@@ -294,6 +294,17 @@ export function useCases(): CaseRow[] {
 // Speak a line via Deepgram (warm voice), with browser fallback if it fails or is slow.
 export async function speakWarm(text: string, opts?: { timeoutMs?: number }): Promise<void> {
   if (typeof window === "undefined" || !text) return;
+  // Auto-translate fixed English app lines into the chosen language.
+  const lang = getLang();
+  let spoken = text;
+  if (lang !== "en") {
+    spoken = translateSync(text, lang);
+    if (spoken === text) {
+      // Not cached yet — fetch (and speak original meanwhile would race), so
+      // wait briefly for translation to land, then speak the translated text.
+      try { spoken = await translateAsync(text, lang); } catch { spoken = text; }
+    }
+  }
   const timeoutMs = opts?.timeoutMs ?? 1500;
   const w = window as unknown as { __mfTtsAudio?: HTMLAudioElement };
   try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
