@@ -1,5 +1,7 @@
-// Deepgram Aura TTS. Returns audio/mp3 bytes. Frontend falls back to speechSynthesis
-// if this fails or DEEPGRAM_API_KEY is not configured.
+// ElevenLabs TTS (multilingual). Returns audio/mpeg bytes.
+// Frontend falls back to browser speechSynthesis if this fails or times out.
+// Uses eleven_multilingual_v2 so a single warm voice speaks all supported
+// languages (English, Spanish, Chinese, Vietnamese, Tagalog) naturally.
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -7,47 +9,66 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Sarah — calm, warm, friendly female voice. Good for elderly users.
+const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
-  if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: CORS });
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405, headers: CORS });
+  }
 
   try {
-    const { text, voice, language } = (await req.json()) as { text?: string; voice?: string; language?: string };
+    const { text, voice } = (await req.json()) as {
+      text?: string;
+      voice?: string;
+      language?: string;
+    };
     if (!text || typeof text !== "string") {
       return Response.json({ error: "text required" }, { status: 400, headers: CORS });
     }
-    const apiKey = Deno.env.get("DEEPGRAM_API_KEY");
+
+    const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
     if (!apiKey) {
-      return Response.json({ error: "deepgram_not_configured" }, { status: 503, headers: CORS });
+      return Response.json({ error: "elevenlabs_not_configured" }, { status: 503, headers: CORS });
     }
 
-    // Aura v1 supports English voices only. For other languages, return 503
-    // so the client falls back to browser speechSynthesis in the right lang.
-    const lang = (language || "en").toLowerCase();
-    if (lang !== "en") {
-      return Response.json({ error: "language_not_supported" }, { status: 503, headers: CORS });
-    }
-    const model = voice || "aura-asteria-en";
-    const url = `https://api.deepgram.com/v1/speak?model=${encodeURIComponent(model)}&encoding=mp3`;
+    const voiceId = voice || DEFAULT_VOICE_ID;
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
 
     const r = await fetch(url, {
       method: "POST",
       headers: {
+        "xi-api-key": apiKey,
         "Content-Type": "application/json",
-        Authorization: `Token ${apiKey}`,
+        Accept: "audio/mpeg",
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({
+        text,
+        model_id: "eleven_multilingual_v2",
+        voice_settings: {
+          stability: 0.55,
+          similarity_boost: 0.8,
+          style: 0.25,
+          use_speaker_boost: true,
+          speed: 0.95,
+        },
+      }),
     });
 
     if (!r.ok) {
       const errText = await r.text();
-      console.error("deepgram error", r.status, errText);
-      return Response.json({ error: `deepgram_${r.status}` }, { status: 502, headers: CORS });
+      console.error("elevenlabs error", r.status, errText);
+      return Response.json({ error: `elevenlabs_${r.status}` }, { status: 502, headers: CORS });
     }
 
     const audio = await r.arrayBuffer();
     return new Response(audio, {
-      headers: { ...CORS, "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=86400" },
+      headers: {
+        ...CORS,
+        "Content-Type": "audio/mpeg",
+        "Cache-Control": "public, max-age=86400",
+      },
     });
   } catch (e) {
     console.error("tts fatal", e);
