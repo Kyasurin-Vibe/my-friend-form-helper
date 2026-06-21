@@ -437,9 +437,9 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
       case "yes": doCapture(); break;
       case "no":
         setCountdown(0);
-        stableSinceRef.current = null;
-        stableBoxRef.current = null;
+        consecutiveReadyRef.current = 0;
         break;
+
       case "read":
         speakingRef.current = true;
         try { DemoServices.voice.stop(); } catch { /* noop */ }
