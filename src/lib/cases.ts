@@ -24,6 +24,7 @@ export type AnalysisResult = {
   recommendedAction: "retake" | "confirm_send" | "human_review";
   elderMessage: string;
   documentBounds: DocumentBounds | null;
+  resourceCategory?: string;
 };
 
 export type SendResult = {
