@@ -44,6 +44,7 @@ type Phase =
   | "sent";
 
 const CaptionsContext = createContext<boolean>(true);
+const VoiceOnContext = createContext<boolean>(true);
 
 function ElderApp() {
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
@@ -63,15 +64,14 @@ function ElderApp() {
     speech.setEnabled(voiceOn);
   }, [voiceOn, speech]);
 
+  // Auto-speak the whole screen on entry (real data for dynamic ones).
   useEffect(() => {
-    if (phase === "review" && analysis?.elderMessage) {
-      speakWarm(analysis.elderMessage);
-    } else if (phase === "sent" && sendResult?.elderMessage) {
-      speakWarm(sendResult.elderMessage);
-    } else if (phase === "retake") {
-      speech.speak("That was a little hard to read. Let's try again, holding steady.");
-    }
-  }, [phase, analysis, sendResult]); // eslint-disable-line
+    if (!voiceOn) return;
+    const text = speakableForPhase(phase, { analysis, sendResult, analyzeError });
+    if (text) speakWarm(text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, analysis, sendResult, voiceOn]);
+
 
   const restart = () => {
     setPhase("find");
