@@ -82,21 +82,38 @@ export function PersistentVoice({
   void paused;
   const active = enabledFromMode && userOn;
 
+  const cancelAllTTS = useCallback(() => {
+    try { DemoServices.voice.stop(); } catch { /* noop */ }
+    cancelSpeech();
+    if (typeof window !== "undefined") {
+      try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
+      try {
+        const w = window as unknown as { __mfTtsAudio?: HTMLAudioElement };
+        const a = w.__mfTtsAudio;
+        if (a && !a.paused) { a.pause(); a.currentTime = 0; }
+      } catch { /* noop */ }
+    }
+    speakingRef.current = false;
+    setSpeaking(false);
+  }, []);
+
   const speakConfirm = useCallback((msg: string) => {
     setConfirmation(msg);
     speakingRef.current = true;
+    setSpeaking(true);
     try { DemoServices.voice.stop(); } catch { /* noop */ }
     cancelSpeech();
-    if (typeof window === "undefined") { speakingRef.current = false; return; }
+    if (typeof window === "undefined") { speakingRef.current = false; setSpeaking(false); return; }
     const synth = window.speechSynthesis;
-    if (!synth) { speakingRef.current = false; return; }
+    if (!synth) { speakingRef.current = false; setSpeaking(false); return; }
     const u = new SpeechSynthesisUtterance(msg);
     u.rate = 0.95; u.pitch = 1.05;
     u.onend = () => {
       speakingRef.current = false;
+      setSpeaking(false);
       if (shouldRunRef.current) startLoop();
     };
-    u.onerror = () => { speakingRef.current = false; };
+    u.onerror = () => { speakingRef.current = false; setSpeaking(false); };
     synth.speak(u);
     // auto-clear caption after a moment
     window.setTimeout(() => setConfirmation((c) => (c === msg ? "" : c)), 2400);
