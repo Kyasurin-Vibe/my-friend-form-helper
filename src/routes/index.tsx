@@ -561,7 +561,7 @@ function ReviewScreen({
         <div className="space-y-2 mt-auto">
           <BigButton variant="ghost" onClick={onRetake}>📷 Retake</BigButton>
           <BigButton variant="danger" onClick={onSend}>
-            {sending ? "Sending…" : "🤝 Send for review"}
+            {sending ? "Sending…" : "🤝 Connect me with a person"}
           </BigButton>
           <VoiceBar
             speakableText={speakableForPhase("review", { analysis: null, sendResult: null, analyzeError })}
