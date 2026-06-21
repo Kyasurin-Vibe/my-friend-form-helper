@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     }
     const recipientLabel =
       recipientKind === "trusted"
-        ? `trusted contact (${trustedName} — ${trustedRel})`
+        ? `trusted contact (${trustedName} — ${trustedRel}${trustedEmail ? ` — ${trustedEmail}` : ""})`
         : centerName;
 
     const supabase = createClient(
