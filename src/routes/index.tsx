@@ -222,16 +222,26 @@ function ElderApp() {
           ) : phase === "magnifier" ? (
             <LiveMagnifier
               onCancel={() => setPhase("find")}
-              onConfirm={() => {
-                setPhase("flow");
-                setStep(3);
-              }}
+              onConfirm={(img) => handleCapture(img)}
               onHandoff={() => {
                 setBranch("missing");
+                setAnalysis({
+                  readable: true,
+                  documentType: "unknown",
+                  documentName: "Unknown document",
+                  confidence: 0.5,
+                  plainEnglishSummary: "User asked for a person to review without analysis.",
+                  possibleMissingFields: ["user requested human review"],
+                  recommendedAction: "human_review",
+                  elderMessage: "Okay. I'll send this to the Legal Aid Center for a person to look at.",
+                });
+                handleSend();
                 setPhase("flow");
                 setStep(5);
               }}
             />
+          ) : phase === "analyzing" ? (
+            <AnalyzingScreen />
           ) : (
             <ScreenRouter
               step={step}
@@ -239,6 +249,11 @@ function ElderApp() {
               branch={branch}
               speech={speech}
               showCaptions={showCaptions}
+              analysis={analysis}
+              sendResult={sendResult}
+              sending={sending}
+              analyzeError={analyzeError}
+              onSend={handleSend}
               onGoCenter={() => navigate({ to: "/center" })}
             />
           )}
