@@ -596,25 +596,24 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
             )}
             {countdown > 0 && (
               <div
-                className="absolute"
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 style={{
-                  top: 12,
-                  right: 12,
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "rgba(0,0,0,0.55)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                  fontWeight: 800,
-                  fontSize: 24,
-                  border: `4px solid ${countdown <= 2 ? "#fbbf24" : "#22c55e"}`,
-                  transition: "border-color 0.3s",
+                  background: "rgba(0,0,0,0.35)",
                 }}
               >
-                {countdown}
+                <div
+                  key={countdown}
+                  style={{
+                    color: "#fff",
+                    fontWeight: 900,
+                    fontSize: 200,
+                    lineHeight: 1,
+                    textShadow: "0 8px 30px rgba(0,0,0,0.6)",
+                    animation: "countdown-pop 0.6s ease-out",
+                  }}
+                >
+                  {countdown}
+                </div>
               </div>
             )}
             {!ready && (
