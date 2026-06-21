@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { unlockAudio } from "../lib/audio-unlock";
 
 function NotFoundComponent() {
   return (
@@ -131,7 +132,10 @@ function RootComponent() {
     const handler = () => {
       if (done) return;
       done = true;
-      void import("../lib/audio-unlock").then((m) => m.unlockAudio());
+      // CRITICAL: call synchronously inside the gesture. A dynamic import()
+      // would resolve a tick later and lose the gesture context on iOS/Android,
+      // leaving speechSynthesis and <audio>.play() blocked for the session.
+      try { unlockAudio(); } catch { /* noop */ }
       window.removeEventListener("pointerdown", handler, true);
       window.removeEventListener("touchstart", handler, true);
       window.removeEventListener("keydown", handler, true);
