@@ -246,10 +246,16 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           aspect <= 1.9;
 
         let next: Guidance;
-        if (meanLum < 70 || !hasDocumentRegion) next = "init";
-        else if (paperFrac < 0.45 || boxAreaFrac < 0.48) next = "corners";
-        else if (sharp < 5.5) next = "blurry";
-        else next = "detected";
+        if (!hasDocumentRegion) {
+          emptyStreak++;
+          next = emptyStreak >= 5 ? "no-doc" : "init";
+        } else {
+          emptyStreak = 0;
+          if (meanLum < 70) next = "init";
+          else if (paperFrac < 0.45 || boxAreaFrac < 0.48) next = "corners";
+          else if (sharp < 5.5) next = "blurry";
+          else next = "detected";
+        }
 
         setDetectionBox(
           hasDocumentRegion
