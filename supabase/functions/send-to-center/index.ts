@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
       analysis: Analysis;
       initials?: string;
       recipient?:
-        | { kind: "center" }
+        | { kind: "center"; partnerName?: string }
         | { kind: "trusted"; name?: string; relationship?: string };
     };
     const { analysis, initials } = body;
@@ -90,11 +90,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: "analysis required" }, { status: 400, headers: CORS });
     }
 
-    // Resolve recipient — default to the institutional Legal Aid Center.
+    // Resolve recipient — default to the institutional accountable partner for the doc category.
     const rawRecipient = body.recipient;
     let recipientKind: "center" | "trusted" = "center";
     let trustedName = "";
     let trustedRel = "";
+    let centerName = DEFAULT_CENTER_NAME;
     if (rawRecipient && rawRecipient.kind === "trusted") {
       const n = String(rawRecipient.name ?? "").trim();
       const r = String(rawRecipient.relationship ?? "").trim();
@@ -103,11 +104,14 @@ Deno.serve(async (req) => {
         trustedName = n.slice(0, 80);
         trustedRel = r.slice(0, 80);
       }
+    } else if (rawRecipient && rawRecipient.kind === "center") {
+      const pn = String(rawRecipient.partnerName ?? "").trim();
+      if (pn) centerName = pn.slice(0, 80);
     }
     const recipientLabel =
       recipientKind === "trusted"
         ? `trusted contact (${trustedName} — ${trustedRel})`
-        : CENTER_NAME;
+        : centerName;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
