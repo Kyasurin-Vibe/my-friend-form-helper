@@ -700,10 +700,10 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
       <div className="flex-1 flex flex-col items-center justify-center">
         <Mascot mode="idle" size={130} />
         <h2 className="mt-3 font-extrabold" style={{ fontSize: 28, color: "var(--color-elder-ink)" }}>
-          Have a question, my friend?
+          {t("question_friend")}
         </h2>
         <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
-          I will open your camera, so I can help you.
+          {t("open_camera_hint")}
         </p>
         <button
           onClick={() => { cancelSpeech(); onOpenMagnifier(); }}
@@ -719,7 +719,7 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
             boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
           }}
         >
-          🔍 Open Scanner
+          {t("open_scanner")}
         </button>
         <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
           The magnifier uses your camera only on this device.
