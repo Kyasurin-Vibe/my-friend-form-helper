@@ -49,6 +49,17 @@ type Phase =
 const CaptionsContext = createContext<boolean>(true);
 const VoiceOnContext = createContext<boolean>(true);
 
+function isValidBounds(b: DocumentBounds | null | undefined): boolean {
+  if (!b) return false;
+  const { x, y, width, height } = b;
+  return (
+    Number.isFinite(x) && Number.isFinite(y) &&
+    Number.isFinite(width) && Number.isFinite(height) &&
+    width > 0.05 && height > 0.05 &&
+    x >= 0 && y >= 0 && x + width <= 1.0001 && y + height <= 1.0001
+  );
+}
+
 function ElderApp() {
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
   const [phase, setPhase] = useState<Phase>("find");
