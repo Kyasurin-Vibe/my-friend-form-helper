@@ -20,7 +20,7 @@ You receive ONE small low-res frame. Decide ONLY these things:
 - documentPresent: true if a paper document (form, letter, certificate, invoice, ID, etc.) is clearly visible in the frame.
 - readable: true if the document text/structure looks sharp enough to read (not blurry, not glare-covered, not too dark, not heavily cropped).
 - confidence: 0..1, your confidence in BOTH judgments together.
-- documentBounds: TIGHT bounding box of the white paper/form/page content ONLY, NORMALIZED 0..1 to image dims (x,y top-left). Exclude all device bezel, dark screen edges, hands, fingers, background, browser UI, camera UI, shadows, and table surface. If the document is shown on a phone, tablet, laptop, or monitor, return bounds for the white document/form/page content only — NOT the device screen or its frame. The crop should look like a scanner output, not a photo of a device. Tight means the visible white form/page area only. If you cannot clearly see a single document, set documentBounds to null.
+- documentBounds: tight bounding box of the paper document, NORMALIZED 0..1 to image dims (x,y top-left). Include only the document — not hands, not ceiling, not background. If you cannot clearly see a single document, set documentBounds to null.
 Reply by calling the "report_presence" tool exactly once. No prose.`;
 
 const TOOL = {
