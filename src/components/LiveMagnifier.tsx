@@ -640,7 +640,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           fontSize: 18, color: hintColor[hint], minHeight: 26, transition: "color 200ms",
         }}>{hintText[hint]}</p>
         <p className="text-center" style={{ fontSize: 14, color: "#6b5d52", minHeight: 20 }}>
-          Fit your paper inside the frame. {autoCapture ? "I'll capture automatically." : "Tap the red button when ready."}
+          Fit your paper inside the frame. Say &quot;yes&quot; or tap the red button when ready.
         </p>
         {heard && listening && (
           <p className="text-center" style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}>
