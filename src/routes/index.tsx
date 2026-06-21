@@ -216,6 +216,13 @@ function ElderApp() {
                 onCancel={() => setPhase("find")}
                 onConfirm={(img) => handleCapture(img)}
               />
+            ) : phase === "preview" ? (
+              <PreviewScreen
+                image={capturedImage}
+                speech={speech}
+                onUse={runAnalyze}
+                onRetake={() => setPhase("magnifier")}
+              />
             ) : phase === "analyzing" ? (
               <AnalyzingScreen />
             ) : phase === "retake" ? (
@@ -226,6 +233,7 @@ function ElderApp() {
                 sending={sending}
                 speech={speech}
               />
+
             ) : phase === "review" ? (
               <ReviewScreen
                 analysis={analysis}
