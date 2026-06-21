@@ -95,6 +95,7 @@ Deno.serve(async (req) => {
     let recipientKind: "center" | "trusted" = "center";
     let trustedName = "";
     let trustedRel = "";
+    let trustedEmail = "";
     let centerName = DEFAULT_CENTER_NAME;
     if (rawRecipient && rawRecipient.kind === "trusted") {
       const n = String(rawRecipient.name ?? "").trim();
@@ -103,6 +104,7 @@ Deno.serve(async (req) => {
         recipientKind = "trusted";
         trustedName = n.slice(0, 80);
         trustedRel = r.slice(0, 80);
+        trustedEmail = String(rawRecipient.email ?? "").trim().slice(0, 120);
       }
     } else if (rawRecipient && rawRecipient.kind === "center") {
       const pn = String(rawRecipient.partnerName ?? "").trim();
