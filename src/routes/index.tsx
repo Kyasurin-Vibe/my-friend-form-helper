@@ -875,6 +875,7 @@ function ChooseRecipientScreen({
   const [mode, setMode] = useState<"pick" | "trusted">("pick");
   const [name, setName] = useState("");
   const [relationship, setRelationship] = useState("");
+  const [email, setEmail] = useState("");
   const partner = getAccountablePartner(analysis?.resourceCategory);
 
   if (mode === "pick") {
