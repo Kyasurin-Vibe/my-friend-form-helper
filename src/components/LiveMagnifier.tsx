@@ -19,7 +19,7 @@ const GUIDANCE_TEXT: Record<Guidance, string> = {
   "hold-still": "Hold still…",
   corners: "Put all four corners inside the frame.",
   blurry: "The picture is too blurry. Please try again.",
-  detected: "Looks clear. Tap the red button to capture and check it.",
+  detected: "Looks clear. Capturing automatically…",
 };
 
 // Lightweight TTS helper local to this screen, so it composes with the
