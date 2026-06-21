@@ -9,7 +9,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const CENTER_NAME = "Legal Aid Center";
+const DEFAULT_CENTER_NAME = "Legal Aid Center";
 
 type Bounds = { x: number; y: number; width: number; height: number; confidence: number };
 type Analysis = {
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
       analysis: Analysis;
       initials?: string;
       recipient?:
-        | { kind: "center" }
+        | { kind: "center"; partnerName?: string }
         | { kind: "trusted"; name?: string; relationship?: string };
     };
     const { analysis, initials } = body;
@@ -90,11 +90,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: "analysis required" }, { status: 400, headers: CORS });
     }
 
-    // Resolve recipient — default to the institutional Legal Aid Center.
+    // Resolve recipient — default to the institutional accountable partner for the doc category.
     const rawRecipient = body.recipient;
     let recipientKind: "center" | "trusted" = "center";
     let trustedName = "";
     let trustedRel = "";
+    let centerName = DEFAULT_CENTER_NAME;
     if (rawRecipient && rawRecipient.kind === "trusted") {
       const n = String(rawRecipient.name ?? "").trim();
       const r = String(rawRecipient.relationship ?? "").trim();
@@ -103,11 +104,14 @@ Deno.serve(async (req) => {
         trustedName = n.slice(0, 80);
         trustedRel = r.slice(0, 80);
       }
+    } else if (rawRecipient && rawRecipient.kind === "center") {
+      const pn = String(rawRecipient.partnerName ?? "").trim();
+      if (pn) centerName = pn.slice(0, 80);
     }
     const recipientLabel =
       recipientKind === "trusted"
         ? `trusted contact (${trustedName} — ${trustedRel})`
-        : CENTER_NAME;
+        : centerName;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -161,7 +165,7 @@ Deno.serve(async (req) => {
       text:
         recipientKind === "trusted"
           ? `Elder chose to send to a trusted contact they picked themselves: ${trustedName} (${trustedRel}). NOT auto-filled.`
-          : `Elder chose to send to ${CENTER_NAME} (default, institutional).`,
+          : `Elder chose to send to ${centerName} (default, institutional accountable partner for need: ${needCategory}).`,
     });
     audit.push({
       time: stamp(),
@@ -197,7 +201,7 @@ Deno.serve(async (req) => {
         elderMessage:
           recipientKind === "trusted"
             ? `I sent this to ${trustedName} (${trustedRel}). Your tracking number is ${trackingId}.`
-            : `I sent this to the ${CENTER_NAME}. Your tracking number is ${trackingId}.`,
+            : `I sent this to the ${centerName}. Your tracking number is ${trackingId}.`,
       },
       { headers: CORS },
     );

@@ -233,7 +233,7 @@ export async function cropToBounds(
 
 
 export type SendRecipient =
-  | { kind: "center" }
+  | { kind: "center"; partnerName?: string }
   | { kind: "trusted"; name: string; relationship: string };
 
 export async function sendToCenter(opts: {

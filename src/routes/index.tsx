@@ -14,7 +14,7 @@ import {
   type DocumentBounds,
   type SendResult,
 } from "@/lib/cases";
-import { getResources } from "@/lib/resources";
+import { getResources, getAccountablePartner } from "@/lib/resources";
 import { cancelSpeech, type VoiceAction } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
@@ -208,10 +208,15 @@ function ElderApp() {
     if (sending) return;
     setSending(true);
     try {
+      const partner = getAccountablePartner(analysis?.resourceCategory);
+      const enrichedRecipient =
+        recipient.kind === "center"
+          ? { kind: "center" as const, partnerName: partner.name }
+          : recipient;
       const result = await sendToCenter({
         originalImage: capturedImage,
         processedImage: processedImage ?? capturedImage,
-        recipient,
+        recipient: enrichedRecipient,
         analysis:
           analysis ?? {
             readable: false,
@@ -314,6 +319,7 @@ function ElderApp() {
             ) : phase === "choose" ? (
               <ChooseRecipientScreen
                 sending={sending}
+                analysis={analysis}
                 onBack={() => setPhase(analysis ? "review" : "retake")}
                 onPick={(r) => handleSend(r)}
                 speech={speech}
@@ -487,6 +493,7 @@ function RetakeScreen({
     playWarning();
   }, []);
   const voiceOn = useContext(VoiceOnContext);
+  const partner = getAccountablePartner(analysis?.resourceCategory);
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} face="x" />
@@ -518,7 +525,7 @@ function RetakeScreen({
           voiceOn={voiceOn}
           actions={[
             { id: "retry", label: "Try again", description: "Retake the photo" },
-            { id: "send", label: "Connect me with a person", description: "Send the photo to a real human at the legal aid center" },
+            { id: "send", label: "Connect me with a person", description: `Send the photo to a real human (a ${partner.name})` },
           ]}
           onAction={(id) => {
             if (id === "retry") onRetry();
@@ -549,9 +556,10 @@ function ReviewScreen({
 }) {
   const missing = analysis?.possibleMissingFields ?? [];
   const voiceOn = useContext(VoiceOnContext);
+  const partner = getAccountablePartner(analysis?.resourceCategory);
   const reviewActions: VoiceAction[] = [
     { id: "retake", label: "Retake", description: "Take the photo again" },
-    { id: "connect", label: "Connect me with a person", description: "Send the document to a real human at the legal aid center" },
+    { id: "connect", label: "Connect me with a person", description: `Send the document to a real human (a ${partner.name})` },
   ];
   const onReviewAction = (id: string) => {
     if (id === "retake") onRetake();
@@ -576,7 +584,7 @@ function ReviewScreen({
             I couldn't read it clearly.
           </p>
           <p style={{ fontSize: 16, color: "#6b5d52" }}>
-            I'd rather not guess. You can try again, or send it for a person at the Legal Aid Center to look at.
+            I'd rather not guess. You can try again, or send it for a person to look at.
           </p>
           {analyzeError && (
             <p className="mt-2 text-sm" style={{ color: "#b91c1c" }}>
@@ -757,7 +765,7 @@ function SentScreen({
 }) {
   const voiceOn = useContext(VoiceOnContext);
   const trackingId = sendResult?.trackingId ?? "—";
-  const centerName = sendResult?.centerName ?? "Legal Aid Center";
+  const centerName = sendResult?.centerName ?? getAccountablePartner(analysis?.resourceCategory).name;
   const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
   const missingCount = analysis?.possibleMissingFields.length ?? 0;
   // (voice actions wired below)
@@ -852,11 +860,13 @@ function SentScreen({
 
 function ChooseRecipientScreen({
   sending,
+  analysis,
   onBack,
   onPick,
   speech,
 }: {
   sending: boolean;
+  analysis: AnalysisResult | null;
   onBack: () => void;
   onPick: (r: Recipient) => void;
   speech: ReturnType<typeof useSpeech>;
@@ -865,6 +875,7 @@ function ChooseRecipientScreen({
   const [mode, setMode] = useState<"pick" | "trusted">("pick");
   const [name, setName] = useState("");
   const [relationship, setRelationship] = useState("");
+  const partner = getAccountablePartner(analysis?.resourceCategory);
 
   if (mode === "pick") {
     return (
@@ -884,7 +895,7 @@ function ChooseRecipientScreen({
         </p>
         <div className="space-y-3 mt-auto">
           <BigButton variant="danger" onClick={() => onPick({ kind: "center" })}>
-            {sending ? "Sending…" : "🤝 Connect me with the Legal Aid Center"}
+            {sending ? "Sending…" : `🤝 ${partner.label}`}
           </BigButton>
           <p
             className="text-center"
@@ -903,10 +914,10 @@ function ChooseRecipientScreen({
           </p>
           <BigButton variant="ghost" onClick={onBack}>← Go back</BigButton>
           <VoiceBar
-            speakableText={speakableForPhase("choose", { analysis: null, sendResult: null, analyzeError: null })}
+            speakableText={speakableForPhase("choose", { analysis, sendResult: null, analyzeError: null })}
             voiceOn={voiceOn}
             actions={[
-              { id: "center", label: "Connect me with the Legal Aid Center", description: "Send the document to the legal aid center (the recommended, accountable option)" },
+              { id: "center", label: partner.label, description: `Send the document to a ${partner.name} (the recommended, accountable option)` },
               { id: "trusted", label: "Send to my trusted person", description: "Open the form to enter a trusted contact the user picks themselves" },
               { id: "back", label: "Go back", description: "Return to the previous screen" },
             ]}
@@ -1157,12 +1168,13 @@ function speakableForPhase(
       const why = ctx.analysis?.elderMessage
         ? `${ctx.analysis.elderMessage} `
         : "";
-      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Connect me with a person to let a real person look at it, or say yes.`;
+      const partnerName = getAccountablePartner(ctx.analysis?.resourceCategory).name;
+      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Connect me with a person to let a ${partnerName} look at it, or say yes.`;
     }
     case "review": {
       if (!ctx.analysis) {
         const err = ctx.analyzeError ? ` Note: ${ctx.analyzeError}.` : "";
-        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Connect me with a person to send it to a person at the Legal Aid Center, or say yes.`;
+        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Connect me with a person to send it to a real person, or say yes.`;
       }
       const a = ctx.analysis;
       const title = a.documentName || a.documentType || "a document";
@@ -1176,15 +1188,18 @@ function speakableForPhase(
       const resourcesIntro = resources.length > 0
         ? ` Here are some places that can help you with this: ${resources.slice(0, 2).map(r => r.name + (r.contact ? ` — ${r.contact}` : "")).join(". ")}.`
         : " This doesn't look like a form you need help with. If you'd still like a person to look at it, I can send it.";
-      return `This looks like ${title}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to the Legal Aid Center, or say yes.`;
+      const partnerName = getAccountablePartner(a.resourceCategory).name;
+      return `This looks like ${title}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to a ${partnerName}, or say yes.`;
     }
-    case "choose":
-      return "Who should I send this to? Tap Connect me with the Legal Aid Center to send it to a person at the legal aid center, or say Legal Aid. Tap Send to my trusted person to send it to someone you pick yourself, like your own attorney or a trusted family member, or say trusted person. Tap Go back to return.";
+    case "choose": {
+      const partner = getAccountablePartner(ctx.analysis?.resourceCategory);
+      return `Who should I send this to? Tap ${partner.label} to send it to a real person at an accountable institution, or say yes. Tap Send to my trusted person to send it to someone you pick yourself, like your own attorney or a trusted family member, or say trusted person. Tap Go back to return.`;
+    }
 
     case "sent": {
       const r = ctx.sendResult;
       const id = r?.trackingId ?? "pending";
-      const center = r?.centerName ?? "Legal Aid Center";
+      const center = r?.centerName ?? getAccountablePartner(ctx.analysis?.resourceCategory).name;
       const isReview = (r?.status ?? "needs_review") === "needs_review";
       const closing = isReview
         ? "I won't guess on something this important. A real person will check it for you."
