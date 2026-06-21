@@ -152,7 +152,7 @@ function ElderApp() {
 
     let cropped: string;
     try {
-      cropped = await cropToBounds(result.original, cropBounds, 0.03);
+      cropped = await cropToBounds(result.original, cropBounds, 0.012);
     } catch {
       cropped = result.processed ?? result.original;
     }
@@ -166,7 +166,7 @@ function ElderApp() {
     const claudeBounds = analysisResult?.documentBounds ?? null;
     if (isValidBounds(claudeBounds)) {
       try {
-        const refined = await cropToBounds(result.original, claudeBounds!, 0.03);
+        const refined = await cropToBounds(result.original, claudeBounds!, 0.012);
         setProcessedImage(refined);
       } catch { /* keep prior cropped */ }
     }
