@@ -23,6 +23,8 @@ export type PersistentVoiceProps = {
   helpHint?: string;
   /** Universal "back" intent. */
   onBack?: () => void;
+  /** Universal "I'm done / no thank you" intent — warm exit to home. */
+  onDone?: () => void;
   /** Per-screen intent handler. Return true if you handled the transcript. */
   onCommand?: (transcript: string, helpers: { confirm: (msg: string) => void }) => boolean;
   /** Current screen id passed to the AI interpreter. */
@@ -39,6 +41,7 @@ export function PersistentVoice({
   speakable,
   helpHint,
   onBack,
+  onDone,
   onCommand,
   screenId,
   actions,
@@ -56,6 +59,7 @@ export function PersistentVoice({
   const speakableRef = useRef(speakable);
   const onCommandRef = useRef(onCommand);
   const onBackRef = useRef(onBack);
+  const onDoneRef = useRef(onDone);
   const helpRef = useRef(helpHint);
   const screenRef = useRef(screenId);
   const actionsRef = useRef(actions);
@@ -65,6 +69,7 @@ export function PersistentVoice({
   useEffect(() => { speakableRef.current = speakable; }, [speakable]);
   useEffect(() => { onCommandRef.current = onCommand; }, [onCommand]);
   useEffect(() => { onBackRef.current = onBack; }, [onBack]);
+  useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
   useEffect(() => { helpRef.current = helpHint; }, [helpHint]);
   useEffect(() => { screenRef.current = screenId; }, [screenId]);
   useEffect(() => { actionsRef.current = actions; }, [actions]);
@@ -115,6 +120,17 @@ export function PersistentVoice({
         return;
       }
     }
+    // Universal: done / no thank you / I'm okay → warm farewell to home
+    if (
+      /\b(no thank you|no thanks|no thank's|i'm done|im done|i am done|that's all|thats all|that is all|i'm okay|im okay|i'm ok|im ok|i am ok|go home|all done|we'?re done|done now|nothing else|no more|finish|finished|good bye|goodbye|bye)\b/.test(t)
+    ) {
+      if (onDoneRef.current) {
+        lastCmdAtRef.current = now;
+        speakConfirm("Alright, have a good day.");
+        window.setTimeout(() => { onDoneRef.current?.(); }, 1200);
+        return;
+      }
+    }
     // Universal: help
     if (/\b(help|what do i do|what now|i'm stuck|im stuck|hint)\b/.test(t)) {
       lastCmdAtRef.current = now;
@@ -127,17 +143,28 @@ export function PersistentVoice({
     const handled = onCommandRef.current?.(t, { confirm: speakConfirm });
     if (handled) { lastCmdAtRef.current = now; return; }
 
-    // AI-interpreted fallback for natural phrasing
+    // AI-interpreted fallback for natural phrasing.
+    // Always include a "done" action so polite/indirect exits like "I think
+    // I'm good now" still route to the warm farewell.
     const scr = screenRef.current;
-    const acts = actionsRef.current;
+    const baseActs = actionsRef.current ?? [];
     const dispatch = onActionRef.current;
-    if (!scr || !acts || acts.length === 0 || !dispatch) return;
+    const acts: IntentAction[] = onDoneRef.current
+      ? [
+          ...baseActs,
+          { id: "__done__", description: "The user politely wants to stop and exit — any 'no thank you', 'I'm okay', 'I'm done', 'that's all', 'go home' style phrasing" },
+        ]
+      : baseActs;
+    if (!scr || acts.length === 0 || (!dispatch && !onDoneRef.current)) return;
     if (interpretingRef.current) return;
     interpretingRef.current = true;
     lastCmdAtRef.current = now;
     void interpretIntent(t, scr, acts)
       .then(({ action, confidence }) => {
-        if (action && action !== "none" && confidence >= 0.5) {
+        if (action === "__done__" && confidence >= 0.5 && onDoneRef.current) {
+          speakConfirm("Alright, have a good day.");
+          window.setTimeout(() => { onDoneRef.current?.(); }, 1200);
+        } else if (action && action !== "none" && action !== "__done__" && confidence >= 0.5 && dispatch) {
           dispatch(action, { confirm: speakConfirm });
         } else {
           speakConfirm("Sorry, I didn't catch that — you can tap a button.");

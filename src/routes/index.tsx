@@ -282,6 +282,7 @@ function ElderApp() {
             speakable={speakableForPhase(phase, { analysis, sendResult, analyzeError })}
             helpHint={helpHintForPhase(phase)}
             onBack={getBackForPhase(phase, { setPhase, analysis, navigate })}
+            onDone={() => { speech.cancel(); restart(); setPhase("home"); }}
             onCommand={(t, { confirm }) =>
               handlePhaseCommand(t, confirm, {
                 phase,
@@ -350,6 +351,7 @@ function ElderApp() {
                 analysis={analysis}
                 onRetry={() => setPhase("magnifier")}
                 onSendAnyway={() => setPhase("choose")}
+                onDone={() => { speakWarm("Alright, have a good day."); setTimeout(() => { restart(); setPhase("home"); }, 1200); }}
                 sending={sending}
                 speech={speech}
               />
@@ -361,6 +363,7 @@ function ElderApp() {
                 analyzeError={analyzeError}
                 onSend={() => setPhase("choose")}
                 onRetake={() => setPhase("magnifier")}
+                onDone={() => { speakWarm("Alright, have a good day."); setTimeout(() => { restart(); setPhase("home"); }, 1200); }}
                 speech={speech}
               />
             ) : phase === "choose" ? (
@@ -599,12 +602,14 @@ function RetakeScreen({
   analysis,
   onRetry,
   onSendAnyway,
+  onDone,
   sending,
   speech,
 }: {
   analysis: AnalysisResult | null;
   onRetry: () => void;
   onSendAnyway: () => void;
+  onDone: () => void;
   sending: boolean;
   speech: ReturnType<typeof useSpeech>;
 }) {
@@ -639,16 +644,19 @@ function RetakeScreen({
         <BigButton variant="ghost" onClick={onSendAnyway}>
           {sending ? "Sending…" : "🤝 Connect me with a person"}
         </BigButton>
+        <DoneButton onClick={onDone} />
         <VoiceBar
           speakableText={speakableForPhase("retake", { analysis, sendResult: null, analyzeError: null })}
           voiceOn={voiceOn}
           actions={[
             { id: "retry", label: "Try again", description: "Retake the photo" },
             { id: "send", label: "Connect me with a person", description: `Send the photo to a real human (a ${partner.name})` },
+            { id: "done", label: "No thanks — I'm done", description: "Politely exit and go home" },
           ]}
           onAction={(id) => {
             if (id === "retry") onRetry();
             else if (id === "send") onSendAnyway();
+            else if (id === "done") onDone();
           }}
         />
       </div>
@@ -664,6 +672,7 @@ function ReviewScreen({
   analyzeError,
   onSend,
   onRetake,
+  onDone,
   speech,
 }: {
   analysis: AnalysisResult | null;
@@ -671,6 +680,7 @@ function ReviewScreen({
   analyzeError: string | null;
   onSend: () => void;
   onRetake: () => void;
+  onDone: () => void;
   speech: ReturnType<typeof useSpeech>;
 }) {
   const missing = analysis?.possibleMissingFields ?? [];
@@ -679,10 +689,12 @@ function ReviewScreen({
   const reviewActions: VoiceAction[] = [
     { id: "retake", label: "Retake", description: "Take the photo again" },
     { id: "connect", label: "Connect me with a person", description: `Send the document to a real human (a ${partner.name})` },
+    { id: "done", label: "No thanks — I'm done", description: "Politely exit and go home" },
   ];
   const onReviewAction = (id: string) => {
     if (id === "retake") onRetake();
     else if (id === "connect") onSend();
+    else if (id === "done") onDone();
   };
 
   useEffect(() => {
@@ -716,6 +728,7 @@ function ReviewScreen({
           <BigButton variant="danger" onClick={onSend}>
             {sending ? "Sending…" : "🤝 Connect me with a person"}
           </BigButton>
+          <DoneButton onClick={onDone} />
           <VoiceBar
             speakableText={speakableForPhase("review", { analysis: null, sendResult: null, analyzeError })}
             voiceOn={voiceOn}
@@ -852,6 +865,7 @@ function ReviewScreen({
         <BigButton variant="danger" onClick={onSend}>
           {sending ? "Sending…" : "🤝 Connect me with a person"}
         </BigButton>
+        <DoneButton onClick={onDone} />
         <VoiceBar
           speakableText={speakableForPhase("review", {
             analysis,
@@ -1708,4 +1722,25 @@ function runPhaseAction(
     case "open_center": confirm("Opening the center."); navigate({ to: "/center" }); return;
     default: return;
   }
+}
+
+function DoneButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full font-bold active:scale-[0.97] transition"
+      style={{
+        background: "transparent",
+        color: "#6b5d52",
+        border: "2px dashed #d8cdb8",
+        borderRadius: 18,
+        padding: "12px 16px",
+        fontSize: 16,
+        minHeight: 52,
+      }}
+      aria-label="No thanks, I'm done"
+    >
+      👋 No thanks — I&apos;m done
+    </button>
+  );
 }
