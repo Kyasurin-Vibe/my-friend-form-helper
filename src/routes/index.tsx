@@ -724,3 +724,55 @@ function BigButton({
     </button>
   );
 }
+
+// ===== speakableText per screen — covers ALL visible meaningful text =====
+function speakableForPhase(
+  phase: Phase,
+  ctx: {
+    analysis: AnalysisResult | null;
+    sendResult: SendResult | null;
+    analyzeError: string | null;
+  },
+): string {
+  switch (phase) {
+    case "start":
+      return "My Friend. How would you like me to help? Tap Talk to me to hear everything out loud. Tap Show me words for big captions with no sound. Tap Both for voice and captions together.";
+    case "find":
+      return "Ready to find your document? I'll open the magnifier so you can see clearly first. Nothing is uploaded yet. Tap the red Open Magnifier button when you're ready, or say yes.";
+    case "magnifier":
+      return "Point the camera at your paper. Keep the corners inside the frame. I'll capture it when it looks clear.";
+    case "analyzing":
+      return "Let me look at this. Reading your paper carefully. This takes just a few seconds.";
+    case "retake": {
+      const why = ctx.analysis?.elderMessage
+        ? `${ctx.analysis.elderMessage} `
+        : "";
+      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Send for human review to let a real person look at it, or say yes.`;
+    }
+    case "review": {
+      if (!ctx.analysis) {
+        const err = ctx.analyzeError ? ` Note: ${ctx.analyzeError}.` : "";
+        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Send for review to send it to a person at the Legal Aid Center, or say yes.`;
+      }
+      const a = ctx.analysis;
+      const title = a.documentName || a.documentType || "a document";
+      const summary = a.plainEnglishSummary ? ` ${a.plainEnglishSummary}` : "";
+      const missing = a.possibleMissingFields ?? [];
+      const missingPart =
+        missing.length > 0
+          ? ` I see some spots that may need attention: ${missing.join("; ")}.`
+          : " Nothing obviously missing. A person will still confirm before anything is filed.";
+      return `This looks like ${title}.${summary}${missingPart} Tap Retake to take another photo, or say no. Tap Send it to send to the Legal Aid Center, or say yes.`;
+    }
+    case "sent": {
+      const r = ctx.sendResult;
+      const id = r?.trackingId ?? "pending";
+      const center = r?.centerName ?? "Legal Aid Center";
+      const isReview = (r?.status ?? "needs_review") === "needs_review";
+      const closing = isReview
+        ? "I won't guess on something this important. A real person will check it for you."
+        : "A person will confirm it before anything is filed.";
+      return `All done. Your tracking number is ${id}. Delivered to ${center}. ${closing} You don't have to do anything else right now. Tap Start over to begin again, or say no. Tap See the center's side to view the staff dashboard, or say yes.`;
+    }
+  }
+}
