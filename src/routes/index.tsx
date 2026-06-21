@@ -1026,6 +1026,19 @@ function TrustedPersonForm({
         placeholder="e.g. my attorney, my daughter, my pastor"
         ariaLabel="How do you know them"
       />
+      <label
+        className="font-bold mt-3"
+        style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
+      >
+        Their email or phone
+      </label>
+      <VoiceField
+        value={email}
+        onChange={onChangeEmail}
+        placeholder="e.g. jane@gmail.com"
+        ariaLabel="Their email or phone"
+        normalize={normalizeSpokenEmail}
+      />
       <div className="space-y-2 mt-auto pt-4">
         <BigButton variant="danger" onClick={onSend}>
           {sending ? "Sending…" : `📨 Send to ${name.trim() || "this person"}`}
