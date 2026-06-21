@@ -242,11 +242,12 @@ function ElderApp() {
               />
             ) : phase === "preview" ? (
               <PreviewScreen
-                image={capturedImage}
+                image={processedImage ?? capturedImage}
                 speech={speech}
                 onUse={runAnalyze}
                 onRetake={() => setPhase("magnifier")}
               />
+
             ) : phase === "analyzing" ? (
               <AnalyzingScreen />
             ) : phase === "retake" ? (
