@@ -940,7 +940,7 @@ function ReviewScreen({
           if (resources.length === 0) {
             return (
               <p style={{ fontSize: 16, color: "#6b5d52" }}>
-                This doesn&apos;t look like a form you need help with. If you&apos;d still like a person to look at it, I can send it.
+                {t("not_a_form")}
               </p>
             );
           }
@@ -1591,7 +1591,7 @@ function speakableForPhase(
       const resources = getResources(a.resourceCategory);
       const resourcesIntro = resources.length > 0
         ? ` Here are some places that can help you with this: ${resources.slice(0, 2).map(r => r.name + (r.contact ? ` — ${r.contact}` : "")).join(". ")}.`
-        : " This doesn't look like a form you need help with. If you'd still like a person to look at it, I can send it.";
+        : ` ${t("not_a_form")}`;
       const partnerName = getAccountablePartner(a.resourceCategory).name;
       return `This looks like ${aiText(title)}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to a ${partnerName}, or say yes.`;
     }
