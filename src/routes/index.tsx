@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, createContext, useContext } from "react";
 import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
+import { SimpleMagnifier } from "@/components/SimpleMagnifier";
 import { VoiceBar } from "@/components/VoiceBar";
 import { useSpeech } from "@/lib/useSpeech";
 import {
