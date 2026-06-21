@@ -86,22 +86,31 @@ function ElderApp() {
   async function handleCapture(image?: string) {
     setCapturedImage(image);
     if (!image) {
-      // Camera failed — go straight to human review path.
       setAnalysis(null);
       setPhase("review");
+      return;
+    }
+    // Show the preview screen first — user confirms before we send to Claude.
+    setAnalyzeError(null);
+    setPhase("preview");
+  }
+
+  async function runAnalyze() {
+    const image = capturedImage;
+    if (!image) {
+      setPhase("magnifier");
       return;
     }
     setPhase("analyzing");
     setAnalyzeError(null);
     const startedAt = Date.now();
-    const minDisplay = 1200; // keep the loading screen visible long enough to see
+    const minDisplay = 1200;
     try {
       const result = await analyzeDocument(image);
       const elapsed = Date.now() - startedAt;
       if (elapsed < minDisplay) {
         await new Promise((r) => setTimeout(r, minDisplay - elapsed));
       }
-      // AI backstop: if Claude doesn't see a real document, return to camera.
       const looksLikeDoc =
         result.readable &&
         result.documentType &&
@@ -130,6 +139,7 @@ function ElderApp() {
       setPhase("review");
     }
   }
+
 
   async function handleSend() {
     if (sending) return;
