@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cases: {
+        Row: {
+          ai_summary: string | null
+          audit_trail: Json
+          confidence: number | null
+          created_at: string
+          doc_name: string | null
+          doc_type: string | null
+          id: string
+          image_url: string | null
+          initials: string | null
+          possible_missing_fields: Json
+          status: string
+          tracking_id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_summary?: string | null
+          audit_trail?: Json
+          confidence?: number | null
+          created_at?: string
+          doc_name?: string | null
+          doc_type?: string | null
+          id?: string
+          image_url?: string | null
+          initials?: string | null
+          possible_missing_fields?: Json
+          status?: string
+          tracking_id: string
+          updated_at?: string
+        }
+        Update: {
+          ai_summary?: string | null
+          audit_trail?: Json
+          confidence?: number | null
+          created_at?: string
+          doc_name?: string | null
+          doc_type?: string | null
+          id?: string
+          image_url?: string | null
+          initials?: string | null
+          possible_missing_fields?: Json
+          status?: string
+          tracking_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
