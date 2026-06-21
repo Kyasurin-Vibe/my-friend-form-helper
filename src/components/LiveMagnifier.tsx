@@ -107,7 +107,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     const W = 96, H = 72;
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true } as any);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
     if (!ctx) return;
     let detectedStreak = 0;
     const id = window.setInterval(() => {
