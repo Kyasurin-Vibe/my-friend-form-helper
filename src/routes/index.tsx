@@ -293,10 +293,11 @@ function ElderApp() {
                 restart,
                 handleSend,
                 analysis,
+                setChooseMode,
               })
             }
-            screenId={phase}
-            actions={getPhaseActions(phase)}
+            screenId={phase === "choose" ? (`choose:${chooseMode}` as Phase) : phase}
+            actions={getPhaseActions(phase, chooseMode)}
             onAction={(id, { confirm }) =>
               runPhaseAction(id, confirm, {
                 phase,
@@ -306,6 +307,7 @@ function ElderApp() {
                 restart,
                 handleSend,
                 analysis,
+                setChooseMode,
               })
             }
           />
