@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getLang, getBCP47, getTTSVoice, ttsSupportsDeepgram, translateAsync, translateSync } from "@/lib/i18n";
+import { getLang, getBCP47, getTTSVoice, ttsSupportsDeepgram, translateAsync, translateSync, splitAiSegments, stripAiMarkers } from "@/lib/i18n";
 
 
 export type Branch = "missing" | "complete";
