@@ -307,7 +307,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         break;
       }
       case "no":
-        setDetected(null);
+        setDetectionBox(null);
         setCountdown(0);
         setGuidance("corners");
         break;
