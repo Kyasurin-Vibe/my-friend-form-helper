@@ -543,43 +543,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         <p className="text-center" style={{ fontSize: 14, color: "#6b5d52", minHeight: 20 }}>
           {t("scan_hint")}
         </p>
-        {heard && listening && (
-          <p className="text-center" style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}>
-            &quot;{heard}&quot;
-          </p>
-        )}
-        {voiceError && (
-          <div className="text-center mt-1">
-            <p style={{ fontSize: 13, color: "#b91c1c", fontWeight: 700 }}>{voiceError}</p>
-            <button onClick={() => {
-              shouldListenRef.current = true; setVoiceArmed(true); setVoiceError(null); startVoice();
-            }} style={{
-              marginTop: 6, background: "var(--color-elder-primary)", color: "#fff", border: 0,
-              borderRadius: 12, padding: "8px 14px", fontWeight: 800, fontSize: 14,
-            }}>{t("enable_voice")}</button>
-          </div>
-        )}
       </div>
 
-      <div className="px-4 pt-2 flex justify-center gap-2 flex-wrap">
-        {/* Auto-capture toggle removed — capture only fires on voice "yes" or tapping Capture */}
-        <button onClick={() => {
-          if (voiceArmed) {
-            shouldListenRef.current = false;
-            try { DemoServices.voice.stop(); } catch { /* noop */ }
-            setVoiceArmed(false); setListening(false);
-          } else {
-            setVoiceError(null); setVoiceArmed(true);
-          }
-        }} aria-pressed={voiceArmed} style={{
-          background: voiceArmed ? (listening ? "#16a34a" : "var(--color-elder-primary)") : "#fff",
-          color: voiceArmed ? "#fff" : "var(--color-elder-ink)",
-          border: "2px solid var(--color-elder-primary)",
-          borderRadius: 999, padding: "8px 14px", fontWeight: 800, fontSize: 14,
-          boxShadow: voiceArmed && listening ? "0 0 0 6px rgba(34,197,94,0.18)" : "none",
-          transition: "all 0.2s",
-        }}>{voiceArmed ? t("voice_label_on") : t("voice_label_off")}</button>
-      </div>
 
       <div className="px-4 pt-3 pb-5 mt-auto">
         <button onClick={doCapture} disabled={!!error}
