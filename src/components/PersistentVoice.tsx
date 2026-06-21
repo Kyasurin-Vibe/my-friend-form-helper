@@ -227,6 +227,24 @@ export function PersistentVoice({
     };
   }, [active, startLoop]);
 
+  // When our own TTS just finished, flush the recognition session — its
+  // buffer is full of our own voice. Restart cleanly so the next user word
+  // is the first thing it hears.
+  useEffect(() => {
+    if (!active) return;
+    let wasPlaying = false;
+    const iv = window.setInterval(() => {
+      const playing = isTTSPlaying();
+      if (wasPlaying && !playing && shouldRunRef.current) {
+        try { DemoServices.voice.stop(); } catch { /* noop */ }
+        setTranscript("");
+        window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 200);
+      }
+      wasPlaying = playing;
+    }, 250);
+    return () => window.clearInterval(iv);
+  }, [active, startLoop, isTTSPlaying]);
+
   // When voice is enabled and not running because mode says off, hide everything.
   if (!enabledFromMode) return null;
 
