@@ -276,7 +276,7 @@ function ElderApp() {
               />
             ) : phase === "preview" ? (
               <PreviewScreen
-                image={processedImage ?? capturedImage}
+                image={processedImage}
                 speech={speech}
                 onUse={confirmPreview}
                 onRetake={() => setPhase("magnifier")}
