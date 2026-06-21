@@ -250,3 +250,16 @@ export function useTranslated(text: string): string {
   return translateSync(text, lang);
 }
 
+/** React hook: returns t(key) and re-renders when language or async cache updates. */
+export function useT(key: string): string {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const offL = onLangChange(() => { if (alive) bump((n) => n + 1); });
+    const offT = onTranslate(() => { if (alive) bump((n) => n + 1); });
+    return () => { alive = false; offL(); offT(); };
+  }, []);
+  return t(key);
+}
+
+
