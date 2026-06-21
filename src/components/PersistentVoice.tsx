@@ -11,7 +11,7 @@ import { DemoServices } from "@/lib/services";
 import { cancelSpeech } from "@/lib/voice";
 import { speakWarm } from "@/lib/cases";
 import { interpretIntent, type IntentAction } from "@/lib/intent";
-import { getBCP47, getLang, translateAsync, translateSync } from "@/lib/i18n";
+import { getBCP47, getLang, translateAsync, translateSync, useT } from "@/lib/i18n";
 
 export type PersistentVoiceProps = {
   /** Pause continuous listening (e.g. while another screen owns the mic). */
