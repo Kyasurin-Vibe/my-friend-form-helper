@@ -2,6 +2,7 @@
 // constrained intent mapping. The frontend never sees DEEPGRAM_API_KEY.
 
 import { supabase } from "@/integrations/supabase/client";
+import { getLang } from "@/lib/i18n";
 
 export type VoiceIntent = "confirm" | "cancel" | "repeat" | "unknown";
 
@@ -79,7 +80,8 @@ export async function startRecording(maxMs = 4000): Promise<{
 
 // Send audio to the transcribe edge function. ~2s timeout for snappy UX.
 export async function transcribeAudio(blob: Blob, timeoutMs = 2500): Promise<string> {
-  const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe`;
+  const lang = getLang();
+  const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe?language=${encodeURIComponent(lang)}`;
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);

@@ -8,19 +8,21 @@ const MODEL = "claude-sonnet-4-5";
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   try {
-    const { transcript, screen, actions } = await req.json();
+    const { transcript, screen, actions, language } = await req.json();
     if (!transcript || !Array.isArray(actions) || actions.length === 0) {
       return Response.json({ action: "none", confidence: 0 }, { headers: CORS });
     }
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) return Response.json({ action: "none", confidence: 0 }, { headers: CORS });
 
+    const LANG_NAME: Record<string, string> = { en: "English", es: "Spanish", zh: "Chinese", vi: "Vietnamese", tl: "Tagalog" };
+    const langName = LANG_NAME[(language || "en").toLowerCase()] ?? "English";
     const list = actions.map((a: any) => `- ${a.id}: ${a.description}`).join("\n");
     const system =
-      `You map an elderly user's spoken words to ONE app action. They are on the "${screen}" ` +
+      `You map an elderly user's spoken words to ONE app action. The user is speaking ${langName}. They are on the "${screen}" ` +
       `screen. Available actions:\n${list}\n\nReturn JSON ONLY: ` +
       `{"action":"<one action id, or 'none'>","confidence":0..1}. Pick "none" if nothing ` +
-      `clearly matches. Understand natural, indirect phrasing — e.g. "help me see this" / ` +
+      `clearly matches. Understand natural, indirect phrasing in any language — e.g. "help me see this" / ` +
       `"I can't read this" → a magnify/see action; "I have a question about my paper" → the ` +
       `scan/question action; "send it" / "connect me" → the connect/send action.`;
 

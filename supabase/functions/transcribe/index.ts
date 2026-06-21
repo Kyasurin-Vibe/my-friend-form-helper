@@ -25,8 +25,14 @@ Deno.serve(async (req) => {
     if (!audio.byteLength)
       return Response.json({ error: "empty_audio" }, { status: 400, headers: CORS });
 
+    const url0 = new URL(req.url);
+    const langParam = (url0.searchParams.get("language") || "en").toLowerCase();
+    const LANG_MAP: Record<string, string> = { en: "en", es: "es", zh: "zh-CN", vi: "vi", tl: "tl" };
+    const dgLang = LANG_MAP[langParam] || "en";
+    // Use nova-2 for English; nova-2-general for others.
+    const model = dgLang === "en" ? "nova-2" : "nova-2-general";
     const url =
-      "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&language=en";
+      `https://api.deepgram.com/v1/listen?model=${model}&smart_format=true&punctuate=true&language=${encodeURIComponent(dgLang)}`;
     const r = await fetch(url, {
       method: "POST",
       headers: { Authorization: `Token ${apiKey}`, "Content-Type": contentType },

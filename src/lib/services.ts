@@ -1,6 +1,9 @@
 // Clean service abstractions for My Friend.
 // Real APIs can be wired later (Deepgram for STT, Claude/OpenAI/Gemini for vision).
 // For the hackathon, Demo / Web Speech fallbacks keep the flow working without keys.
+import { getBCP47 } from "@/lib/i18n";
+
+
 
 // ============ Voice Recognition ============
 
@@ -66,7 +69,9 @@ export function createWebSpeechService(): VoiceRecognitionService {
       rec = new Ctor();
       rec.continuous = true;
       rec.interimResults = true;
-      rec.lang = "en-US";
+      // Use the active app language so the mic actually understands the user.
+      try { rec.lang = getBCP47(); } catch { rec.lang = "en-US"; }
+
       rec.onstart = () => {
         running = true;
         cb.onStart?.();
@@ -93,6 +98,7 @@ export function createWebSpeechService(): VoiceRecognitionService {
         cb.onError?.(err?.message || "could not start");
       }
     },
+
     stop() {
       try {
         rec?.stop();

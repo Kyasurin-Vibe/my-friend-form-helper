@@ -19,6 +19,7 @@ import {
 import { getResources, getAccountablePartner, normalizeSpokenEmail } from "@/lib/resources";
 import { cancelSpeech, startRecording, transcribeAudio, type VoiceAction } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
+import { LANG_LABELS, type Lang, setLang, t, onLangChange } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/")({
 
 export type A11yMode = "voice" | "text" | "both";
 type Phase =
+  | "language"
   | "start"
   | "home"
   | "viewer"
@@ -74,7 +76,14 @@ function isValidBounds(b: DocumentBounds | null | undefined): boolean {
 
 function ElderApp() {
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
-  const [phase, setPhase] = useState<Phase>("home");
+  const [phase, setPhase] = useState<Phase>(
+    typeof window !== "undefined" && localStorage.getItem("mf_lang") ? "home" : "language",
+  );
+  const [, forceRerender] = useState(0);
+  useEffect(() => {
+    const off = onLangChange(() => forceRerender((n) => n + 1));
+    return () => { off(); };
+  }, []);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
   const [processedImage, setProcessedImage] = useState<string | undefined>(undefined);
@@ -315,7 +324,11 @@ function ElderApp() {
 
           <CaptionsContext.Provider value={showCaptions}>
            <VoiceOnContext.Provider value={voiceOn}>
-            {phase === "start" ? (
+            {phase === "language" ? (
+              <LanguagePickerScreen
+                onPick={(l) => { setLang(l); setPhase("home"); }}
+              />
+            ) : phase === "start" ? (
               <StartGate
                 onStart={(mode) => {
                   setA11yMode(mode);
@@ -326,6 +339,7 @@ function ElderApp() {
               <HomeScreen
                 onMagnifier={() => setPhase("viewer")}
                 onScanner={() => setPhase("find")}
+                onChangeLang={() => setPhase("language")}
               />
             ) : phase === "viewer" ? (
               <SimpleMagnifier
@@ -406,6 +420,56 @@ function ElderApp() {
     </div>
   );
 }
+function LanguagePickerScreen({ onPick }: { onPick: (l: Lang) => void }) {
+  const langs: Lang[] = ["en", "es", "zh", "vi", "tl"];
+  const speakLabel = (l: Lang) => {
+    try {
+      const u = new SpeechSynthesisUtterance(LANG_LABELS[l].native);
+      u.rate = 0.95; u.pitch = 1.05;
+      const bcp: Record<Lang, string> = { en: "en-US", es: "es-ES", zh: "zh-CN", vi: "vi-VN", tl: "fil-PH" };
+      u.lang = bcp[l];
+      try {
+        const v = window.speechSynthesis.getVoices().find((vv) => vv.lang?.toLowerCase().startsWith(u.lang.toLowerCase().slice(0, 2)));
+        if (v) u.voice = v;
+      } catch { /* noop */ }
+      window.speechSynthesis.speak(u);
+    } catch { /* noop */ }
+  };
+  return (
+    <div className="flex-1 flex flex-col items-center p-6 text-center">
+      <Mascot mode="idle" size={120} />
+      <h1 className="mt-3 font-extrabold" style={{ fontSize: 22, color: "var(--color-elder-ink)", lineHeight: 1.35 }}>
+        What language do you speak?<br />
+        <span style={{ fontSize: 16, fontWeight: 700, color: "#6b5d52" }}>
+          ¿Qué idioma habla? · 您说什么语言? · Bạn nói ngôn ngữ nào? · Anong wika ang gusto mo?
+        </span>
+      </h1>
+      <div className="w-full space-y-3 mt-5">
+        {langs.map((l) => (
+          <button
+            key={l}
+            onClick={() => { speakLabel(l); setTimeout(() => onPick(l), 250); }}
+            onFocus={() => speakLabel(l)}
+            className="w-full font-extrabold active:scale-[0.96] animate-button-pop"
+            style={{
+              background: "#fff",
+              color: "var(--color-elder-ink)",
+              border: "3px solid var(--color-elder-sky)",
+              borderRadius: 22,
+              padding: "20px 22px",
+              fontSize: 26,
+              minHeight: 78,
+              boxShadow: "0 6px 18px rgba(47,111,176,0.12)",
+            }}
+          >
+            {LANG_LABELS[l].native}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
   const choose = (mode: A11yMode) => {
@@ -454,20 +518,39 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
 function HomeScreen({
   onMagnifier,
   onScanner,
+  onChangeLang,
 }: {
   onMagnifier: () => void;
   onScanner: () => void;
+  onChangeLang: () => void;
 }) {
   const voiceOn = useContext(VoiceOnContext);
   return (
-    <div className="flex-1 flex flex-col items-center p-6 text-center">
+    <div className="flex-1 flex flex-col items-center p-6 text-center relative">
+      <button
+        type="button"
+        onClick={() => { cancelSpeech(); onChangeLang(); }}
+        aria-label="Change language"
+        className="absolute top-3 right-3 font-bold active:scale-[0.96]"
+        style={{
+          background: "#fff",
+          color: "var(--color-elder-ink)",
+          border: "2px solid var(--color-elder-sky)",
+          borderRadius: 999,
+          padding: "6px 12px",
+          fontSize: 13,
+          boxShadow: "0 4px 12px rgba(47,111,176,0.12)",
+        }}
+      >
+        {t("lang.change")}
+      </button>
       <div className="flex-1 flex flex-col items-center justify-center w-full">
         <Mascot mode="idle" size={130} />
         <h1 className="mt-3 font-extrabold" style={{ fontSize: 30, color: "var(--color-elder-ink)" }}>
-          My Friend
+          {t("home.title")}
         </h1>
         <p className="mt-1 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
-          How can I help you today?
+          {t("home.subtitle")}
         </p>
         <div className="w-full space-y-4">
           <button
@@ -484,9 +567,9 @@ function HomeScreen({
               boxShadow: "0 8px 22px rgba(47,111,176,0.14)",
             }}
           >
-            <div style={{ fontSize: 26 }}>🔍 Help me see this</div>
+            <div style={{ fontSize: 26 }}>{t("home.see")}</div>
             <div style={{ fontSize: 15, color: "#6b5d52", fontWeight: 600, marginTop: 4 }}>
-              Open the magnifier — just look, no upload.
+              {t("home.see.sub")}
             </div>
           </button>
           <button
@@ -503,9 +586,9 @@ function HomeScreen({
               boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
             }}
           >
-            <div style={{ fontSize: 26 }}>❓ I have a question about a document</div>
+            <div style={{ fontSize: 26 }}>{t("home.scan")}</div>
             <div style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", fontWeight: 600, marginTop: 4 }}>
-              Scan it and I'll read it out and find help.
+              {t("home.scan.sub")}
             </div>
           </button>
         </div>
@@ -522,6 +605,7 @@ function HomeScreen({
     </div>
   );
 }
+
 
 function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
   const voiceOn = useContext(VoiceOnContext);
@@ -1438,6 +1522,8 @@ function speakableForPhase(
   },
 ): string {
   switch (phase) {
+    case "language":
+      return "What language do you speak? ¿Qué idioma habla? 您说什么语言?";
     case "start":
       return "My Friend. How would you like me to help? Tap Talk to me to hear everything out loud. Tap Show me words for big captions with no sound. Tap Both for voice and captions together.";
     case "home":

@@ -3,6 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getLang, getBCP47, getTTSVoice, ttsSupportsDeepgram } from "@/lib/i18n";
+
 
 export type Branch = "missing" | "complete";
 
@@ -56,7 +58,7 @@ export const CENTER_NAME = "Legal Aid Center";
 
 export async function analyzeDocument(imageDataUrl: string, userGoal?: string): Promise<AnalysisResult> {
   const { data, error } = await supabase.functions.invoke("analyze-document", {
-    body: { image: imageDataUrl, userGoal },
+    body: { image: imageDataUrl, userGoal, language: getLang() },
   });
   if (error) throw error;
   return data as AnalysisResult;
@@ -303,13 +305,27 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number }): Pr
       const u = new SpeechSynthesisUtterance(text);
       u.rate = 0.95;
       u.pitch = 1.05;
+      u.lang = getBCP47();
+      // Pick a voice matching the language if available.
+      try {
+        const voices = window.speechSynthesis.getVoices();
+        const match = voices.find((v) => v.lang?.toLowerCase().startsWith(u.lang.toLowerCase().slice(0, 2)));
+        if (match) u.voice = match;
+      } catch { /* noop */ }
       window.speechSynthesis.speak(u);
     } catch { /* noop */ }
   };
 
+  // Deepgram Aura v1 is English-only — for other languages use the browser
+  // voice with the matching lang code.
+  if (!ttsSupportsDeepgram()) {
+    fallback();
+    return;
+  }
+
   try {
     const fetchPromise = supabase.functions.invoke("tts", {
-      body: { text },
+      body: { text, voice: getTTSVoice(), language: getLang() },
       // @ts-expect-error supabase-js supports responseType: 'blob' at runtime
       responseType: "blob",
     });
@@ -334,4 +350,5 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number }): Pr
     fallback();
   }
 }
+
 

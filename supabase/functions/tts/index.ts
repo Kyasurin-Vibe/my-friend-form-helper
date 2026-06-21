@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: CORS });
 
   try {
-    const { text, voice } = (await req.json()) as { text?: string; voice?: string };
+    const { text, voice, language } = (await req.json()) as { text?: string; voice?: string; language?: string };
     if (!text || typeof text !== "string") {
       return Response.json({ error: "text required" }, { status: 400, headers: CORS });
     }
@@ -21,6 +21,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: "deepgram_not_configured" }, { status: 503, headers: CORS });
     }
 
+    // Aura v1 supports English voices only. For other languages, return 503
+    // so the client falls back to browser speechSynthesis in the right lang.
+    const lang = (language || "en").toLowerCase();
+    if (lang !== "en") {
+      return Response.json({ error: "language_not_supported" }, { status: 503, headers: CORS });
+    }
     const model = voice || "aura-asteria-en";
     const url = `https://api.deepgram.com/v1/speak?model=${encodeURIComponent(model)}&encoding=mp3`;
 
