@@ -4,6 +4,7 @@ import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
 import { SimpleMagnifier } from "@/components/SimpleMagnifier";
 import { VoiceBar } from "@/components/VoiceBar";
+import { PersistentVoice } from "@/components/PersistentVoice";
 import { useSpeech } from "@/lib/useSpeech";
 import {
   analyzeDocument,
