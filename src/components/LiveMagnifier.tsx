@@ -508,68 +508,8 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         )}
       </div>
 
-      {/* Controls */}
-      <div className="px-4 mt-1 space-y-2">
-        <SliderRow
-          label="🔍 Zoom"
-          value={zoom}
-          min={1}
-          max={3}
-          step={0.1}
-          onChange={setZoom}
-          display={`${zoom.toFixed(1)}×`}
-        />
-        <SliderRow
-          label="☀️ Brightness"
-          value={brightness}
-          min={0.6}
-          max={1.6}
-          step={0.05}
-          onChange={setBrightness}
-          display={`${Math.round(brightness * 100)}%`}
-        />
-        <SliderRow
-          label="🌗 Contrast"
-          value={contrast}
-          min={0.6}
-          max={1.8}
-          step={0.05}
-          onChange={setContrast}
-          display={`${Math.round(contrast * 100)}%`}
-        />
-        <button
-          onClick={() => setHighContrast((v) => !v)}
-          className="w-full font-bold"
-          style={{
-            background: highContrast ? "var(--color-elder-ink)" : "#fff",
-            color: highContrast ? "#fff" : "var(--color-elder-ink)",
-            border: "2px solid var(--color-elder-ink)",
-            borderRadius: 14,
-            padding: "10px",
-            fontSize: 16,
-          }}
-        >
-          {highContrast ? "✓ High contrast on" : "High contrast"}
-        </button>
-      </div>
-
-      {/* Actions */}
-      <div className="px-4 pt-3 pb-5 space-y-2">
-        <button
-          onClick={readDocAloud}
-          className="w-full font-extrabold"
-          style={{
-            background: "#fff",
-            color: "var(--color-elder-primary)",
-            border: "2px solid var(--color-elder-sky)",
-            borderRadius: 22,
-            padding: "18px",
-            fontSize: 22,
-            minHeight: 70,
-          }}
-        >
-          🔊 Read this
-        </button>
+      {/* Single fallback action — the app drives, the user follows. */}
+      <div className="px-4 pt-4 pb-5 mt-auto space-y-2">
         <button
           onClick={doCapture}
           disabled={!!error}
@@ -585,7 +525,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
             opacity: error ? 0.5 : 1,
           }}
         >
-          📸 Capture & check
+          📸 Capture now
         </button>
         <button
           onClick={onHandoff}
@@ -595,8 +535,8 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
             color: "var(--color-elder-ink)",
             border: "2px solid #e7ddd0",
             borderRadius: 18,
-            padding: "14px",
-            fontSize: 17,
+            padding: "12px",
+            fontSize: 15,
           }}
         >
           🤝 Not sure — send to a person
@@ -606,43 +546,3 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   );
 }
 
-function SliderRow({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-  display,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (n: number) => void;
-  display: string;
-}) {
-  return (
-    <div
-      className="flex items-center gap-3 px-3 py-2 rounded-2xl"
-      style={{ background: "#fff", border: "1px solid #e7ddd0" }}
-    >
-      <span className="font-bold" style={{ fontSize: 15, minWidth: 110, color: "var(--color-elder-ink)" }}>
-        {label}
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        style={{ flex: 1, accentColor: "var(--color-elder-primary)", height: 32 }}
-      />
-      <span className="font-bold" style={{ fontSize: 14, minWidth: 48, textAlign: "right", color: "#6b5d52" }}>
-        {display}
-      </span>
-    </div>
-  );
-}
