@@ -6,12 +6,23 @@ type Props = {
   onCancel: () => void;
 };
 
-type Guidance = "init" | "no-doc" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
+type Guidance =
+  | "init"
+  | "no-doc"
+  | "not-face"
+  | "not-object"
+  | "move-closer"
+  | "hold-still"
+  | "corners"
+  | "blurry"
+  | "detected";
 type DetectionBox = { x: number; y: number; w: number; h: number };
 
 const GUIDANCE_TEXT: Record<Guidance, string> = {
   init: "Point the camera at your paper.",
   "no-doc": "I don't see a document — point the camera at your paper.",
+  "not-face": "I see a face — please point the camera at your paper.",
+  "not-object": "That doesn't look like a document — point the camera at your paper.",
   "move-closer": "Move a little closer.",
   "hold-still": "Hold still…",
   corners: "Put all four corners inside the frame.",
