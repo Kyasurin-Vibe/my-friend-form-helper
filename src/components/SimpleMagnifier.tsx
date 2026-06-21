@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DemoServices } from "@/lib/services";
+import { translateAsync, translateSync, getLang, getBCP47 } from "@/lib/i18n";
 
 type Props = {
   onBack: () => void;
@@ -11,13 +12,22 @@ function speak(text: string, onDone?: () => void) {
   const synth = window.speechSynthesis;
   if (!synth) { onDone?.(); return; }
   synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 0.95;
-  u.pitch = 1.05;
-  u.onend = () => onDone?.();
-  u.onerror = () => onDone?.();
-  synth.speak(u);
+  const lang = getLang();
+  const startSpeak = (final: string) => {
+    const u = new SpeechSynthesisUtterance(final);
+    u.rate = 0.95;
+    u.pitch = 1.05;
+    try { u.lang = getBCP47(); } catch { /* noop */ }
+    u.onend = () => onDone?.();
+    u.onerror = () => onDone?.();
+    synth.speak(u);
+  };
+  if (lang === "en") { startSpeak(text); return; }
+  const cached = translateSync(text, lang);
+  if (cached !== text) { startSpeak(cached); return; }
+  translateAsync(text, lang).then((tr) => startSpeak(tr || text)).catch(() => startSpeak(text));
 }
+
 
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 5;
