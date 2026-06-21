@@ -375,9 +375,6 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
 
 function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
   const voiceOn = useContext(VoiceOnContext);
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onOpenMagnifier();
-  };
   return (
     <div className="flex-1 flex flex-col items-center p-6 text-center">
       <div className="flex-1 flex flex-col items-center justify-center">
@@ -411,11 +408,15 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
       <VoiceBar
         speakableText={speakableForPhase("find", { analysis: null, sendResult: null, analyzeError: null })}
         voiceOn={voiceOn}
-        onIntent={handleIntent}
+        actions={[
+          { id: "open", label: "Open Magnifier", description: "Start the camera to find the document" },
+        ]}
+        onAction={(id) => { if (id === "open") onOpenMagnifier(); }}
       />
     </div>
   );
 }
+
 
 
 function AnalyzingScreen() {
@@ -470,10 +471,6 @@ function RetakeScreen({
     playWarning();
   }, []);
   const voiceOn = useContext(VoiceOnContext);
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onSendAnyway();
-    else if (i === "cancel") onRetry();
-  };
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} face="x" />
@@ -503,12 +500,20 @@ function RetakeScreen({
         <VoiceBar
           speakableText={speakableForPhase("retake", { analysis, sendResult: null, analyzeError: null })}
           voiceOn={voiceOn}
-          onIntent={handleIntent}
+          actions={[
+            { id: "retry", label: "Try again", description: "Retake the photo" },
+            { id: "send", label: "Connect me with a person", description: "Send the photo to a real human at the legal aid center" },
+          ]}
+          onAction={(id) => {
+            if (id === "retry") onRetry();
+            else if (id === "send") onSendAnyway();
+          }}
         />
       </div>
     </div>
   );
 }
+
 
 
 function ReviewScreen({
@@ -528,10 +533,15 @@ function ReviewScreen({
 }) {
   const missing = analysis?.possibleMissingFields ?? [];
   const voiceOn = useContext(VoiceOnContext);
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onSend();
-    else if (i === "cancel") onRetake();
+  const reviewActions: VoiceAction[] = [
+    { id: "retake", label: "Retake", description: "Take the photo again" },
+    { id: "connect", label: "Connect me with a person", description: "Send the document to a real human at the legal aid center" },
+  ];
+  const onReviewAction = (id: string) => {
+    if (id === "retake") onRetake();
+    else if (id === "connect") onSend();
   };
+
   useEffect(() => {
     if (missing.length > 0) playWarning();
   }, [missing.length]);
