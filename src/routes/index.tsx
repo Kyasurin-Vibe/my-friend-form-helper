@@ -106,6 +106,9 @@ function ElderApp() {
 
   useEffect(() => {
     if (!voiceOn) return;
+    // The language picker speaks its own greeting and locks the mic to
+    // Deepgram; skip the global auto-speak/continuous-voice on that screen.
+    if (phase === "language") return;
     const text = speakableForPhase(phase, { analysis, sendResult, analyzeError });
     if (text) speakWarm(text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
