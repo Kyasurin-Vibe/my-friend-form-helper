@@ -100,13 +100,13 @@ export function useCases(): CaseRow[] {
 }
 
 // Speak a line via Deepgram (warm voice), with browser fallback if it fails or is slow.
-let ttsAudio: HTMLAudioElement | null = null;
 export async function speakWarm(text: string, opts?: { timeoutMs?: number }): Promise<void> {
   if (typeof window === "undefined" || !text) return;
   const timeoutMs = opts?.timeoutMs ?? 1500;
+  const w = window as unknown as { __mfTtsAudio?: HTMLAudioElement };
   try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
-  try { ttsAudio?.pause(); } catch { /* noop */ }
-  ttsAudio = null;
+  try { w.__mfTtsAudio?.pause(); } catch { /* noop */ }
+  w.__mfTtsAudio = undefined;
 
   const fallback = () => {
     try {
@@ -136,7 +136,7 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number }): Pr
     }
     const url = URL.createObjectURL(data);
     const audio = new Audio(url);
-    ttsAudio = audio;
+    w.__mfTtsAudio = audio;
     audio.onended = () => URL.revokeObjectURL(url);
     audio.onerror = () => { URL.revokeObjectURL(url); fallback(); };
     await audio.play();
@@ -144,3 +144,4 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number }): Pr
     fallback();
   }
 }
+

@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, createContext, useContext } from "react";
 import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
+import { VoiceBar } from "@/components/VoiceBar";
 import { useSpeech } from "@/lib/useSpeech";
 import {
   analyzeDocument,
@@ -10,6 +11,7 @@ import {
   type AnalysisResult,
   type SendResult,
 } from "@/lib/cases";
+import { cancelSpeech, type VoiceIntent } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
 export const Route = createFileRoute("/")({
@@ -42,6 +44,7 @@ type Phase =
   | "sent";
 
 const CaptionsContext = createContext<boolean>(true);
+const VoiceOnContext = createContext<boolean>(true);
 
 function ElderApp() {
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
@@ -61,15 +64,14 @@ function ElderApp() {
     speech.setEnabled(voiceOn);
   }, [voiceOn, speech]);
 
+  // Auto-speak the whole screen on entry (real data for dynamic ones).
   useEffect(() => {
-    if (phase === "review" && analysis?.elderMessage) {
-      speakWarm(analysis.elderMessage);
-    } else if (phase === "sent" && sendResult?.elderMessage) {
-      speakWarm(sendResult.elderMessage);
-    } else if (phase === "retake") {
-      speech.speak("That was a little hard to read. Let's try again, holding steady.");
-    }
-  }, [phase, analysis, sendResult]); // eslint-disable-line
+    if (!voiceOn) return;
+    const text = speakableForPhase(phase, { analysis, sendResult, analyzeError });
+    if (text) speakWarm(text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, analysis, sendResult, voiceOn]);
+
 
   const restart = () => {
     setPhase("find");
@@ -166,6 +168,7 @@ function ElderApp() {
           }}
         >
           <CaptionsContext.Provider value={showCaptions}>
+           <VoiceOnContext.Provider value={voiceOn}>
             {phase === "start" ? (
               <StartGate
                 onStart={(mode) => {
@@ -212,7 +215,9 @@ function ElderApp() {
                 onRestart={restart}
               />
             )}
+           </VoiceOnContext.Provider>
           </CaptionsContext.Provider>
+
         </div>
       </div>
 
@@ -272,39 +277,52 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
 }
 
 function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
+  const voiceOn = useContext(VoiceOnContext);
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onOpenMagnifier();
+  };
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-      <Mascot mode="idle" size={130} />
-      <h2 className="mt-3 font-extrabold" style={{ fontSize: 28, color: "var(--color-elder-ink)" }}>
-        Ready to find your document?
-      </h2>
-      <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
-        I'll open the magnifier so you can see clearly first. Nothing is uploaded yet.
-      </p>
-      <button
-        onClick={onOpenMagnifier}
-        className="w-full font-extrabold animate-button-pop-red active:scale-[0.96]"
-        style={{
-          background: "var(--color-elder-red)",
-          color: "#fff",
-          border: "none",
-          borderRadius: 26,
-          padding: "24px",
-          fontSize: 24,
-          minHeight: 88,
-          boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
-        }}
-      >
-        🔍 Open Magnifier
-      </button>
-      <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
-        The magnifier uses your camera only on this device.
-      </p>
+    <div className="flex-1 flex flex-col items-center p-6 text-center">
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <Mascot mode="idle" size={130} />
+        <h2 className="mt-3 font-extrabold" style={{ fontSize: 28, color: "var(--color-elder-ink)" }}>
+          Ready to find your document?
+        </h2>
+        <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
+          I'll open the magnifier so you can see clearly first. Nothing is uploaded yet.
+        </p>
+        <button
+          onClick={() => { cancelSpeech(); onOpenMagnifier(); }}
+          className="w-full font-extrabold animate-button-pop-red active:scale-[0.96]"
+          style={{
+            background: "var(--color-elder-red)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 26,
+            padding: "24px",
+            fontSize: 24,
+            minHeight: 88,
+            boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
+          }}
+        >
+          🔍 Open Magnifier
+        </button>
+        <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
+          The magnifier uses your camera only on this device.
+        </p>
+      </div>
+      <VoiceBar
+        speakableText={speakableForPhase("find", { analysis: null, sendResult: null, analyzeError: null })}
+        voiceOn={voiceOn}
+        onIntent={handleIntent}
+      />
     </div>
   );
 }
 
+
 function AnalyzingScreen() {
+  const voiceOn = useContext(VoiceOnContext);
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
       <Mascot mode="speaking" size={150} />
@@ -328,9 +346,17 @@ function AnalyzingScreen() {
           />
         ))}
       </div>
+      <div className="w-full max-w-sm mt-6">
+        <VoiceBar
+          speakableText={speakableForPhase("analyzing", { analysis: null, sendResult: null, analyzeError: null })}
+          voiceOn={voiceOn}
+          hideMic
+        />
+      </div>
     </div>
   );
 }
+
 
 function RetakeScreen({
   analysis,
@@ -348,6 +374,11 @@ function RetakeScreen({
   useEffect(() => {
     playWarning();
   }, []);
+  const voiceOn = useContext(VoiceOnContext);
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onSendAnyway();
+    else if (i === "cancel") onRetry();
+  };
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} face="x" />
@@ -374,10 +405,16 @@ function RetakeScreen({
         <BigButton variant="ghost" onClick={onSendAnyway}>
           {sending ? "Sending…" : "🤝 Send for human review"}
         </BigButton>
+        <VoiceBar
+          speakableText={speakableForPhase("retake", { analysis, sendResult: null, analyzeError: null })}
+          voiceOn={voiceOn}
+          onIntent={handleIntent}
+        />
       </div>
     </div>
   );
 }
+
 
 function ReviewScreen({
   analysis,
@@ -395,9 +432,15 @@ function ReviewScreen({
   speech: ReturnType<typeof useSpeech>;
 }) {
   const missing = analysis?.possibleMissingFields ?? [];
+  const voiceOn = useContext(VoiceOnContext);
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onSend();
+    else if (i === "cancel") onRetake();
+  };
   useEffect(() => {
     if (missing.length > 0) playWarning();
   }, [missing.length]);
+
 
   // No analysis available — show honest fallback, do NOT fake check rows.
   if (!analysis) {
@@ -425,7 +468,13 @@ function ReviewScreen({
           <BigButton variant="danger" onClick={onSend}>
             {sending ? "Sending…" : "🤝 Send for review"}
           </BigButton>
+          <VoiceBar
+            speakableText={speakableForPhase("review", { analysis: null, sendResult: null, analyzeError })}
+            voiceOn={voiceOn}
+            onIntent={handleIntent}
+          />
         </div>
+
       </div>
     );
   }
@@ -494,7 +543,13 @@ function ReviewScreen({
         <BigButton variant="danger" onClick={onSend}>
           {sending ? "Sending…" : "🤝 Send it"}
         </BigButton>
+        <VoiceBar
+          speakableText={speakableForPhase("review", { analysis, sendResult: null, analyzeError: null })}
+          voiceOn={voiceOn}
+          onIntent={handleIntent}
+        />
       </div>
+
     </div>
   );
 }
@@ -512,10 +567,15 @@ function SentScreen({
   onGoCenter: () => void;
   onRestart: () => void;
 }) {
+  const voiceOn = useContext(VoiceOnContext);
   const trackingId = sendResult?.trackingId ?? "—";
   const centerName = sendResult?.centerName ?? "Legal Aid Center";
   const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
   const missingCount = analysis?.possibleMissingFields.length ?? 0;
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onGoCenter();
+    else if (i === "cancel") onRestart();
+  };
 
   const log = [
     "Photo captured on this device",
@@ -525,6 +585,7 @@ function SentScreen({
       : "No obvious missing fields",
     `Sent to ${centerName}`,
   ];
+
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto">
       <MascotHeader speech={speech} small face={isReview ? "x" : "smile"} />
@@ -582,7 +643,13 @@ function SentScreen({
       <div className="space-y-2 mt-auto">
         <BigButton variant="ghost" onClick={onRestart}>↻ Start over</BigButton>
         <BigButton variant="danger" onClick={onGoCenter}>See the center's side →</BigButton>
+        <VoiceBar
+          speakableText={speakableForPhase("sent", { analysis, sendResult, analyzeError: null })}
+          voiceOn={voiceOn}
+          onIntent={handleIntent}
+        />
       </div>
+
     </div>
   );
 }
@@ -636,9 +703,11 @@ function BigButton({
   return (
     <button
       onClick={() => {
+        cancelSpeech();
         if ("vibrate" in navigator) navigator.vibrate(35);
         onClick();
       }}
+
       className={`w-full font-extrabold transition active:scale-[0.96] ${danger ? "animate-button-pop-red" : "animate-button-pop"}`}
       style={{
         background: danger ? "var(--color-elder-red)" : primary ? "var(--color-elder-primary)" : "#fff",
@@ -654,4 +723,56 @@ function BigButton({
       {children}
     </button>
   );
+}
+
+// ===== speakableText per screen — covers ALL visible meaningful text =====
+function speakableForPhase(
+  phase: Phase,
+  ctx: {
+    analysis: AnalysisResult | null;
+    sendResult: SendResult | null;
+    analyzeError: string | null;
+  },
+): string {
+  switch (phase) {
+    case "start":
+      return "My Friend. How would you like me to help? Tap Talk to me to hear everything out loud. Tap Show me words for big captions with no sound. Tap Both for voice and captions together.";
+    case "find":
+      return "Ready to find your document? I'll open the magnifier so you can see clearly first. Nothing is uploaded yet. Tap the red Open Magnifier button when you're ready, or say yes.";
+    case "magnifier":
+      return "Point the camera at your paper. Keep the corners inside the frame. I'll capture it when it looks clear.";
+    case "analyzing":
+      return "Let me look at this. Reading your paper carefully. This takes just a few seconds.";
+    case "retake": {
+      const why = ctx.analysis?.elderMessage
+        ? `${ctx.analysis.elderMessage} `
+        : "";
+      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Send for human review to let a real person look at it, or say yes.`;
+    }
+    case "review": {
+      if (!ctx.analysis) {
+        const err = ctx.analyzeError ? ` Note: ${ctx.analyzeError}.` : "";
+        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Send for review to send it to a person at the Legal Aid Center, or say yes.`;
+      }
+      const a = ctx.analysis;
+      const title = a.documentName || a.documentType || "a document";
+      const summary = a.plainEnglishSummary ? ` ${a.plainEnglishSummary}` : "";
+      const missing = a.possibleMissingFields ?? [];
+      const missingPart =
+        missing.length > 0
+          ? ` I see some spots that may need attention: ${missing.join("; ")}.`
+          : " Nothing obviously missing. A person will still confirm before anything is filed.";
+      return `This looks like ${title}.${summary}${missingPart} Tap Retake to take another photo, or say no. Tap Send it to send to the Legal Aid Center, or say yes.`;
+    }
+    case "sent": {
+      const r = ctx.sendResult;
+      const id = r?.trackingId ?? "pending";
+      const center = r?.centerName ?? "Legal Aid Center";
+      const isReview = (r?.status ?? "needs_review") === "needs_review";
+      const closing = isReview
+        ? "I won't guess on something this important. A real person will check it for you."
+        : "A person will confirm it before anything is filed.";
+      return `All done. Your tracking number is ${id}. Delivered to ${center}. ${closing} You don't have to do anything else right now. Tap Start over to begin again, or say no. Tap See the center's side to view the staff dashboard, or say yes.`;
+    }
+  }
 }
