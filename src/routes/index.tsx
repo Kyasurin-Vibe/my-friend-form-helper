@@ -691,6 +691,65 @@ function SentScreen({
 
 // ===== Shared building blocks =====
 
+function PreviewScreen({
+  image,
+  speech,
+  onUse,
+  onRetake,
+}: {
+  image: string | undefined;
+  speech: ReturnType<typeof useSpeech>;
+  onUse: () => void;
+  onRetake: () => void;
+}) {
+  const voiceOn = useContext(VoiceOnContext);
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onUse();
+    else if (i === "cancel") onRetake();
+  };
+  return (
+    <div className="flex-1 flex flex-col p-6">
+      <MascotHeader speech={speech} small face="smile" />
+      <h2
+        className="text-center font-extrabold mt-2 mb-3"
+        style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
+      >
+        Is this clear enough?
+      </h2>
+      <div
+        className="rounded-2xl overflow-hidden mb-4"
+        style={{
+          background: "#111",
+          boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
+          maxHeight: 340,
+        }}
+      >
+        {image ? (
+          <img
+            src={image}
+            alt="Captured document"
+            className="w-full h-full object-contain"
+            style={{ maxHeight: 340 }}
+          />
+        ) : (
+          <div className="p-10 text-center text-white">No image captured.</div>
+        )}
+      </div>
+      <div className="space-y-2 mt-auto">
+        <BigButton variant="danger" onClick={onUse}>✅ Yes, use this</BigButton>
+        <BigButton variant="ghost" onClick={onRetake}>🔄 Retake</BigButton>
+        <VoiceBar
+          speakableText={speakableForPhase("preview", { analysis: null, sendResult: null, analyzeError: null })}
+          voiceOn={voiceOn}
+          onIntent={handleIntent}
+        />
+      </div>
+    </div>
+  );
+}
+
+
+
 function MascotHeader({
   speech,
   small,
