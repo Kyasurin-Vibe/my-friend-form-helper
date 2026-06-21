@@ -92,16 +92,38 @@ function ElderApp() {
     }
     setPhase("analyzing");
     setAnalyzeError(null);
+    const startedAt = Date.now();
+    const minDisplay = 1200; // keep the loading screen visible long enough to see
     try {
       const result = await analyzeDocument(image);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < minDisplay) {
+        await new Promise((r) => setTimeout(r, minDisplay - elapsed));
+      }
+      // AI backstop: if Claude doesn't see a real document, return to camera.
+      const looksLikeDoc =
+        result.readable &&
+        result.documentType &&
+        result.documentType.toLowerCase() !== "unknown" &&
+        (result.confidence ?? 0) >= 0.35;
+      if (!looksLikeDoc) {
+        setAnalysis(null);
+        speakWarm("I don't see a document yet — point the camera at your paper.");
+        setPhase("magnifier");
+        return;
+      }
       setAnalysis(result);
-      if (result.recommendedAction === "retake" || !result.readable) {
+      if (result.recommendedAction === "retake") {
         setPhase("retake");
         return;
       }
       setPhase("review");
     } catch (e) {
       console.error("analyze failed", e);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < minDisplay) {
+        await new Promise((r) => setTimeout(r, minDisplay - elapsed));
+      }
       setAnalyzeError(e instanceof Error ? e.message : "Could not analyze right now.");
       setAnalysis(null);
       setPhase("review");
