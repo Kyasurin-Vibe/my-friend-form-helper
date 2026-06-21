@@ -65,8 +65,25 @@ const DICT: Record<string, Partial<Record<Lang, string>>> = {
 
 export function t(key: string, lang: Lang = _lang): string {
   const entry = DICT[key];
-  if (!entry) return key;
-  return entry[lang] ?? entry.en ?? key;
+  const english = entry?.en ?? key;
+  if (lang === "en") return english;
+  // Prefer a hand-authored translation in the dictionary.
+  const dict = entry?.[lang];
+  if (dict) return dict;
+  // Fall back to the translate cache; kick off a one-time async fetch
+  // if missing. Listeners re-render when the translation arrives.
+  const cached = cache.get(cacheKey(english, lang));
+  if (cached) return cached;
+  if (english) {
+    // Fire and forget — translateAsync handles dedup + cache + notify.
+    void translateAsync(english, lang);
+  }
+  return english;
+}
+
+export function onTranslate(fn: () => void): () => void {
+  translateListeners.add(fn);
+  return () => { translateListeners.delete(fn); };
 }
 
 // =====================================================================
