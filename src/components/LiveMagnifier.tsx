@@ -334,13 +334,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     );
   }
 
-  const filter = [
-    `brightness(${brightness})`,
-    `contrast(${highContrast ? contrast * 1.6 : contrast})`,
-    highContrast ? "grayscale(1)" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const filter = `brightness(${brightness}) contrast(${contrast})`;
 
   return (
     <div className="flex-1 flex flex-col" style={{ background: "var(--color-elder-bg)" }}>
