@@ -185,14 +185,37 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         const boxH = Math.max(0, maxY - minY + 1);
         const boxArea = boxW * boxH;
         const boxPaper = best.count;
+        const bandX = Math.max(2, Math.floor(boxW * 0.12));
+        const bandY = Math.max(2, Math.floor(boxH * 0.12));
+        let topPaper = 0, bottomPaper = 0, leftPaper = 0, rightPaper = 0;
+        if (boxArea > 0) {
+          for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+              const isPaper = paperMask[y * W + x];
+              if (!isPaper) continue;
+              if (y < minY + bandY) topPaper++;
+              if (y > maxY - bandY) bottomPaper++;
+              if (x < minX + bandX) leftPaper++;
+              if (x > maxX - bandX) rightPaper++;
+            }
+          }
+        }
         const boxAreaFrac = boxArea / (W * H);
         const boxDensity = boxArea > 0 ? boxPaper / boxArea : 0;
+        const topFill = boxW * bandY > 0 ? topPaper / (boxW * bandY) : 0;
+        const bottomFill = boxW * bandY > 0 ? bottomPaper / (boxW * bandY) : 0;
+        const leftFill = boxH * bandX > 0 ? leftPaper / (boxH * bandX) : 0;
+        const rightFill = boxH * bandX > 0 ? rightPaper / (boxH * bandX) : 0;
+        const rectangularEnough =
+          [topFill, bottomFill, leftFill, rightFill].filter((v) => v >= 0.34).length >= 3 &&
+          (topFill + bottomFill + leftFill + rightFill) / 4 >= 0.44;
         const aspect = boxH > 0 ? boxW / boxH : 0;
         const hasDocumentRegion =
           meanLum >= 75 &&
           paperFrac >= 0.3 &&
           boxAreaFrac >= 0.38 &&
-          boxDensity >= 0.48 &&
+          boxDensity >= 0.62 &&
+          rectangularEnough &&
           aspect >= 0.48 &&
           aspect <= 1.9;
 
