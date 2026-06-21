@@ -120,6 +120,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     if (!ctx) return;
 
     let detectedStreak = 0;
+    let emptyStreak = 0;
     const id = window.setInterval(() => {
       if (confirmedRef.current || !video.videoWidth) return;
       try {
