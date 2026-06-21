@@ -62,8 +62,6 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const confirmedRef = useRef(false);
-  const speakingRef = useRef(false);
-  const shouldListenRef = useRef(false);
   const introSpokenRef = useRef(false);
 
   // Detection state (in refs so the analysis loop doesn't trigger re-renders)
@@ -83,10 +81,6 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const [ready, setReady] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [autoCapture] = useState(true);
-  const [listening, setListening] = useState(false);
-  const [voiceArmed, setVoiceArmed] = useState(false);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [heard, setHeard] = useState("");
   const [hint, setHint] = useState<Hint>("starting");
   const [, _bumpLang] = useState(0);
   useEffect(() => onLangChange(() => _bumpLang((n) => n + 1)), []);
