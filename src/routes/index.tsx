@@ -487,10 +487,10 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
       <div className="flex-1 flex flex-col items-center justify-center">
         <Mascot mode="idle" size={130} />
         <h2 className="mt-3 font-extrabold" style={{ fontSize: 28, color: "var(--color-elder-ink)" }}>
-          Have a question
+          Have a question, my friend?
         </h2>
         <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
-          i will open the camera, so i can read your document
+          I will open your camera, so I can help you.
         </p>
         <button
           onClick={() => { cancelSpeech(); onOpenMagnifier(); }}
@@ -1388,7 +1388,7 @@ function speakableForPhase(
     case "viewer":
       return "Magnifier. Point your camera at anything you'd like to see bigger. Say back to return home, or say I have a question to scan a document.";
     case "find":
-      return "Have a question? I'll open the camera so I can read your document. Tap the red Open Scanner button when you're ready, or say yes.";
+      return "Have a question, my friend? I'll open your camera, so I can help you. Tap the red Open Scanner button when you're ready, or say yes.";
     case "magnifier":
       return "Point the camera at your paper. Keep the corners inside the frame. I'll capture it when it looks clear.";
     case "preview":
