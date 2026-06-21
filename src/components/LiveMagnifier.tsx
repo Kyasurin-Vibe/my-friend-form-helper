@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { DemoServices, type VoiceCommand } from "@/lib/services";
+import {
+  loadJscanify,
+  extractPaperDataUrl,
+  findPaperCornersNormalized,
+  type PaperCorners,
+} from "@/lib/jscanify";
 
 type Props = {
   onConfirm: (image?: string) => void;
