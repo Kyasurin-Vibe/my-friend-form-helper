@@ -40,6 +40,9 @@ export function PersistentVoice({
   helpHint,
   onBack,
   onCommand,
+  screenId,
+  actions,
+  onAction,
 }: PersistentVoiceProps) {
   const [userOn, setUserOn] = useState(true);
   const [listening, setListening] = useState(false);
