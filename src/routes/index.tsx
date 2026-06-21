@@ -475,11 +475,6 @@ function HomeScreen({
           { id: "question", label: "I have a question", description: "Scan a document" },
         ]}
         onAction={(id) => { if (id === "see") onMagnifier(); else if (id === "question") onScanner(); }}
-        onTranscript={(t) => {
-          const s = t.toLowerCase();
-          if (/\b(see|magnif|bigger|larger|zoom|look)\b/.test(s)) onMagnifier();
-          else if (/\b(question|document|help|scan|paper|form|read)\b/.test(s)) onScanner();
-        }}
       />
     </div>
   );
