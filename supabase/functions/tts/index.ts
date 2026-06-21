@@ -9,8 +9,8 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Sarah — calm, warm, friendly female voice. Good for elderly users.
-const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+// Laura — gentle, soft, warm female voice. More soothing for elderly users.
+const DEFAULT_VOICE_ID = "FGY2WhTYpPnrIDTdsKH5";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
