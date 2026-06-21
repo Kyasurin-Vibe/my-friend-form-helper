@@ -1723,3 +1723,24 @@ function runPhaseAction(
     default: return;
   }
 }
+
+function DoneButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full font-bold active:scale-[0.97] transition"
+      style={{
+        background: "transparent",
+        color: "#6b5d52",
+        border: "2px dashed #d8cdb8",
+        borderRadius: 18,
+        padding: "12px 16px",
+        fontSize: 16,
+        minHeight: 52,
+      }}
+      aria-label="No thanks, I'm done"
+    >
+      👋 No thanks — I&apos;m done
+    </button>
+  );
+}
