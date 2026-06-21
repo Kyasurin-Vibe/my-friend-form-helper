@@ -14,6 +14,7 @@ import {
   type DocumentBounds,
   type SendResult,
 } from "@/lib/cases";
+import { getResources } from "@/lib/resources";
 import { cancelSpeech, type VoiceIntent } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
