@@ -1545,6 +1545,16 @@ function getBackForPhase(
   }
 }
 
+function dispatchSimpleMagnifierCommand(action: "bigger" | "smaller" | "brighter" | "dimmer") {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("mf-simple-magnifier-command", { detail: { action } }));
+}
+
+function dispatchScannerCommand(action: "capture" | "wait") {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("mf-scanner-command", { detail: { action } }));
+}
+
 // Returns true when the transcript matched something on this screen.
 function handlePhaseCommand(
   t: string,
