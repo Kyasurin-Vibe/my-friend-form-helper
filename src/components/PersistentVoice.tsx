@@ -320,7 +320,7 @@ function PersistentVoiceStatus({
   userOn: boolean;
   speaking: boolean;
   listening: boolean;
-  setUserOn: React.Dispatch<React.SetStateAction<boolean>>;
+  setUserOn: Dispatch<SetStateAction<boolean>>;
   blocked: boolean;
   active: boolean;
   transcript: string;
