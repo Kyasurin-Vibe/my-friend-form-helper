@@ -308,13 +308,16 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         setGuidance("corners");
         break;
       case "zoom":
-        setZoom((z) => Math.min(3, +(z + 0.3).toFixed(2)));
+        autoRef.current.zoom = Math.min(2.6, autoRef.current.zoom + 0.3);
+        setZoom(+autoRef.current.zoom.toFixed(2));
         break;
       case "brighter":
-        setBrightness((b) => Math.min(1.6, +(b + 0.15).toFixed(2)));
+        autoRef.current.brightness = Math.min(1.7, autoRef.current.brightness + 0.15);
+        setBrightness(+autoRef.current.brightness.toFixed(2));
         break;
       case "contrast":
-        setContrast((c) => Math.min(1.8, +(c + 0.15).toFixed(2)));
+        autoRef.current.contrast = Math.min(1.7, autoRef.current.contrast + 0.15);
+        setContrast(+autoRef.current.contrast.toFixed(2));
         break;
       case "read":
         readDocAloud();
