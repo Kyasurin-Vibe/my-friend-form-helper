@@ -70,6 +70,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const confirmedRef = useRef(false);
   const speakingRef = useRef(false);
   const shouldListenRef = useRef(false);
+  const jscanRef = useRef<Awaited<ReturnType<typeof loadJscanify>> | null>(null);
+  const [paperCorners, setPaperCorners] = useState<PaperCorners | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
