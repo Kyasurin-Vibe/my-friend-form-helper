@@ -1564,6 +1564,10 @@ function handlePhaseCommand(
 
   const yes = /\b(yes|yeah|yep|yup|sure|okay|ok|do it|go ahead|use this|use it|it's clear|its clear|looks good|good|send|send it|capture|take it|snap|take the picture|take the photo|connect me)\b/;
   const no = /\b(no|nope|nah|not yet|wait|keep looking|don't|dont)\b/;
+  const dimmer = /\b(dim|dimmer|dimer|dimmed|dimm|too bright|too light|too white|darker|darken|less light|less bright|lower brightness|reduce (the )?light|reduce brightness|make it darker|make it dimmer|tone it down)\b/;
+  const brighter = /\b(bright|brighter|too dark|more light|lighter|light it up|brighten|can't see it|cant see it|still can't see|still cant see)\b/;
+  const smaller = /\b(smaller|too big|zoom out|further|farther|back out|less|make it smaller)\b/;
+  const bigger = /\b(bigger|larger|zoom in|closer|enlarge|magnify|more|can't see|cant see|hard to see|make it bigger)\b/;
 
   switch (phase) {
     case "home": {
@@ -1579,10 +1583,35 @@ function handlePhaseCommand(
       }
       return false;
     }
+    case "viewer": {
+      if (/\b(question|document|scan|paper|form|read this paper|help me read|i have a question)\b/.test(t)) {
+        confirm("Okay — let's scan it.");
+        setPhase("find");
+        return true;
+      }
+      if (dimmer.test(t)) { confirm("Dimmer."); dispatchSimpleMagnifierCommand("dimmer"); return true; }
+      if (brighter.test(t)) { confirm("Brighter now."); dispatchSimpleMagnifierCommand("brighter"); return true; }
+      if (smaller.test(t)) { confirm("Smaller."); dispatchSimpleMagnifierCommand("smaller"); return true; }
+      if (bigger.test(t)) { confirm("Okay — bigger."); dispatchSimpleMagnifierCommand("bigger"); return true; }
+      return false;
+    }
     case "find": {
       if (yes.test(t) || /\b(open|scanner|camera|start|ready)\b/.test(t)) {
         confirm("Opening the camera.");
         setPhase("magnifier");
+        return true;
+      }
+      return false;
+    }
+    case "magnifier": {
+      if (yes.test(t) || /\b(capture|take picture|take photo|snap|ready)\b/.test(t)) {
+        confirm("Okay — capture now.");
+        dispatchScannerCommand("capture");
+        return true;
+      }
+      if (no.test(t) || /\b(keep looking|not ready|wait)\b/.test(t)) {
+        confirm("Okay — keep looking.");
+        dispatchScannerCommand("wait");
         return true;
       }
       return false;
