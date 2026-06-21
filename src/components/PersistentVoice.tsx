@@ -57,14 +57,14 @@ export function PersistentVoice({
   const [blocked, setBlocked] = useState(false);
 
   // If a screen-owned voice loop is registered, prefer its screen + actions.
-  const active = useActiveVoiceLoop();
-  const effectiveScreen = active?.screen ?? screenId;
-  const effectiveActions: IntentAction[] | undefined = active
-    ? actionDescriptors(active)
+  const activeLoop = useActiveVoiceLoop();
+  const effectiveScreen = activeLoop?.screen ?? screenId;
+  const effectiveActions: IntentAction[] | undefined = activeLoop
+    ? actionDescriptors(activeLoop)
     : actions;
-  const effectiveOnAction = active
+  const effectiveOnAction = activeLoop
     ? (id: string, helpers: { confirm: (msg: string) => void }) => {
-        const fn = active.actions[id];
+        const fn = activeLoop.actions[id];
         if (fn) fn();
         else onAction?.(id, helpers);
       }
