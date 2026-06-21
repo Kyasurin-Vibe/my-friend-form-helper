@@ -350,6 +350,63 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
 }
 
 
+function PreviewScreen({
+  image,
+  onConfirm,
+  onRetake,
+}: {
+  image: string | undefined;
+  onConfirm: () => void;
+  onRetake: () => void;
+}) {
+  const voiceOn = useContext(VoiceOnContext);
+  const handleIntent = (i: VoiceIntent) => {
+    if (i === "confirm") onConfirm();
+    else if (i === "cancel") onRetake();
+  };
+  return (
+    <div className="flex-1 flex flex-col p-5">
+      <div className="flex flex-col items-center">
+        <Mascot mode="idle" size={84} />
+        <h2
+          className="mt-2 font-extrabold text-center"
+          style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
+        >
+          Is this clear enough?
+        </h2>
+      </div>
+      <div
+        className="mt-3 rounded-2xl overflow-hidden flex items-center justify-center"
+        style={{
+          background: "#111",
+          border: "2px solid #EFE6D6",
+          minHeight: 240,
+          maxHeight: 360,
+        }}
+      >
+        {image ? (
+          <img
+            src={image}
+            alt="Captured document preview"
+            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+          />
+        ) : (
+          <p style={{ color: "#fff", padding: 24 }}>No image captured.</p>
+        )}
+      </div>
+      <div className="space-y-2 mt-4">
+        <BigButton variant="danger" onClick={onConfirm}>✅ Yes, use this</BigButton>
+        <BigButton variant="ghost" onClick={onRetake}>🔄 Retake</BigButton>
+        <VoiceBar
+          speakableText={speakableForPhase("preview", { analysis: null, sendResult: null, analyzeError: null })}
+          voiceOn={voiceOn}
+          onIntent={handleIntent}
+        />
+      </div>
+    </div>
+  );
+}
+
 function AnalyzingScreen() {
   const voiceOn = useContext(VoiceOnContext);
   return (
