@@ -276,6 +276,25 @@ function ElderApp() {
             borderRadius: 40,
           }}
         >
+          <PersistentVoice
+            enabledFromMode={voiceOn}
+            paused={phase === "viewer" || phase === "magnifier"}
+            speakable={speakableForPhase(phase, { analysis, sendResult, analyzeError })}
+            helpHint={helpHintForPhase(phase)}
+            onBack={getBackForPhase(phase, { setPhase, analysis, navigate })}
+            onCommand={(t, { confirm }) =>
+              handlePhaseCommand(t, confirm, {
+                phase,
+                setPhase,
+                confirmPreview,
+                navigate,
+                restart,
+                handleSend,
+                analysis,
+              })
+            }
+          />
+
           <CaptionsContext.Provider value={showCaptions}>
            <VoiceOnContext.Provider value={voiceOn}>
             {phase === "start" ? (
