@@ -52,9 +52,9 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [brightness, setBrightness] = useState(1);
-  const lblStarting = useTranslated("Starting camera…");
-  const lblQuestion = useTranslated("I have a question");
-  const lblBackHome = useTranslated("Back to home");
+  const lblStarting = useT("starting_camera");
+  const lblQuestion = useT("i_have_question");
+  const lblBackHome = useT("back_home");
 
   const zoomRef = useRef(zoom);
   const brightRef = useRef(brightness);
