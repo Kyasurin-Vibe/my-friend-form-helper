@@ -282,6 +282,7 @@ function ElderApp() {
             speakable={speakableForPhase(phase, { analysis, sendResult, analyzeError })}
             helpHint={helpHintForPhase(phase)}
             onBack={getBackForPhase(phase, { setPhase, analysis, navigate })}
+            onDone={() => { speech.cancel(); restart(); setPhase("home"); }}
             onCommand={(t, { confirm }) =>
               handlePhaseCommand(t, confirm, {
                 phase,
