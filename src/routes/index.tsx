@@ -105,8 +105,10 @@ function ElderApp() {
   }
 
   async function runAnalyze() {
-    const image = capturedImage;
-    if (!image) {
+    // We send the already-cropped image (processedImage) to Claude so it focuses
+    // on the document, not hands/background.
+    const imageForClaude = processedImage ?? capturedImage;
+    if (!imageForClaude) {
       setPhase("magnifier");
       return;
     }
@@ -115,10 +117,17 @@ function ElderApp() {
     const startedAt = Date.now();
     const minDisplay = 1200;
     try {
-      const result = await analyzeDocument(image);
-      // Crop to AI-returned bounds (or full frame if null).
-      const cropped = await cropToBounds(image, result.documentBounds, 0.03);
-      setProcessedImage(cropped);
+      const result = await analyzeDocument(imageForClaude);
+      // Optional refinement: if Claude returns bounds, crop again (relative to
+      // the image we sent). If not, keep the frontend crop.
+      if (result.documentBounds) {
+        try {
+          const refined = await cropToBounds(imageForClaude, result.documentBounds, 0.03);
+          setProcessedImage(refined);
+        } catch { /* keep existing processedImage */ }
+      }
+      void capturedBounds;
+
 
       const elapsed = Date.now() - startedAt;
       if (elapsed < minDisplay) {
