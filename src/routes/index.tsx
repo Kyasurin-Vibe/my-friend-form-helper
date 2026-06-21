@@ -15,7 +15,7 @@ import {
   type SendResult,
 } from "@/lib/cases";
 import { getResources } from "@/lib/resources";
-import { cancelSpeech, type VoiceIntent } from "@/lib/voice";
+import { cancelSpeech, type VoiceAction } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
 export const Route = createFileRoute("/")({
@@ -375,9 +375,6 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
 
 function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
   const voiceOn = useContext(VoiceOnContext);
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onOpenMagnifier();
-  };
   return (
     <div className="flex-1 flex flex-col items-center p-6 text-center">
       <div className="flex-1 flex flex-col items-center justify-center">
@@ -411,11 +408,15 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
       <VoiceBar
         speakableText={speakableForPhase("find", { analysis: null, sendResult: null, analyzeError: null })}
         voiceOn={voiceOn}
-        onIntent={handleIntent}
+        actions={[
+          { id: "open", label: "Open Magnifier", description: "Start the camera to find the document" },
+        ]}
+        onAction={(id) => { if (id === "open") onOpenMagnifier(); }}
       />
     </div>
   );
 }
+
 
 
 function AnalyzingScreen() {
@@ -470,10 +471,6 @@ function RetakeScreen({
     playWarning();
   }, []);
   const voiceOn = useContext(VoiceOnContext);
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onSendAnyway();
-    else if (i === "cancel") onRetry();
-  };
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} face="x" />
@@ -503,12 +500,20 @@ function RetakeScreen({
         <VoiceBar
           speakableText={speakableForPhase("retake", { analysis, sendResult: null, analyzeError: null })}
           voiceOn={voiceOn}
-          onIntent={handleIntent}
+          actions={[
+            { id: "retry", label: "Try again", description: "Retake the photo" },
+            { id: "send", label: "Connect me with a person", description: "Send the photo to a real human at the legal aid center" },
+          ]}
+          onAction={(id) => {
+            if (id === "retry") onRetry();
+            else if (id === "send") onSendAnyway();
+          }}
         />
       </div>
     </div>
   );
 }
+
 
 
 function ReviewScreen({
@@ -528,10 +533,15 @@ function ReviewScreen({
 }) {
   const missing = analysis?.possibleMissingFields ?? [];
   const voiceOn = useContext(VoiceOnContext);
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onSend();
-    else if (i === "cancel") onRetake();
+  const reviewActions: VoiceAction[] = [
+    { id: "retake", label: "Retake", description: "Take the photo again" },
+    { id: "connect", label: "Connect me with a person", description: "Send the document to a real human at the legal aid center" },
+  ];
+  const onReviewAction = (id: string) => {
+    if (id === "retake") onRetake();
+    else if (id === "connect") onSend();
   };
+
   useEffect(() => {
     if (missing.length > 0) playWarning();
   }, [missing.length]);
@@ -566,8 +576,10 @@ function ReviewScreen({
           <VoiceBar
             speakableText={speakableForPhase("review", { analysis: null, sendResult: null, analyzeError })}
             voiceOn={voiceOn}
-            onIntent={handleIntent}
+            actions={reviewActions}
+            onAction={onReviewAction}
           />
+
         </div>
 
       </div>
@@ -692,8 +704,10 @@ function ReviewScreen({
             analyzeError: null,
           })}
           voiceOn={voiceOn}
-          onIntent={handleIntent}
+          actions={reviewActions}
+          onAction={onReviewAction}
         />
+
       </div>
 
     </div>
@@ -718,10 +732,8 @@ function SentScreen({
   const centerName = sendResult?.centerName ?? "Legal Aid Center";
   const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
   const missingCount = analysis?.possibleMissingFields.length ?? 0;
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onGoCenter();
-    else if (i === "cancel") onRestart();
-  };
+  // (voice actions wired below)
+
 
   const log = [
     "Photo captured on this device",
@@ -792,8 +804,16 @@ function SentScreen({
         <VoiceBar
           speakableText={speakableForPhase("sent", { analysis, sendResult, analyzeError: null })}
           voiceOn={voiceOn}
-          onIntent={handleIntent}
+          actions={[
+            { id: "restart", label: "Start over", description: "Scan another document from the beginning" },
+            { id: "center", label: "See the center's side", description: "Open the staff dashboard view" },
+          ]}
+          onAction={(id) => {
+            if (id === "restart") onRestart();
+            else if (id === "center") onGoCenter();
+          }}
         />
+
       </div>
 
     </div>
@@ -814,10 +834,7 @@ function PreviewScreen({
   onRetake: () => void;
 }) {
   const voiceOn = useContext(VoiceOnContext);
-  const handleIntent = (i: VoiceIntent) => {
-    if (i === "confirm") onUse();
-    else if (i === "cancel") onRetake();
-  };
+
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} small face="smile" />
@@ -852,8 +869,16 @@ function PreviewScreen({
         <VoiceBar
           speakableText={speakableForPhase("preview", { analysis: null, sendResult: null, analyzeError: null })}
           voiceOn={voiceOn}
-          onIntent={handleIntent}
+          actions={[
+            { id: "use", label: "Yes, use this", description: "Accept this photo and analyze it" },
+            { id: "retake", label: "Retake", description: "Take a new photo" },
+          ]}
+          onAction={(id) => {
+            if (id === "use") onUse();
+            else if (id === "retake") onRetake();
+          }}
         />
+
       </div>
     </div>
   );

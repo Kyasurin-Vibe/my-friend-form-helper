@@ -99,3 +99,49 @@ export async function transcribeAudio(blob: Blob, timeoutMs = 2500): Promise<str
     clearTimeout(t);
   }
 }
+
+// AI-backed command interpreter. Given a transcript and the buttons currently
+// on screen, ask the edge function which button (if any) the user meant.
+// Returns "repeat" when the user wants the prompt read again, "none" when
+// nothing matched clearly, or one of the supplied action ids.
+export type VoiceAction = { id: string; label: string; description?: string };
+export type InterpretResult = {
+  actionId: string | "none" | "repeat" | null;
+  transcript: string;
+  confidence: number;
+};
+
+export async function interpretCommand(
+  transcript: string,
+  actions: VoiceAction[],
+  timeoutMs = 4000,
+): Promise<InterpretResult> {
+  const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/interpret-command`;
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(fnUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({ transcript, actions }),
+      signal: ctrl.signal,
+    });
+    if (!r.ok) return { actionId: null, transcript, confidence: 0 };
+    const j = await r.json().catch(() => ({}));
+    return {
+      actionId: (j?.actionId as string) ?? null,
+      transcript: (j?.transcript as string) ?? transcript,
+      confidence: Number(j?.confidence ?? 0),
+    };
+  } catch {
+    return { actionId: null, transcript, confidence: 0 };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
