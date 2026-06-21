@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, createContext, useContext } from "react";
+import { useEffect, useRef, useState, createContext, useContext } from "react";
 import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
 import { VoiceBar } from "@/components/VoiceBar";
@@ -15,7 +15,7 @@ import {
   type SendResult,
 } from "@/lib/cases";
 import { getResources, getAccountablePartner } from "@/lib/resources";
-import { cancelSpeech, type VoiceAction } from "@/lib/voice";
+import { cancelSpeech, startRecording, transcribeAudio, type VoiceAction } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
 export const Route = createFileRoute("/")({
@@ -932,7 +932,54 @@ function ChooseRecipientScreen({
     );
   }
 
-  const canSend = name.trim().length > 0 && relationship.trim().length > 0 && !sending;
+  const canSend = name.trim().length > 0 && !sending;
+  return (
+    <TrustedPersonForm
+      sending={sending}
+      name={name}
+      relationship={relationship}
+      onChangeName={setName}
+      onChangeRelationship={setRelationship}
+      onBack={() => setMode("pick")}
+      onSend={() =>
+        canSend && onPick({ kind: "trusted", name: name.trim(), relationship: relationship.trim() })
+      }
+      canSend={canSend}
+      speech={speech}
+    />
+  );
+}
+
+function TrustedPersonForm({
+  sending,
+  name,
+  relationship,
+  onChangeName,
+  onChangeRelationship,
+  onBack,
+  onSend,
+  canSend,
+  speech,
+}: {
+  sending: boolean;
+  name: string;
+  relationship: string;
+  onChangeName: (v: string) => void;
+  onChangeRelationship: (v: string) => void;
+  onBack: () => void;
+  onSend: () => void;
+  canSend: boolean;
+  speech: ReturnType<typeof useSpeech>;
+}) {
+  const voiceOn = useContext(VoiceOnContext);
+  useEffect(() => {
+    if (voiceOn) {
+      speakWarm(
+        "Who do you trust with this? Tap the microphone and say their name, then tell me how you know them.",
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className="flex-1 flex flex-col p-6">
       <MascotHeader speech={speech} small face="smile" />
@@ -946,7 +993,7 @@ function ChooseRecipientScreen({
         className="text-center mb-4"
         style={{ fontSize: 15, color: "#6b5d52" }}
       >
-        Only pick someone you trust completely.
+        Tap the microphone and say it, or type it.
       </p>
       <label
         className="font-bold"
@@ -954,55 +1001,129 @@ function ChooseRecipientScreen({
       >
         Their name
       </label>
-      <input
-        type="text"
+      <VoiceField
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={onChangeName}
         placeholder="e.g. Jane Smith"
-        autoComplete="off"
-        className="w-full mt-1 mb-3"
-        style={{
-          fontSize: 20,
-          padding: "14px 16px",
-          borderRadius: 14,
-          border: "2px solid #e7ddd0",
-          background: "#fff",
-          color: "var(--color-elder-ink)",
-        }}
+        ariaLabel="Their name"
       />
       <label
-        className="font-bold"
+        className="font-bold mt-3"
         style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
       >
         How do you know them?
       </label>
-      <input
-        type="text"
+      <VoiceField
         value={relationship}
-        onChange={(e) => setRelationship(e.target.value)}
+        onChange={onChangeRelationship}
         placeholder="e.g. my attorney, my daughter, my pastor"
-        autoComplete="off"
-        className="w-full mt-1 mb-3"
-        style={{
-          fontSize: 20,
-          padding: "14px 16px",
-          borderRadius: 14,
-          border: "2px solid #e7ddd0",
-          background: "#fff",
-          color: "var(--color-elder-ink)",
-        }}
+        ariaLabel="How do you know them"
       />
-      <div className="space-y-2 mt-auto">
-        <BigButton
-          variant="danger"
-          onClick={() =>
-            canSend && onPick({ kind: "trusted", name: name.trim(), relationship: relationship.trim() })
-          }
-        >
+      <div className="space-y-2 mt-auto pt-4">
+        <BigButton variant="danger" onClick={onSend}>
           {sending ? "Sending…" : `📨 Send to ${name.trim() || "this person"}`}
         </BigButton>
-        <BigButton variant="ghost" onClick={() => setMode("pick")}>← Back</BigButton>
+        <BigButton variant="ghost" onClick={onBack}>← Back</BigButton>
       </div>
+    </div>
+  );
+}
+
+function VoiceField({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+}) {
+  const [recording, setRecording] = useState(false);
+  const [working, setWorking] = useState(false);
+  const stopRef = useRef<null | (() => Promise<Blob | null>)>(null);
+
+  const start = async () => {
+    if (recording || working) return;
+    cancelSpeech();
+    try {
+      const ctrl = await startRecording(6000);
+      stopRef.current = ctrl.stop;
+      setRecording(true);
+    } catch {
+      /* mic blocked — typing still works */
+    }
+  };
+  const stop = async () => {
+    if (!stopRef.current) return;
+    setRecording(false);
+    setWorking(true);
+    try {
+      const blob = await stopRef.current();
+      stopRef.current = null;
+      if (!blob) return;
+      const transcript = (await transcribeAudio(blob)).trim();
+      if (transcript) {
+        const cleaned = transcript.replace(/[.。!?！？]+$/g, "").trim();
+        onChange(cleaned);
+      }
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="mt-1">
+      <div className="flex gap-2 items-stretch">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={recording ? "🎙 Listening…" : placeholder}
+          autoComplete="off"
+          aria-label={ariaLabel}
+          className="flex-1"
+          style={{
+            fontSize: 20,
+            padding: "14px 16px",
+            borderRadius: 14,
+            border: `2px solid ${recording ? "var(--color-elder-red)" : "#e7ddd0"}`,
+            background: "#fff",
+            color: "var(--color-elder-ink)",
+            minWidth: 0,
+          }}
+        />
+        <button
+          type="button"
+          onPointerDown={(e) => { e.preventDefault(); start(); }}
+          onPointerUp={(e) => { e.preventDefault(); stop(); }}
+          onPointerLeave={() => { if (recording) stop(); }}
+          onClick={(e) => e.preventDefault()}
+          aria-label={`Hold to speak ${ariaLabel}`}
+          className="font-bold active:scale-[0.97] shrink-0"
+          style={{
+            background: recording ? "var(--color-elder-red)" : "#fff",
+            color: recording ? "#fff" : "var(--color-elder-ink)",
+            border: `2px solid ${recording ? "var(--color-elder-red)" : "#e7ddd0"}`,
+            borderRadius: 14,
+            padding: "0 18px",
+            fontSize: 22,
+            minHeight: 56,
+            minWidth: 72,
+          }}
+        >
+          {working ? "…" : recording ? "●" : "🎙"}
+        </button>
+      </div>
+      {recording && (
+        <p
+          className="mt-1"
+          style={{ fontSize: 13, color: "var(--color-elder-red)", fontWeight: 700 }}
+        >
+          🎙 Listening… release when done.
+        </p>
+      )}
     </div>
   );
 }
