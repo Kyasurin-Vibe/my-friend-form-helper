@@ -34,42 +34,14 @@ export interface VoiceRecognitionService {
 export function classifyCommand(raw: string): VoiceCommand {
   const t = raw.toLowerCase().trim();
   if (!t) return "unknown";
-
-  // Multilingual "yes" — Chinese / Vietnamese / Tagalog / Spanish tokens.
-  // \b doesn't work for CJK, so check substrings too.
-  const yesTokens = [
-    // zh
-    "是的", "是", "好的", "好了", "好", "可以", "行", "准备好了", "拍", "拍照", "开始", "来吧", "对",
-    // vi
-    "có", "vâng", "dạ", "được", "sẵn sàng", "chụp", "đi",
-    // tl
-    "oo", "opo", "sige", "handa na", "handa", "kuhanan", "kunan",
-    // es
-    "sí", "si", "vale", "claro", "listo", "lista", "dale", "hazlo", "adelante", "ahora", "captura", "foto",
-  ];
-  if (yesTokens.some((w) => t.includes(w))) return "yes";
   if (/\b(yes|yeah|yea|yep|yup|ya|uh huh|mhm|correct|right|that's it|sure|ok|okay|okey|alright|all right|fine|please|capture|snap|take it|take the picture|take the photo|do it|go|go ahead|ready|scan|now)\b/.test(t)) return "yes";
-
-  const noTokens = [
-    // zh
-    "不要", "不行", "不", "等等", "等一下", "停", "取消", "再等",
-    // vi
-    "không", "đợi", "dừng", "hủy", "chưa",
-    // tl
-    "hindi", "teka", "hintay", "huwag", "kanselahin",
-    // es
-    "espera", "para", "cancela", "cancelar", "todavía no",
-  ];
-  if (noTokens.some((w) => t.includes(w))) return "no";
   if (/\b(no|nope|nah|wrong|not this|keep looking|wait|stop|cancel)\b/.test(t)) return "no";
-
   if (/\b(zoom|bigger|larger|closer|zoom in)\b/.test(t)) return "zoom";
   if (/\b(bright|brighter|lighter|light)\b/.test(t)) return "brighter";
   if (/\b(contrast|sharper|sharpen)\b/.test(t)) return "contrast";
   if (/\b(read|read this|read it|speak|say it)\b/.test(t)) return "read";
   return "unknown";
 }
-
 
 // Browser Web Speech API implementation.
 export function createWebSpeechService(): VoiceRecognitionService {
