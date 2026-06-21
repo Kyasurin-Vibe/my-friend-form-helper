@@ -161,6 +161,26 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         }
 
         setGuidance((prev) => (prev === next ? prev : next));
+
+        // === Auto-enhance (EMA-smoothed, subtle, no flicker) ===
+        // Target brightness: lift dark frames, leave bright ones alone.
+        const targetBrightness = Math.max(0.9, Math.min(1.45, 165 / Math.max(60, meanLum)));
+        // Target contrast: bump a touch when the frame is flat (low edges).
+        const targetContrast = Math.max(1, Math.min(1.35, 1 + (8 - Math.min(sharp, 8)) * 0.04));
+        // Target zoom: tighter once a document fills the frame.
+        const targetZoom =
+          paperFrac >= 0.5 ? 1.85 : paperFrac >= 0.35 ? 1.6 : 1.4;
+
+        const a = 0.18; // EMA alpha — slow enough to avoid flicker
+        const cur = autoRef.current;
+        cur.brightness = cur.brightness + (targetBrightness - cur.brightness) * a;
+        cur.contrast = cur.contrast + (targetContrast - cur.contrast) * a;
+        cur.zoom = cur.zoom + (targetZoom - cur.zoom) * a;
+
+        // Only commit when change is meaningful — keeps DOM stable.
+        setBrightness((b) => (Math.abs(b - cur.brightness) > 0.03 ? +cur.brightness.toFixed(2) : b));
+        setContrast((c) => (Math.abs(c - cur.contrast) > 0.03 ? +cur.contrast.toFixed(2) : c));
+        setZoom((z) => (Math.abs(z - cur.zoom) > 0.04 ? +cur.zoom.toFixed(2) : z));
       } catch { /* noop */ }
     }, 450);
     return () => window.clearInterval(id);
