@@ -1225,7 +1225,7 @@ function ChooseRecipientScreen({
           >
             Someone YOU pick — your own attorney or a family member you trust.
           </p>
-          <BigButton variant="ghost" onClick={onBack}>← Go back</BigButton>
+          <BigButton variant="ghost" onClick={onBack}>{t("back")}</BigButton>
           <VoiceBar
             speakableText={speakableForPhase("choose", { analysis, sendResult: null, analyzeError: null })}
             voiceOn={voiceOn}
