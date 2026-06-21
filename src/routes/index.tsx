@@ -14,7 +14,7 @@ import {
   type DocumentBounds,
   type SendResult,
 } from "@/lib/cases";
-import { getResources, getAccountablePartner } from "@/lib/resources";
+import { getResources, getAccountablePartner, normalizeSpokenEmail } from "@/lib/resources";
 import { cancelSpeech, startRecording, transcribeAudio, type VoiceAction } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
