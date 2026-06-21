@@ -82,6 +82,7 @@ function ElderApp() {
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
   const [sending, setSending] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [chooseMode, setChooseMode] = useState<"pick" | "trusted">("pick");
   const speech = useSpeech();
   const navigate = useNavigate();
 
@@ -292,10 +293,11 @@ function ElderApp() {
                 restart,
                 handleSend,
                 analysis,
+                setChooseMode,
               })
             }
-            screenId={phase}
-            actions={getPhaseActions(phase)}
+            screenId={phase === "choose" ? `choose:${chooseMode}` : phase}
+            actions={getPhaseActions(phase, chooseMode)}
             onAction={(id, { confirm }) =>
               runPhaseAction(id, confirm, {
                 phase,
@@ -305,6 +307,7 @@ function ElderApp() {
                 restart,
                 handleSend,
                 analysis,
+                setChooseMode,
               })
             }
           />
@@ -373,7 +376,10 @@ function ElderApp() {
                 onBack={() => setPhase(analysis ? "review" : "retake")}
                 onPick={(r) => handleSend(r)}
                 speech={speech}
+                mode={chooseMode}
+                setMode={setChooseMode}
               />
+
             ) : (
               <SentScreen
                 sendResult={sendResult}
@@ -997,15 +1003,18 @@ function ChooseRecipientScreen({
   onBack,
   onPick,
   speech,
+  mode,
+  setMode,
 }: {
   sending: boolean;
   analysis: AnalysisResult | null;
   onBack: () => void;
   onPick: (r: Recipient) => void;
   speech: ReturnType<typeof useSpeech>;
+  mode: "pick" | "trusted";
+  setMode: (m: "pick" | "trusted") => void;
 }) {
   const voiceOn = useContext(VoiceOnContext);
-  const [mode, setMode] = useState<"pick" | "trusted">("pick");
   const [name, setName] = useState("");
   const [relationship, setRelationship] = useState("");
   const [email, setEmail] = useState("");
@@ -1548,9 +1557,10 @@ function handlePhaseCommand(
     restart: () => void;
     handleSend: (r: Recipient) => void | Promise<void>;
     analysis: AnalysisResult | null;
+    setChooseMode: (m: "pick" | "trusted") => void;
   },
 ): boolean {
-  const { phase, setPhase, confirmPreview, navigate, restart, handleSend } = ctx;
+  const { phase, setPhase, confirmPreview, navigate, restart, handleSend, setChooseMode } = ctx;
 
   const yes = /\b(yes|yeah|yep|yup|sure|okay|ok|do it|go ahead|use this|use it|it's clear|its clear|looks good|good|send|send it|capture|take it|snap|take the picture|take the photo|connect me)\b/;
   const no = /\b(no|nope|nah|not yet|wait|keep looking|don't|dont)\b/;
@@ -1624,13 +1634,12 @@ function handlePhaseCommand(
       }
       if (/\b(trust|trusted|my own|someone i trust|my person|family|attorney|daughter|son)\b/.test(t)) {
         confirm("Okay — your trusted person.");
-        // The choose screen has its own internal state machine; the user will
-        // tap the form fields. We can't directly flip mode from here without
-        // exposing more state, so we just acknowledge — the big buttons remain.
+        setChooseMode("trusted");
         return true;
       }
       return false;
     }
+
     case "sent": {
       if (/\b(start over|again|new one|restart|another)\b/.test(t)) {
         confirm("Starting over.");
@@ -1652,7 +1661,7 @@ function handlePhaseCommand(
 
 // ===== AI-interpreted action catalog per phase =====
 
-function getPhaseActions(phase: Phase): { id: string; description: string }[] {
+function getPhaseActions(phase: Phase, chooseMode: "pick" | "trusted" = "pick"): { id: string; description: string }[] {
   switch (phase) {
     case "home":
       return [
@@ -1679,9 +1688,14 @@ function getPhaseActions(phase: Phase): { id: string; description: string }[] {
         { id: "retake", description: "Retake the photo instead" },
       ];
     case "choose":
+      if (chooseMode === "trusted") {
+        return [
+          { id: "back_to_pick", description: "Go back to the recipient choice (the user changed their mind)" },
+        ];
+      }
       return [
         { id: "center", description: "Send to the recommended center / institution / partner / legal aid / social worker" },
-        { id: "trusted", description: "Send to someone the user personally trusts, like family, daughter, son, attorney" },
+        { id: "trusted", description: "Send to someone the user personally trusts — trusted person, my own person, family, daughter, son, attorney, lawyer" },
       ];
     case "sent":
       return [
@@ -1704,9 +1718,10 @@ function runPhaseAction(
     restart: () => void;
     handleSend: (r: Recipient) => void | Promise<void>;
     analysis: AnalysisResult | null;
+    setChooseMode: (m: "pick" | "trusted") => void;
   },
 ): void {
-  const { setPhase, confirmPreview, navigate, restart, handleSend } = ctx;
+  const { setPhase, confirmPreview, navigate, restart, handleSend, setChooseMode } = ctx;
   switch (id) {
     case "magnifier": confirm("Opening the magnifier."); setPhase("viewer"); return;
     case "scan": confirm("Okay — let's scan it."); setPhase("find"); return;
@@ -1717,12 +1732,14 @@ function runPhaseAction(
     case "connect_person": confirm("Sending to a person."); setPhase("choose"); return;
     case "send": confirm("Sending now."); setPhase("choose"); return;
     case "center": confirm("Sending to the center."); void handleSend({ kind: "center" }); return;
-    case "trusted": confirm("Okay — your trusted person."); return;
+    case "trusted": confirm("Okay — your trusted person."); setChooseMode("trusted"); return;
+    case "back_to_pick": confirm("Okay — going back."); setChooseMode("pick"); return;
     case "restart": confirm("Starting over."); restart(); return;
     case "open_center": confirm("Opening the center."); navigate({ to: "/center" }); return;
     default: return;
   }
 }
+
 
 function DoneButton({ onClick }: { onClick: () => void }) {
   return (
