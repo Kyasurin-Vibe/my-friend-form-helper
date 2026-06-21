@@ -70,12 +70,8 @@ export function createWebSpeechService(): VoiceRecognitionService {
       rec.continuous = true;
       rec.interimResults = true;
       // Use the active app language so the mic actually understands the user.
-      try {
-        // Lazy import to avoid SSR cycles.
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { getBCP47 } = require("@/lib/i18n") as typeof import("@/lib/i18n");
-        rec.lang = getBCP47();
-      } catch { rec.lang = "en-US"; }
+      try { rec.lang = getBCP47(); } catch { rec.lang = "en-US"; }
+
       rec.onstart = () => {
         running = true;
         cb.onStart?.();
