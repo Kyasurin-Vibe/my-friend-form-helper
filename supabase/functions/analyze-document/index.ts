@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: CORS });
 
   try {
-    const { image } = await req.json();
+    const { image, language } = await req.json();
     if (!image || typeof image !== "string") {
       return Response.json({ error: "image (base64 data URL) required" }, { status: 400, headers: CORS });
     }
@@ -127,6 +127,12 @@ Deno.serve(async (req) => {
 
     const parsed = parseDataUrl(image);
     if (!parsed) return Response.json({ error: "image must be a data URL" }, { status: 400, headers: CORS });
+
+    const LANG_NAME: Record<string, string> = { en: "English", es: "Spanish", zh: "Chinese", vi: "Vietnamese", tl: "Tagalog" };
+    const langName = LANG_NAME[(language || "en").toLowerCase()] ?? "English";
+    const systemWithLang =
+      SYSTEM +
+      `\n- Write elderMessage, plainEnglishSummary, and possibleMissingFields in ${langName}. Keep them warm and plain. Keep documentType codes, enums, and field names in English.`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -138,7 +144,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 1024,
-        system: SYSTEM,
+        system: systemWithLang,
         tools: [TOOL],
         tool_choice: { type: "tool", name: "report_document" },
         messages: [{
