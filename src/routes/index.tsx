@@ -722,7 +722,7 @@ function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
           {t("open_scanner")}
         </button>
         <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
-          The magnifier uses your camera only on this device.
+          {t("camera_only_device")}
         </p>
       </div>
       <VoiceBar
@@ -802,7 +802,7 @@ function RetakeScreen({
         style={{ background: "#FFF6E5", border: "1px solid #F5DDA8" }}
       >
         <p className="font-bold mb-1" style={{ fontSize: 20, color: "#7a5a1c" }}>
-          I couldn't read it clearly.
+          {t("couldnt_read")}
         </p>
         {analysis?.elderMessage && (
           <p className="mb-2" style={{ fontSize: 16, color: "#6b5d52" }}>
@@ -810,9 +810,9 @@ function RetakeScreen({
           </p>
         )}
         <ul className="space-y-1" style={{ fontSize: 17 }}>
-          <li>✋ Hold still</li>
-          <li>💡 More light</li>
-          <li>🟦 Keep the corners in the box</li>
+          <li>{t("hold_still_emoji")}</li>
+          <li>{t("more_light")}</li>
+          <li>{t("corners_in_box")}</li>
         </ul>
       </div>
       <div className="space-y-2 mt-auto">
@@ -888,14 +888,14 @@ function ReviewScreen({
           style={{ background: "#fff", border: "1px solid #EFE6D6" }}
         >
           <p className="font-extrabold mb-2" style={{ fontSize: 20, color: "var(--color-elder-ink)" }}>
-            I couldn't read it clearly.
+            {t("couldnt_read")}
           </p>
           <p style={{ fontSize: 16, color: "#6b5d52" }}>
-            I'd rather not guess. You can try again, or send it for a person to look at.
+            {t("rather_not_guess")}
           </p>
           {analyzeError && (
             <p className="mt-2 text-sm" style={{ color: "#b91c1c" }}>
-              (Note: {analyzeError})
+              ({t("note_label")}: {analyzeError})
             </p>
           )}
         </div>
@@ -932,7 +932,7 @@ function ReviewScreen({
         }}
       >
         <p className="text-xs uppercase font-bold tracking-wide mb-1" style={{ color: "#6b5d52" }}>
-          Document
+          {t("document_label")}
         </p>
         <p className="font-extrabold mb-3" style={{ fontSize: 19, color: "var(--color-elder-ink)" }}>
           {docTitle}
