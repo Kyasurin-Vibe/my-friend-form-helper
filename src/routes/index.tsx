@@ -319,6 +319,7 @@ function ElderApp() {
             ) : phase === "choose" ? (
               <ChooseRecipientScreen
                 sending={sending}
+                analysis={analysis}
                 onBack={() => setPhase(analysis ? "review" : "retake")}
                 onPick={(r) => handleSend(r)}
                 speech={speech}
