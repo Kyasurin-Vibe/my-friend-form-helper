@@ -293,7 +293,21 @@ function ElderApp() {
                 analysis,
               })
             }
+            screenId={phase}
+            actions={getPhaseActions(phase)}
+            onAction={(id, { confirm }) =>
+              runPhaseAction(id, confirm, {
+                phase,
+                setPhase,
+                confirmPreview,
+                navigate,
+                restart,
+                handleSend,
+                analysis,
+              })
+            }
           />
+
 
           <CaptionsContext.Provider value={showCaptions}>
            <VoiceOnContext.Provider value={voiceOn}>
