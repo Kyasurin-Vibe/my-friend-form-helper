@@ -204,10 +204,6 @@ function ElderApp() {
               <LiveMagnifier
                 onCancel={() => setPhase("find")}
                 onConfirm={(img) => handleCapture(img)}
-                onHandoff={() => {
-                  setAnalysis(null);
-                  handleSend();
-                }}
               />
             ) : phase === "analyzing" ? (
               <AnalyzingScreen />
@@ -349,24 +345,22 @@ function AnalyzingScreen() {
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
       <Mascot mode="speaking" size={150} />
       <h2 className="mt-4 font-extrabold" style={{ fontSize: 26, color: "var(--color-elder-ink)" }}>
-        Let me look at this…
+        Reading your document… one moment
       </h2>
-      <p className="mt-2" style={{ fontSize: 17, color: "#6b5d52" }}>
-        Reading your paper carefully. This takes just a few seconds.
-      </p>
-      <div className="mt-6 flex gap-2">
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="inline-block rounded-full"
-            style={{
-              width: 14,
-              height: 14,
-              background: "var(--color-elder-primary)",
-              animation: `pulse 1.2s ${i * 0.15}s infinite ease-in-out`,
-            }}
-          />
-        ))}
+      <div
+        className="mt-6"
+        aria-label="Reading document"
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: "50%",
+          border: "6px solid var(--color-elder-sky)",
+          borderTopColor: "var(--color-elder-primary)",
+          animation: "spin 0.9s linear infinite",
+        }}
+      />
+      <div className="sr-only" role="status">
+        Reading your document… one moment
       </div>
       <div className="w-full max-w-sm mt-6">
         <VoiceBar
