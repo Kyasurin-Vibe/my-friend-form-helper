@@ -3,8 +3,16 @@ import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
 import { useSpeech } from "@/lib/useSpeech";
-import { addCase, buildCase, clearCases, type Branch } from "@/lib/handoff";
+import {
+  analyzeDocument,
+  sendToCenter,
+  speakWarm,
+  type AnalysisResult,
+  type SendResult,
+} from "@/lib/cases";
 import { playWarning, playSuccess } from "@/lib/chime";
+
+type Branch = "missing" | "complete";
 
 
 export const Route = createFileRoute("/")({
@@ -34,7 +42,12 @@ function ElderApp() {
   const [branch, setBranch] = useState<Branch>("missing");
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
   const [started, setStarted] = useState(true);
-  const [phase, setPhase] = useState<"find" | "magnifier" | "flow">("find");
+  const [phase, setPhase] = useState<"find" | "magnifier" | "analyzing" | "flow">("find");
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
+  const [sendResult, setSendResult] = useState<SendResult | null>(null);
+  const [sending, setSending] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const speech = useSpeech();
   const navigate = useNavigate();
 
@@ -49,31 +62,34 @@ function ElderApp() {
   // Speak on step change (after user has tapped once)
   useEffect(() => {
     if (!started || phase !== "flow") return;
+    if (step === 4 && analysis?.elderMessage) {
+      // Use AI-generated elder line, spoken warmly via Deepgram (with fallback).
+      speakWarm(analysis.elderMessage);
+      return;
+    }
+    if (step === 5 && sendResult?.elderMessage) {
+      speakWarm(sendResult.elderMessage);
+      return;
+    }
     const lines: Record<Step, string> = {
       1: "Hi, I'm My Friend. Put your paper in the box, and I'll take a look.",
       2: "That was a little blurry. Hold steady, and let's try again.",
-      3: "I can see this clearly now. This is your FL-142 — your list of assets. I can see your name and your assets.",
-      4:
-        branch === "missing"
-          ? "I checked your form. I'm not sure this one is ready. There's no signature and no date. Do you want to fix it yourself, or should I send it to a person?"
-          : "I checked your form. This looks complete.",
-      5:
-        branch === "missing"
-          ? "I won't guess on something this important. I've sent it to your legal aid center so a real person can check it for you."
-          : "It looks complete. I've sent it to your legal aid center so a person can confirm it before you file.",
+      3: "I can see this clearly now.",
+      4: "I checked your form.",
+      5: "I've sent it to the Legal Aid Center so a real person can check it.",
       6: "My Friend gives accountable help.",
     };
     speech.speak(lines[step]);
-    if (step === 5) {
-      addCase(buildCase(branch));
-    }
-  }, [step, branch, started, phase]); // eslint-disable-line
+  }, [step, branch, started, phase, analysis, sendResult]); // eslint-disable-line
 
   const restart = () => {
     setStep(1);
     setStarted(true);
     setPhase("find");
-    clearCases();
+    setAnalysis(null);
+    setSendResult(null);
+    setCapturedImage(undefined);
+    setAnalyzeError(null);
     speech.cancel();
   };
 
@@ -89,6 +105,66 @@ function ElderApp() {
       }, 50);
     }
   };
+
+  async function handleCapture(image?: string) {
+    setCapturedImage(image);
+    if (!image) {
+      // No frame captured (camera not ready) — go to the manual review path.
+      setBranch("missing");
+      setPhase("flow");
+      setStep(5);
+      return;
+    }
+    setPhase("analyzing");
+    setAnalyzeError(null);
+    try {
+      const result = await analyzeDocument(image);
+      setAnalysis(result);
+      if (result.recommendedAction === "retake") {
+        setPhase("flow");
+        setStep(2);
+        return;
+      }
+      setBranch(result.possibleMissingFields.length > 0 ? "missing" : "complete");
+      setPhase("flow");
+      setStep(4);
+    } catch (e) {
+      console.error("analyze failed", e);
+      setAnalyzeError(e instanceof Error ? e.message : "Could not analyze right now.");
+      // Safe handoff path
+      setBranch("missing");
+      setPhase("flow");
+      setStep(4);
+    }
+  }
+
+  async function handleSend() {
+    if (sending) return;
+    setSending(true);
+    try {
+      const result = await sendToCenter({
+        image: capturedImage,
+        analysis:
+          analysis ?? {
+            readable: true,
+            documentType: "unknown",
+            documentName: "Unknown document",
+            confidence: 0.5,
+            plainEnglishSummary: "User submitted without automated analysis.",
+            possibleMissingFields: [],
+            recommendedAction: "human_review",
+            elderMessage: "Sent for human review.",
+          },
+      });
+      setSendResult(result);
+      setStep(5);
+    } catch (e) {
+      console.error("send failed", e);
+      setAnalyzeError(e instanceof Error ? e.message : "Could not send right now.");
+    } finally {
+      setSending(false);
+    }
+  }
 
 
 
@@ -146,16 +222,26 @@ function ElderApp() {
           ) : phase === "magnifier" ? (
             <LiveMagnifier
               onCancel={() => setPhase("find")}
-              onConfirm={() => {
-                setPhase("flow");
-                setStep(3);
-              }}
+              onConfirm={(img) => handleCapture(img)}
               onHandoff={() => {
                 setBranch("missing");
+                setAnalysis({
+                  readable: true,
+                  documentType: "unknown",
+                  documentName: "Unknown document",
+                  confidence: 0.5,
+                  plainEnglishSummary: "User asked for a person to review without analysis.",
+                  possibleMissingFields: ["user requested human review"],
+                  recommendedAction: "human_review",
+                  elderMessage: "Okay. I'll send this to the Legal Aid Center for a person to look at.",
+                });
+                handleSend();
                 setPhase("flow");
                 setStep(5);
               }}
             />
+          ) : phase === "analyzing" ? (
+            <AnalyzingScreen />
           ) : (
             <ScreenRouter
               step={step}
@@ -163,6 +249,11 @@ function ElderApp() {
               branch={branch}
               speech={speech}
               showCaptions={showCaptions}
+              analysis={analysis}
+              sendResult={sendResult}
+              sending={sending}
+              analyzeError={analyzeError}
+              onSend={handleSend}
               onGoCenter={() => navigate({ to: "/center" })}
             />
           )}
@@ -352,12 +443,45 @@ function FindDocGate({
 }
 
 
+function AnalyzingScreen() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+      <Mascot mode="speaking" size={150} />
+      <h2 className="mt-4 font-extrabold" style={{ fontSize: 26, color: "var(--color-elder-ink)" }}>
+        Let me look at this…
+      </h2>
+      <p className="mt-2" style={{ fontSize: 17, color: "#6b5d52" }}>
+        Reading your paper carefully. This takes just a few seconds.
+      </p>
+      <div className="mt-6 flex gap-2">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="inline-block rounded-full"
+            style={{
+              width: 14,
+              height: 14,
+              background: "var(--color-elder-primary)",
+              animation: `pulse 1.2s ${i * 0.15}s infinite ease-in-out`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ScreenRouter({
   step,
   setStep,
   branch,
   speech,
   showCaptions,
+  analysis,
+  sendResult,
+  sending,
+  analyzeError,
+  onSend,
   onGoCenter,
 }: {
   step: Step;
@@ -365,6 +489,11 @@ function ScreenRouter({
   branch: Branch;
   speech: ReturnType<typeof useSpeech>;
   showCaptions: boolean;
+  analysis: AnalysisResult | null;
+  sendResult: SendResult | null;
+  sending: boolean;
+  analyzeError: string | null;
+  onSend: () => void;
   onGoCenter: () => void;
 }) {
   const next = (n: Step) => setStep(n);
@@ -382,13 +511,24 @@ function ScreenRouter({
             return (
               <Screen4
                 branch={branch}
-                onSendToCenter={() => next(5)}
+                analysis={analysis}
+                sending={sending}
+                analyzeError={analyzeError}
+                onSendToCenter={onSend}
                 onFixSelf={() => setStep(1)}
                 speech={speech}
               />
             );
           case 5:
-            return <Screen5 branch={branch} onGoCenter={onGoCenter} speech={speech} />;
+            return (
+              <Screen5
+                branch={branch}
+                sendResult={sendResult}
+                analysis={analysis}
+                onGoCenter={onGoCenter}
+                speech={speech}
+              />
+            );
           case 6:
             return <Screen6 />;
         }
@@ -396,6 +536,7 @@ function ScreenRouter({
     </CaptionsCtx>
   );
 }
+
 
 // ===== Shared building blocks =====
 
@@ -617,11 +758,17 @@ function Screen3({
 
 function Screen4({
   branch,
+  analysis,
+  sending,
+  analyzeError,
   onSendToCenter,
   onFixSelf,
   speech,
 }: {
   branch: Branch;
+  analysis: AnalysisResult | null;
+  sending: boolean;
+  analyzeError: string | null;
   onSendToCenter: () => void;
   onFixSelf: () => void;
   speech: ReturnType<typeof useSpeech>;
@@ -629,25 +776,13 @@ function Screen4({
   useEffect(() => {
     if (branch === "missing") playWarning();
   }, [branch]);
-  const rows =
-    branch === "missing"
-      ? [
-          { ok: true, label: "Name" },
-          { ok: true, label: "Assets" },
-          { ok: true, label: "Debts" },
-          { ok: false, label: "Signature" },
-          { ok: false, label: "Date" },
-        ]
-      : [
-          { ok: true, label: "Name" },
-          { ok: true, label: "Assets" },
-          { ok: true, label: "Debts" },
-          { ok: true, label: "Signature" },
-          { ok: true, label: "Date" },
-        ];
+
+  const missing = analysis?.possibleMissingFields ?? (branch === "missing" ? ["Signature area appears blank", "Date area appears blank"] : []);
+  const docTitle = analysis ? `${analysis.documentType} — ${analysis.documentName}` : "FL-142 — Schedule of Assets and Debts";
+
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-      <MascotHeader speech={speech} small face="surprised" />
+      <MascotHeader speech={speech} small face={missing.length ? "surprised" : "smile"} />
       <div
         className="rounded-3xl p-4 mt-3 mb-3"
         style={{
@@ -656,62 +791,56 @@ function Screen4({
           boxShadow: "0 8px 24px rgba(36,31,26,0.06)",
         }}
       >
-        <p className="font-bold mb-2" style={{ fontSize: 20 }}>
-          Here's what I found:
+        <p className="text-xs uppercase font-bold tracking-wide mb-1" style={{ color: "#6b5d52" }}>
+          Document
         </p>
-        <ul className="space-y-2">
-          {rows.map((r) => (
-            <li
-              key={r.label}
-              className="flex items-center gap-3"
-              style={{ fontSize: 22, fontWeight: 600 }}
-            >
-              <span
-                aria-hidden
-                className="inline-flex items-center justify-center"
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 10,
-                  background: r.ok ? "#E6F3EE" : "#FBEBD8",
-                  color: r.ok
-                    ? "var(--color-elder-teal)"
-                    : "var(--color-elder-amber)",
-                  fontWeight: 800,
-                }}
-              >
-                {r.ok ? "✓" : "!"}
-              </span>
-              <span style={{ color: r.ok ? "var(--color-elder-ink)" : "#7a5a1c" }}>
-                {r.label}
-              </span>
-              <span
-                className="ml-auto text-xs font-bold uppercase tracking-wide"
-                style={{
-                  color: r.ok
-                    ? "var(--color-elder-teal)"
-                    : "var(--color-elder-amber)",
-                }}
-              >
-                {r.ok ? "found" : "missing"}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <p
-          className="mt-3 font-semibold"
-          style={{
-            fontSize: 18,
-            color: branch === "missing" ? "#7a5a1c" : "var(--color-elder-teal)",
-          }}
-        >
-          {branch === "missing"
-            ? "I'm not sure this one is ready."
-            : "This looks complete."}
+        <p className="font-extrabold mb-3" style={{ fontSize: 19, color: "var(--color-elder-ink)" }}>
+          {docTitle}
         </p>
+        {analysis?.plainEnglishSummary && (
+          <p className="mb-3" style={{ fontSize: 16, color: "#6b5d52" }}>
+            {analysis.plainEnglishSummary}
+          </p>
+        )}
+        {missing.length > 0 ? (
+          <>
+            <p className="font-bold mb-2" style={{ fontSize: 18, color: "#7a5a1c" }}>
+              I see some spots that may be blank:
+            </p>
+            <ul className="space-y-2">
+              {missing.map((m, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-3"
+                  style={{ fontSize: 18, fontWeight: 600 }}
+                >
+                  <span
+                    aria-hidden
+                    className="inline-flex items-center justify-center shrink-0"
+                    style={{
+                      width: 30, height: 30, borderRadius: 10,
+                      background: "#FBEBD8", color: "var(--color-elder-amber)",
+                      fontWeight: 800,
+                    }}
+                  >!</span>
+                  <span style={{ color: "#7a5a1c" }}>{m}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="font-semibold" style={{ fontSize: 18, color: "var(--color-elder-teal)" }}>
+            ✓ Nothing obviously missing. A person will still confirm before anything is filed.
+          </p>
+        )}
+        {analyzeError && (
+          <p className="mt-2 text-sm" style={{ color: "#b91c1c" }}>
+            (Note: {analyzeError})
+          </p>
+        )}
       </div>
       <VoiceControls speech={speech} />
-      {branch === "missing" ? (
+      {missing.length > 0 ? (
         <div className="space-y-2">
           <BigButton
             variant="ghost"
@@ -720,14 +849,16 @@ function Screen4({
               onFixSelf();
             }}
           >
-            ✍️ I'll fix it myself
+            ✍️ No, keep looking
           </BigButton>
           <BigButton variant="danger" onClick={onSendToCenter}>
-            🤝 I don't know — send to a person
+            {sending ? "Sending…" : "🤝 Yes, send it"}
           </BigButton>
         </div>
       ) : (
-        <BigButton variant="danger" onClick={onSendToCenter}>What happens now?</BigButton>
+        <BigButton variant="danger" onClick={onSendToCenter}>
+          {sending ? "Sending…" : "✓ Yes, send it"}
+        </BigButton>
       )}
     </div>
   );
@@ -735,29 +866,29 @@ function Screen4({
 
 function Screen5({
   branch,
+  sendResult,
+  analysis,
   onGoCenter,
   speech,
 }: {
   branch: Branch;
+  sendResult: SendResult | null;
+  analysis: AnalysisResult | null;
   onGoCenter: () => void;
   speech: ReturnType<typeof useSpeech>;
 }) {
-  const log =
-    branch === "missing"
-      ? [
-          ["2:14", "Scanned FL-142"],
-          ["2:14", "Read: name, assets, debts"],
-          ["2:14", "Missing: signature, date"],
-          ["2:14", "Flagged: human review"],
-          ["2:15", "Sent to legal aid center"],
-        ]
-      : [
-          ["2:14", "Scanned FL-142"],
-          ["2:14", "Read: name, assets, debts"],
-          ["2:14", "All required fields present"],
-          ["2:14", "Flagged: human review"],
-          ["2:15", "Sent to legal aid center"],
-        ];
+  const trackingId = sendResult?.trackingId ?? "—";
+  const centerName = sendResult?.centerName ?? "Legal Aid Center";
+  const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
+
+  const log = [
+    "Photo captured on this device",
+    `Identified as ${analysis?.documentType ?? "unknown document"}`,
+    isReview
+      ? `Flagged ${analysis?.possibleMissingFields.length ?? 0} spot(s) for human review`
+      : "No obvious missing fields",
+    `Sent to ${centerName}`,
+  ];
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto">
       <MascotHeader speech={speech} small face={branch === "missing" ? "x" : "smile"} />
@@ -777,7 +908,7 @@ function Screen5({
             className="font-extrabold"
             style={{ fontSize: 22, letterSpacing: 0.5 }}
           >
-            MF-2048
+            {trackingId}
           </span>
         </div>
         <div
@@ -788,24 +919,24 @@ function Screen5({
             fontSize: 16,
           }}
         >
-          📨 Delivered — waiting for a staff member
+          📨 Delivered to {centerName}
         </div>
         <p
           className="mt-3 font-semibold"
           style={{ fontSize: 18, color: "var(--color-elder-ink)" }}
         >
-          {branch === "missing"
+          {isReview
             ? "I won't guess on something this important. A real person will check it for you."
-            : "A person will confirm it before you file."}
+            : "A person will confirm it before anything is filed."}
         </p>
         <div className="mt-3">
           <p className="text-xs uppercase font-bold tracking-wide" style={{ color: "#6b5d52" }}>
             What I did
           </p>
           <ul className="mt-1 space-y-1">
-            {log.map(([t, s]) => (
-              <li key={t + s} className="flex gap-3 text-[15px]">
-                <span style={{ color: "#6b5d52", minWidth: 40 }}>{t}</span>
+            {log.map((s, i) => (
+              <li key={i} className="flex gap-3 text-[15px]">
+                <span style={{ color: "#6b5d52", minWidth: 16 }}>{i + 1}.</span>
                 <span>{s}</span>
               </li>
             ))}
