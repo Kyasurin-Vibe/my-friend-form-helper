@@ -22,7 +22,13 @@ type Hint =
   | "possibleFace"
   | "moveCloser"
   | "holdStill"
-  | "documentDetected";
+  | "documentDetected"
+  | "aiChecking"
+  | "aiNoDoc"
+  | "aiUnreadable"
+  | "aiReady"
+  | "aiUnavailable";
+
 
 function speak(text: string, onDone?: () => void) {
   if (typeof window === "undefined") return;
