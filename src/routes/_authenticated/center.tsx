@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useCases, CENTER_NAME, type CaseRow } from "@/lib/cases";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/center")({
+export const Route = createFileRoute("/_authenticated/center")({
   head: () => ({
     meta: [
       { title: `My Friend — ${CENTER_NAME} · Review Queue` },

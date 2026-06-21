@@ -9,55 +9,48 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as CenterRouteImport } from './routes/center'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedCenterRouteImport } from './routes/_authenticated/center'
 
-const CenterRoute = CenterRouteImport.update({
-  id: '/center',
-  path: '/center',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedCenterRoute = AuthenticatedCenterRouteImport.update({
+  id: '/_authenticated/center',
+  path: '/center',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/center': typeof CenterRoute
+  '/center': typeof AuthenticatedCenterRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/center': typeof CenterRoute
+  '/center': typeof AuthenticatedCenterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/center': typeof CenterRoute
+  '/_authenticated/center': typeof AuthenticatedCenterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths: '/' | '/center'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/center'
-  id: '__root__' | '/' | '/center'
+  id: '__root__' | '/' | '/_authenticated/center'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CenterRoute: typeof CenterRoute
+  AuthenticatedCenterRoute: typeof AuthenticatedCenterRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/center': {
-      id: '/center'
-      path: '/center'
-      fullPath: '/center'
-      preLoaderRoute: typeof CenterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -65,12 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/center': {
+      id: '/_authenticated/center'
+      path: '/center'
+      fullPath: '/center'
+      preLoaderRoute: typeof AuthenticatedCenterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CenterRoute: CenterRoute,
+  AuthenticatedCenterRoute: AuthenticatedCenterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
