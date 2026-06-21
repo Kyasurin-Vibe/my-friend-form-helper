@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getLang, getBCP47, getTTSVoice, ttsSupportsDeepgram, translateAsync, translateSync } from "@/lib/i18n";
+import { getLang, getBCP47, getTTSVoice, ttsSupportsDeepgram, translateAsync, translateSync, splitAiSegments, stripAiMarkers } from "@/lib/i18n";
 
 
 export type Branch = "missing" | "complete";
@@ -292,18 +292,29 @@ export function useCases(): CaseRow[] {
 }
 
 // Speak a line via Deepgram (warm voice), with browser fallback if it fails or is slow.
-export async function speakWarm(text: string, opts?: { timeoutMs?: number }): Promise<void> {
+export async function speakWarm(text: string, opts?: { timeoutMs?: number; skipTranslate?: boolean }): Promise<void> {
   if (typeof window === "undefined" || !text) return;
-  // Auto-translate fixed English app lines into the chosen language.
+  // Split into fixed-English segments (translate) and AI segments (already
+  // in the target language — do NOT translate). AI content is tagged with
+  // aiText() in i18n.ts.
   const lang = getLang();
   let spoken = text;
-  if (lang !== "en") {
-    spoken = translateSync(text, lang);
-    if (spoken === text) {
-      // Not cached yet — fetch (and speak original meanwhile would race), so
-      // wait briefly for translation to land, then speak the translated text.
-      try { spoken = await translateAsync(text, lang); } catch { spoken = text; }
+  if (opts?.skipTranslate) {
+    spoken = stripAiMarkers(text);
+  } else if (lang === "en") {
+    spoken = stripAiMarkers(text);
+  } else {
+    const segs = splitAiSegments(text);
+    const out: string[] = [];
+    for (const seg of segs) {
+      if (seg.ai || !seg.text.trim()) { out.push(seg.text); continue; }
+      let tr = translateSync(seg.text, lang);
+      if (tr === seg.text) {
+        try { tr = await translateAsync(seg.text, lang); } catch { tr = seg.text; }
+      }
+      out.push(tr);
     }
+    spoken = out.join("");
   }
   const timeoutMs = opts?.timeoutMs ?? 1500;
   const w = window as unknown as { __mfTtsAudio?: HTMLAudioElement };
