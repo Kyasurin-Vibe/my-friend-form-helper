@@ -25,6 +25,13 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+const ADJACENT_OFFSETS = [
+  { dx: -1, dy: 0 },
+  { dx: 1, dy: 0 },
+  { dx: 0, dy: -1 },
+  { dx: 0, dy: 1 },
+];
+
 // Lightweight TTS helper local to this screen, so it composes with the
 // outer useSpeech without fighting it for the queue.
 function speak(text: string, onDone?: () => void) {
