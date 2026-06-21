@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { DemoServices, type VoiceCommand } from "@/lib/services";
 import type { DocumentBounds } from "@/lib/cases";
+import { speakWarm } from "@/lib/cases";
 import { supabase } from "@/integrations/supabase/client";
-import { translateAsync, translateSync, getLang, getBCP47, t, onLangChange } from "@/lib/i18n";
+import { getLang, t, onLangChange } from "@/lib/i18n";
+import { useVoiceLoop } from "@/lib/voice-loop";
 
 
 type CaptureResult = {
@@ -30,27 +31,6 @@ type Hint =
   | "aiReady"
   | "aiUnavailable";
 
-
-function speak(text: string, onDone?: () => void) {
-  if (typeof window === "undefined") return;
-  const synth = window.speechSynthesis;
-  if (!synth) { onDone?.(); return; }
-  synth.cancel();
-  const lang = getLang();
-  const startSpeak = (final: string) => {
-    const utterance = new SpeechSynthesisUtterance(final);
-    utterance.rate = 0.95;
-    utterance.pitch = 1.05;
-    try { utterance.lang = getBCP47(); } catch { /* noop */ }
-    utterance.onend = () => onDone?.();
-    utterance.onerror = () => onDone?.();
-    synth.speak(utterance);
-  };
-  if (lang === "en") { startSpeak(text); return; }
-  const cached = translateSync(text, lang);
-  if (cached !== text) { startSpeak(cached); return; }
-  translateAsync(text, lang).then((tr) => startSpeak(tr || text)).catch(() => startSpeak(text));
-}
 
 
 const GUIDE_WIDTH_PCT = 78;
