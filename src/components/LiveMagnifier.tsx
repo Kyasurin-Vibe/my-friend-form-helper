@@ -115,7 +115,6 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           await videoRef.current.play().catch(() => undefined);
         }
         setReady(true);
-        setVoiceArmed(true);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Camera unavailable");
       }
@@ -130,14 +129,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   useEffect(() => {
     if (!ready || introSpokenRef.current) return;
     introSpokenRef.current = true;
-    speakingRef.current = true;
-    speak(
-      "Fit your paper inside the frame. Say \"yes\" or tap the red button when ready.",
-      () => {
-        speakingRef.current = false;
-        if (shouldListenRef.current) startVoice();
-      },
-    );
+    void speakWarm(t("scan_hint"), { skipTranslate: true });
   }, [ready]);
 
   // ===== Lightweight per-frame analysis: 64x48 downsample, ~5 Hz =====
