@@ -9,7 +9,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const CENTER_NAME = "Legal Aid Center";
+const DEFAULT_CENTER_NAME = "Legal Aid Center";
 
 type Bounds = { x: number; y: number; width: number; height: number; confidence: number };
 type Analysis = {
