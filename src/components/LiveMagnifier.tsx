@@ -104,7 +104,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   }, []);
 
   // === Real frame analysis: only auto-capture when a paper-like, sharp,
-  // bright region fills enough of the frame. Faces / hands / room must NOT trigger. ===
+  // bright, low-saturation region fills enough of the frame. Faces / hands / room must NOT trigger. ===
   useEffect(() => {
     if (!ready) return;
     const v = videoRef.current;
@@ -122,7 +122,10 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         ctx.drawImage(v, 0, 0, W, H);
         const data = ctx.getImageData(0, 0, W, H).data;
         const lum = new Float32Array(W * H);
+        const paperMask = new Uint8Array(W * H);
         let lumSum = 0, paperCount = 0;
+        const rowCounts = new Uint16Array(H);
+        const colCounts = new Uint16Array(W);
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
           const r = data[i], g = data[i + 1], b = data[i + 2];
           const y = 0.299 * r + 0.587 * g + 0.114 * b;
@@ -131,8 +134,14 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
           const sat = max === 0 ? 0 : (max - min) / max;
           lum[p] = y;
           lumSum += y;
-          // Paper-like: bright AND low color saturation (skin/walls are saturated or dim)
-          if (y > 140 && sat < 0.22) paperCount++;
+          const skinTone = r > 95 && g > 45 && b > 30 && r > g && r > b && r - b > 20 && sat > 0.12;
+          // Paper-like: bright AND low color saturation, explicitly excluding skin-tone blobs.
+          if (y > 145 && sat < 0.2 && !skinTone) {
+            paperMask[p] = 1;
+            paperCount++;
+            rowCounts[Math.floor(p / W)]++;
+            colCounts[p % W]++;
+          }
         }
         const meanLum = lumSum / (W * H);
         const paperFrac = paperCount / (W * H);
@@ -149,12 +158,50 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         }
         const sharp = edgeSum / edgeN;
 
+        let minX = W, maxX = -1, minY = H, maxY = -1;
+        for (let y = 0; y < H; y++) {
+          if (rowCounts[y] > W * 0.18) { minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+        }
+        for (let x = 0; x < W; x++) {
+          if (colCounts[x] > H * 0.18) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
+        }
+
+        const boxW = Math.max(0, maxX - minX + 1);
+        const boxH = Math.max(0, maxY - minY + 1);
+        const boxArea = boxW * boxH;
+        let boxPaper = 0;
+        if (boxArea > 0) {
+          for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) boxPaper += paperMask[y * W + x];
+          }
+        }
+        const boxAreaFrac = boxArea / (W * H);
+        const boxDensity = boxArea > 0 ? boxPaper / boxArea : 0;
+        const aspect = boxH > 0 ? boxW / boxH : 0;
+        const hasDocumentRegion =
+          meanLum >= 75 &&
+          paperFrac >= 0.3 &&
+          boxAreaFrac >= 0.38 &&
+          boxDensity >= 0.48 &&
+          aspect >= 0.48 &&
+          aspect <= 1.9;
+
         let next: Guidance;
-        if (meanLum < 70) next = "init"; // too dark / no view
-        else if (paperFrac < 0.28) next = "init"; // no paper-like region (face/room/hand)
-        else if (paperFrac < 0.45) next = "corners"; // partial paper — frame it
+        if (meanLum < 70 || !hasDocumentRegion) next = "init"; // no document-like region (face/room/hand)
+        else if (paperFrac < 0.45 || boxAreaFrac < 0.48) next = "corners"; // partial paper — frame it
         else if (sharp < 5.5) next = "blurry";
         else next = "detected";
+
+        setDetectionBox(
+          hasDocumentRegion
+            ? {
+                x: clamp(minX / W, 0.04, 0.86),
+                y: clamp(minY / H, 0.04, 0.86),
+                w: clamp(boxW / W, 0.12, 0.92),
+                h: clamp(boxH / H, 0.12, 0.92),
+              }
+            : null,
+        );
 
         // Require 2 consecutive paper+sharp frames before triggering capture
         if (next === "detected") {
@@ -173,7 +220,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         const targetContrast = Math.max(1, Math.min(1.35, 1 + (8 - Math.min(sharp, 8)) * 0.04));
         // Target zoom: tighter once a document fills the frame.
         const targetZoom =
-          paperFrac >= 0.5 ? 1.85 : paperFrac >= 0.35 ? 1.6 : 1.4;
+          hasDocumentRegion && boxAreaFrac >= 0.5 ? 1.85 : hasDocumentRegion ? 1.6 : 1.25;
 
         const a = 0.18; // EMA alpha — slow enough to avoid flicker
         const cur = autoRef.current;
