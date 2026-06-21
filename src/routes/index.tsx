@@ -76,11 +76,15 @@ function isValidBounds(b: DocumentBounds | null | undefined): boolean {
 
 function ElderApp() {
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
-  const [phase, setPhase] = useState<Phase>(
-    typeof window !== "undefined" && localStorage.getItem("mf_lang") ? "home" : "language",
-  );
+  const [phase, setPhase] = useState<Phase>("language");
   const [, forceRerender] = useState(0);
   useEffect(() => {
+    // Read stored language after mount to avoid SSR hydration mismatch.
+    try {
+      if (typeof window !== "undefined" && localStorage.getItem("mf_lang")) {
+        setPhase("home");
+      }
+    } catch { /* noop */ }
     const off = onLangChange(() => forceRerender((n) => n + 1));
     return () => { off(); };
   }, []);
