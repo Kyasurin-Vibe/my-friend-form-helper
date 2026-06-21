@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { DemoServices } from "@/lib/services";
 
 type Props = {
   onBack: () => void;
@@ -33,6 +34,9 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const introSpokenRef = useRef(false);
+  const speakingRef = useRef(false);
+  const shouldListenRef = useRef(false);
+  const lastCmdAtRef = useRef(0);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -80,7 +84,13 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   }, []);
 
   const speakConfirm = useCallback((text: string) => {
-    speak(text);
+    speakingRef.current = true;
+    try { DemoServices.voice.stop(); } catch { /* noop */ }
+    speak(text, () => {
+      speakingRef.current = false;
+      if (shouldListenRef.current) startVoice();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const doBigger = useCallback(() => {
@@ -115,28 +125,92 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   useEffect(() => {
     if (!ready || introSpokenRef.current) return;
     introSpokenRef.current = true;
+    speakingRef.current = true;
     speak(
-      "I'll make things bigger and clearer. Say bigger, smaller, brighter, or dimmer.",
+      "I'll make things bigger and clearer. If it's hard to see, just say 'bigger', 'smaller', or 'brighter'.",
+      () => {
+        speakingRef.current = false;
+        if (shouldListenRef.current) startVoice();
+      },
     );
+    shouldListenRef.current = true;
+    startVoice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
   useEffect(() => {
     return () => {
+      shouldListenRef.current = false;
+      try { DemoServices.voice.stop(); } catch { /* noop */ }
       try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
     };
   }, []);
 
-  useEffect(() => {
-    const onCommand = (event: Event) => {
-      const action = (event as CustomEvent<{ action?: string }>).detail?.action;
-      if (action === "bigger") doBigger();
-      else if (action === "smaller") doSmaller();
-      else if (action === "brighter") doBrighter();
-      else if (action === "dimmer") doDimmer();
-    };
-    window.addEventListener("mf-simple-magnifier-command", onCommand);
-    return () => window.removeEventListener("mf-simple-magnifier-command", onCommand);
-  }, [doBigger, doSmaller, doBrighter, doDimmer]);
+  function startVoice() {
+    const service = DemoServices.voice;
+    if (!service.available()) return;
+    if (speakingRef.current) return;
+    try {
+      service.start({
+        onStart: () => { /* listening */ },
+        onEnd: () => {
+          if (shouldListenRef.current && !speakingRef.current) {
+            window.setTimeout(() => startVoice(), 250);
+          }
+        },
+        onError: () => { /* swallow */ },
+        onTranscript: () => undefined,
+        onCommand: (_cmd, raw) => {
+          const t = (raw || "").toLowerCase().trim();
+          if (!t) return;
+          // de-dupe rapid duplicate fires
+          const now = Date.now();
+          if (now - lastCmdAtRef.current < 400) return;
+
+          // Navigation intents first
+          if (/\b(question|document|scan|paper|form|read|help me read)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            shouldListenRef.current = false;
+            try { service.stop(); } catch { /* noop */ }
+            onQuestion();
+            return;
+          }
+          if (/\b(go back|back to home|home|exit|cancel|quit|done|return)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            shouldListenRef.current = false;
+            try { service.stop(); } catch { /* noop */ }
+            onBack();
+            return;
+          }
+
+          // Brightness intents — check DIMMER first (more specific phrases),
+          // and be generous with how speech-to-text mis-hears "dimmer".
+          if (/\b(dim|dimmer|dimer|dimmed|demure|dimm|too bright|too light|too white|darker|darken|less light|less bright|lower brightness|reduce (the )?light|reduce brightness|make it darker|make it dimmer|tone it down)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            doDimmer();
+            return;
+          }
+          if (/\b(bright|brighter|too dark|more light|lighter|light it up|brighten|can't see it|cant see it|still can't see|still cant see)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            doBrighter();
+            return;
+          }
+
+          // Zoom intents
+          if (/\b(smaller|too big|zoom out|further|farther|back out|less)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            doSmaller();
+            return;
+          }
+          if (/\b(bigger|larger|zoom in|closer|enlarge|magnify|more|can't see|cant see|hard to see)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            doBigger();
+            return;
+          }
+        },
+      });
+    } catch { /* noop */ }
+  }
 
   const btn = (label: string, onClick: () => void, big = false) => (
     <button

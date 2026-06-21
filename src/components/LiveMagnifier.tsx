@@ -540,20 +540,6 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     }
   }
 
-  useEffect(() => {
-    const onCommand = (event: Event) => {
-      const action = (event as CustomEvent<{ action?: string }>).detail?.action;
-      if (action === "capture") doCapture();
-      else if (action === "wait") {
-        setCountdown(0);
-        consecutiveReadyRef.current = 0;
-      }
-    };
-    window.addEventListener("mf-scanner-command", onCommand);
-    return () => window.removeEventListener("mf-scanner-command", onCommand);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const hintText: Record<Hint, string> = {
     starting: "Starting camera…",
     tooDark: "💡 Too dark — move to better light",
