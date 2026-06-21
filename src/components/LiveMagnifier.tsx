@@ -19,7 +19,7 @@ const GUIDANCE_TEXT: Record<Guidance, string> = {
   "hold-still": "Hold still…",
   corners: "Put all four corners inside the frame.",
   blurry: "The picture is too blurry. Please try again.",
-  detected: "This looks like FL-142. Is this the file you are looking for?",
+  detected: "Looks clear. Tap the red button to capture and check it.",
 };
 
 // Lightweight TTS helper local to this screen, so it composes with the
