@@ -56,6 +56,20 @@ export function PersistentVoice({
   const [confirmation, setConfirmation] = useState("");
   const [blocked, setBlocked] = useState(false);
 
+  // If a screen-owned voice loop is registered, prefer its screen + actions.
+  const active = useActiveVoiceLoop();
+  const effectiveScreen = active?.screen ?? screenId;
+  const effectiveActions: IntentAction[] | undefined = active
+    ? actionDescriptors(active)
+    : actions;
+  const effectiveOnAction = active
+    ? (id: string, helpers: { confirm: (msg: string) => void }) => {
+        const fn = active.actions[id];
+        if (fn) fn();
+        else onAction?.(id, helpers);
+      }
+    : onAction;
+
   const shouldRunRef = useRef(false);
   const speakingRef = useRef(false);
   const lastCmdAtRef = useRef(0);
@@ -64,9 +78,9 @@ export function PersistentVoice({
   const onBackRef = useRef(onBack);
   const onDoneRef = useRef(onDone);
   const helpRef = useRef(helpHint);
-  const screenRef = useRef(screenId);
-  const actionsRef = useRef(actions);
-  const onActionRef = useRef(onAction);
+  const screenRef = useRef(effectiveScreen);
+  const actionsRef = useRef(effectiveActions);
+  const onActionRef = useRef(effectiveOnAction);
   const interpretingRef = useRef(false);
 
   useEffect(() => { speakableRef.current = speakable; }, [speakable]);
@@ -74,9 +88,9 @@ export function PersistentVoice({
   useEffect(() => { onBackRef.current = onBack; }, [onBack]);
   useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
   useEffect(() => { helpRef.current = helpHint; }, [helpHint]);
-  useEffect(() => { screenRef.current = screenId; }, [screenId]);
-  useEffect(() => { actionsRef.current = actions; }, [actions]);
-  useEffect(() => { onActionRef.current = onAction; }, [onAction]);
+  useEffect(() => { screenRef.current = effectiveScreen; }, [effectiveScreen]);
+  useEffect(() => { actionsRef.current = effectiveActions; }, [effectiveActions]);
+  useEffect(() => { onActionRef.current = effectiveOnAction; }, [effectiveOnAction]);
 
   // Voice is active on EVERY screen whenever the user keeps it on.
   // `paused` is accepted for compatibility but does not stop listening — the
