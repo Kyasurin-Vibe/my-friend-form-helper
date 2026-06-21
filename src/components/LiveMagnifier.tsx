@@ -52,17 +52,17 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   const [contrast, setContrast] = useState(1);
   const autoRef = useRef({ zoom: 1.4, brightness: 1, contrast: 1 });
   const [guidance, setGuidance] = useState<Guidance>("init");
-  const [detected, setDetected] = useState<DetectedDoc | null>(null);
+  const [detectionBox, setDetectionBox] = useState<DetectionBox | null>(null);
   const [countdown, setCountdown] = useState(0); // seconds remaining
   const [listening, setListening] = useState(false);
   const [voiceArmed, setVoiceArmed] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [heard, setHeard] = useState<string>("");
   const confirmedRef = useRef(false);
-  const detectedRef = useRef<DetectedDoc | null>(null);
+  const detectionBoxRef = useRef<DetectionBox | null>(null);
   const speakingRef = useRef(false);
   const shouldListenRef = useRef(false);
-  useEffect(() => { detectedRef.current = detected; }, [detected]);
+  useEffect(() => { detectionBoxRef.current = detectionBox; }, [detectionBox]);
 
   // === Camera + mic permission ===
   useEffect(() => {
