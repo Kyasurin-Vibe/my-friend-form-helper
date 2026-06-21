@@ -22,6 +22,7 @@ type Analysis = {
   recommendedAction?: "retake" | "confirm_send" | "human_review";
   elderMessage?: string;
   documentBounds?: Bounds | null;
+  resourceCategory?: string;
 };
 
 function genTrackingId() {
@@ -125,6 +126,11 @@ Deno.serve(async (req) => {
       time: stamp(),
       text: `Claude analyzed document — type: ${analysis.documentType ?? "unknown"}, confidence: ${(analysis.confidence ?? 0).toFixed(2)}.`,
     });
+    const needCategory = (analysis.resourceCategory ?? "general").toString();
+    audit.push({ time: stamp(), text: `Need identified: ${needCategory}.` });
+    if (analysis.plainEnglishSummary) {
+      audit.push({ time: stamp(), text: `Plain-English summary: ${analysis.plainEnglishSummary}` });
+    }
     if (analysis.documentBounds) {
       const b = analysis.documentBounds;
       audit.push({

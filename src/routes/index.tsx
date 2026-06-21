@@ -675,36 +675,48 @@ function ReviewScreen({
         >
           Here&apos;s help available for you
         </p>
-        <div className="space-y-3">
-          {getResources(analysis.documentType).map((r, i) => (
-            <div
-              key={i}
-              className="rounded-2xl p-3"
-              style={{
-                background: "#FDFBF7",
-                border: "1px solid #EFE6D6",
-              }}
-            >
-              <p
-                className="font-extrabold"
-                style={{ fontSize: 18, color: "var(--color-elder-ink)" }}
-              >
-                {r.name}
+        {(() => {
+          const resources = getResources(analysis.resourceCategory);
+          if (resources.length === 0) {
+            return (
+              <p style={{ fontSize: 16, color: "#6b5d52" }}>
+                This doesn&apos;t look like a form you need help with. If you&apos;d still like a person to look at it, I can send it.
               </p>
-              <p className="mt-1" style={{ fontSize: 16, color: "#6b5d52" }}>
-                {r.helpsWith}
-              </p>
-              {r.contact && (
-                <p
-                  className="mt-1 font-semibold"
-                  style={{ fontSize: 15, color: "var(--color-elder-primary)" }}
+            );
+          }
+          return (
+            <div className="space-y-3">
+              {resources.map((r, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl p-3"
+                  style={{
+                    background: "#FDFBF7",
+                    border: "1px solid #EFE6D6",
+                  }}
                 >
-                  {r.contact}
-                </p>
-              )}
+                  <p
+                    className="font-extrabold"
+                    style={{ fontSize: 18, color: "var(--color-elder-ink)" }}
+                  >
+                    {r.name}
+                  </p>
+                  <p className="mt-1" style={{ fontSize: 16, color: "#6b5d52" }}>
+                    {r.helpsWith}
+                  </p>
+                  {r.contact && (
+                    <p
+                      className="mt-1 font-semibold"
+                      style={{ fontSize: 15, color: "var(--color-elder-primary)" }}
+                    >
+                      {r.contact}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </div>
       <div className="space-y-2 mt-auto">
         <BigButton variant="ghost" onClick={onRetake}>
@@ -1160,10 +1172,10 @@ function speakableForPhase(
         missing.length > 0
           ? ` I see some spots that may need attention: ${missing.join("; ")}.`
           : " Nothing obviously missing. A person will still confirm before anything is filed.";
-      const resources = getResources(a.documentType);
+      const resources = getResources(a.resourceCategory);
       const resourcesIntro = resources.length > 0
         ? ` Here are some places that can help you with this: ${resources.slice(0, 2).map(r => r.name + (r.contact ? ` — ${r.contact}` : "")).join(". ")}.`
-        : "";
+        : " This doesn't look like a form you need help with. If you'd still like a person to look at it, I can send it.";
       return `This looks like ${title}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to the Legal Aid Center, or say yes.`;
     }
     case "choose":
