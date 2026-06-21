@@ -327,6 +327,14 @@ function ElderApp() {
           />
 
 
+          {phase !== "language" && phase !== "home" && (
+            <TopNav
+              onHome={() => { cancelSpeech(); speech.cancel(); restart(); setPhase("home"); }}
+              onLang={() => { cancelSpeech(); speech.cancel(); setPhase("language"); }}
+            />
+          )}
+
+
           <CaptionsContext.Provider value={showCaptions}>
            <VoiceOnContext.Provider value={voiceOn}>
             {phase === "language" ? (

@@ -190,6 +190,8 @@ const DICT: Record<string, Partial<Record<Lang, string>>> = {
   hint_checking:    { en: "🔍 Checking your document…", es: "🔍 Revisando su documento…", zh: "🔍 正在检查您的文件…", vi: "🔍 Đang kiểm tra tài liệu của bạn…", tl: "🔍 Sinusuri ang iyong dokumento…" },
   hint_unreadable:  { en: "🔎 Move closer and hold still", es: "🔎 Acérquese y quédese quieto", zh: "🔎 靠近一点并保持不动", vi: "🔎 Lại gần hơn và giữ yên", tl: "🔎 Lumapit at huwag gumalaw" },
   hint_say_yes:     { en: '📸 Say "yes" or tap Capture when ready', es: '📸 Diga "sí" o toque Capturar cuando esté listo', zh: '📸 准备好就说「好」或点拍照', vi: '📸 Khi sẵn sàng, nói "có" hoặc chạm Chụp', tl: '📸 Sabihin mong "oo" o pindutin ang Kunan kapag handa na' },
+
+  home_btn:         { en: "🏠 Home", es: "🏠 Inicio", zh: "🏠 主页", vi: "🏠 Trang chủ", tl: "🏠 Home" },
 };
 
 export function t(key: string, lang: Lang = _lang): string {
