@@ -110,6 +110,33 @@ const DICT: Record<string, Partial<Record<Lang, string>>> = {
   mic_blocked:      { en: "Mic is blocked — the buttons still work.", es: "El micrófono está bloqueado — los botones aún funcionan.", zh: "麦克风被阻止 — 按钮仍然可以使用。", vi: "Micrô bị chặn — các nút vẫn hoạt động.", tl: "Naka-block ang mic — gumagana pa rin ang mga button." },
   staff_dashboard:  { en: "Open staff dashboard →", es: "Abrir panel del personal →", zh: "打开员工面板 →", vi: "Mở bảng điều khiển nhân viên →", tl: "Buksan ang staff dashboard →" },
   sending:          { en: "Sending…", es: "Enviando…", zh: "正在发送…", vi: "Đang gửi…", tl: "Ipinapadala…" },
+
+  // Review / Sent / Retake / Choose screens
+  couldnt_read:     { en: "I couldn't read it clearly.", es: "No pude leerlo con claridad.", zh: "我没能看清楚。", vi: "Tôi không đọc rõ được.", tl: "Hindi ko ito malinaw na nabasa." },
+  rather_not_guess: { en: "I'd rather not guess. You can try again, or send it for a person to look at.", es: "Prefiero no adivinar. Puede intentarlo de nuevo o enviarlo a una persona.", zh: "我不想猜。您可以再试一次,或交给真人看。", vi: "Tôi không đoán mò. Bạn có thể thử lại, hoặc gửi cho một người xem.", tl: "Ayoko nang manghula. Pwede mong subukan ulit, o ipadala sa isang tao." },
+  note_label:       { en: "Note", es: "Nota", zh: "注", vi: "Lưu ý", tl: "Tala" },
+  more_light:       { en: "💡 More light", es: "💡 Más luz", zh: "💡 多些光线", vi: "💡 Cần thêm ánh sáng", tl: "💡 Mas maraming ilaw" },
+  hold_still_emoji: { en: "✋ Hold still", es: "✋ Quédese quieto", zh: "✋ 请保持不动", vi: "✋ Giữ yên", tl: "✋ Huwag gumalaw" },
+  corners_in_box:   { en: "🟦 Keep the corners in the box", es: "🟦 Mantenga las esquinas dentro del recuadro", zh: "🟦 让四角保持在框内", vi: "🟦 Giữ các góc trong khung", tl: "🟦 Panatilihin ang mga sulok sa loob ng kahon" },
+  document_label:   { en: "Document", es: "Documento", zh: "文件", vi: "Tài liệu", tl: "Dokumento" },
+  attention_spots:  { en: "I see some spots that may need attention:", es: "Veo algunos puntos que pueden necesitar atención:", zh: "我看到一些可能需要注意的地方:", vi: "Tôi thấy một vài chỗ có thể cần chú ý:", tl: "May ilang lugar akong nakita na maaaring kailangang bantayan:" },
+  nothing_missing:  { en: "✓ Nothing obviously missing. A person will still confirm before anything is filed.", es: "✓ No falta nada obvio. Una persona lo confirmará antes de presentarlo.", zh: "✓ 没有明显缺失。提交前仍由真人确认。", vi: "✓ Không thiếu rõ ràng điều gì. Một người sẽ xác nhận trước khi nộp.", tl: "✓ Walang halatang kulang. May taong magkukumpirma bago isumite." },
+  tracking_number:  { en: "Tracking number", es: "Número de seguimiento", zh: "追踪编号", vi: "Số theo dõi", tl: "Numero ng pagsubaybay" },
+  delivered_to:     { en: "📨 Delivered to", es: "📨 Entregado a", zh: "📨 已发送至", vi: "📨 Đã gửi đến", tl: "📨 Naipadala sa" },
+  what_i_did:       { en: "What I did", es: "Lo que hice", zh: "我做了什么", vi: "Tôi đã làm gì", tl: "Ang ginawa ko" },
+  will_check:       { en: "I won't guess on something this important. A real person will check it for you.", es: "No voy a adivinar en algo tan importante. Una persona real lo revisará por usted.", zh: "这么重要的事我不会去猜。真人会替您查看。", vi: "Tôi sẽ không đoán mò chuyện quan trọng như vậy. Một người thật sẽ kiểm tra cho bạn.", tl: "Hindi ako manghuhula sa ganito kahalaga. May totoong tao ang magtitingin para sa iyo." },
+  will_confirm:     { en: "A person will confirm it before anything is filed.", es: "Una persona lo confirmará antes de presentarlo.", zh: "提交前会由真人确认。", vi: "Một người sẽ xác nhận trước khi nộp.", tl: "May taong magkukumpirma bago isumite." },
+  nothing_more:     { en: "You don't have to do anything else right now.", es: "No tiene que hacer nada más ahora.", zh: "您现在不需要再做什么。", vi: "Bạn không cần làm gì thêm lúc này.", tl: "Wala ka nang kailangang gawin ngayon." },
+  start_over:       { en: "↻ Start over", es: "↻ Empezar de nuevo", zh: "↻ 重新开始", vi: "↻ Bắt đầu lại", tl: "↻ Magsimula muli" },
+  see_center:       { en: "See the center's side →", es: "Ver el lado del centro →", zh: "查看中心端 →", vi: "Xem phía trung tâm →", tl: "Tingnan ang panig ng sentro →" },
+  who_send:         { en: "Who should I send this to?", es: "¿A quién debo enviárselo?", zh: "我应该把这个发给谁?", vi: "Tôi nên gửi cái này cho ai?", tl: "Kanino ko ito dapat ipadala?" },
+  pick_trust:       { en: "Pick the person YOU trust. You're in charge.", es: "Elija la persona en QUIEN confía. Usted manda.", zh: "选择您信任的人。您说了算。", vi: "Chọn người BẠN tin tưởng. Bạn quyết định.", tl: "Piliin ang taong PINAGKAKATIWALAAN mo. Ikaw ang masusunod." },
+  recommended_inst: { en: "Recommended. An accountable institution.", es: "Recomendado. Una institución responsable.", zh: "推荐选项。负责任的机构。", vi: "Được khuyến nghị. Một tổ chức có trách nhiệm.", tl: "Inirerekomenda. Isang responsableng institusyon." },
+  send_trusted:     { en: "👪 Send to my trusted person", es: "👪 Enviar a mi persona de confianza", zh: "👪 发给我信任的人", vi: "👪 Gửi cho người tôi tin tưởng", tl: "👪 Ipadala sa pinagkakatiwalaan ko" },
+  trusted_hint:     { en: "Someone YOU pick — your own attorney or a family member you trust.", es: "Alguien que USTED elija — su propio abogado o un familiar de confianza.", zh: "由您来挑选 — 您的律师或您信任的家人。", vi: "Người BẠN chọn — luật sư của bạn hoặc người thân bạn tin.", tl: "Isang taong IKAW ang pumili — sarili mong abogado o pamilyang pinagkakatiwalaan." },
+  mic_or_type:      { en: "Tap the microphone and say it, or type it.", es: "Toque el micrófono y dígalo, o escríbalo.", zh: "点击麦克风说出来,或者输入。", vi: "Nhấn micrô và nói, hoặc gõ vào.", tl: "Pindutin ang mikropono at sabihin, o i-type." },
+  email_or_phone:   { en: "Their email or phone", es: "Su correo o teléfono", zh: "他们的邮箱或电话", vi: "Email hoặc điện thoại của họ", tl: "Email o telepono nila" },
+  camera_only_device: { en: "The magnifier uses your camera only on this device.", es: "La lupa usa su cámara solo en este dispositivo.", zh: "放大镜只在本设备上使用相机。", vi: "Kính lúp chỉ dùng máy ảnh trên thiết bị này.", tl: "Ang magnifier ay gumagamit ng camera mo sa device na ito lamang." },
 };
 
 export function t(key: string, lang: Lang = _lang): string {
