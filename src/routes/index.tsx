@@ -584,7 +584,7 @@ function ReviewScreen({
             I couldn't read it clearly.
           </p>
           <p style={{ fontSize: 16, color: "#6b5d52" }}>
-            I'd rather not guess. You can try again, or send it for a person at the Legal Aid Center to look at.
+            I'd rather not guess. You can try again, or send it for a person to look at.
           </p>
           {analyzeError && (
             <p className="mt-2 text-sm" style={{ color: "#b91c1c" }}>
