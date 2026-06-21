@@ -204,13 +204,14 @@ function ElderApp() {
 
 
 
-  async function handleSend() {
+  async function handleSend(recipient: Recipient) {
     if (sending) return;
     setSending(true);
     try {
       const result = await sendToCenter({
         originalImage: capturedImage,
         processedImage: processedImage ?? capturedImage,
+        recipient,
         analysis:
           analysis ?? {
             readable: false,
@@ -233,6 +234,7 @@ function ElderApp() {
       setSending(false);
     }
   }
+
 
   return (
     <div
