@@ -661,16 +661,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
       </div>
 
       <div className="px-4 pt-2 flex justify-center gap-2 flex-wrap">
-        <button onClick={() => {
-          setAutoCapture((v) => !v);
-          consecutiveReadyRef.current = 0;
-        }} aria-pressed={autoCapture} style={{
-
-          background: autoCapture ? "var(--color-elder-teal)" : "#fff",
-          color: autoCapture ? "#fff" : "var(--color-elder-ink)",
-          border: "2px solid var(--color-elder-teal)",
-          borderRadius: 999, padding: "8px 14px", fontWeight: 800, fontSize: 14,
-        }}>⏱ Auto-capture {autoCapture ? "ON" : "OFF"}</button>
+        {/* Auto-capture toggle removed — capture only fires on voice "yes" or tapping Capture */}
         <button onClick={() => {
           if (voiceArmed) {
             shouldListenRef.current = false;
