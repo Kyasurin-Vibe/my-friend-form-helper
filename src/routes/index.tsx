@@ -42,7 +42,12 @@ function ElderApp() {
   const [branch, setBranch] = useState<Branch>("missing");
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
   const [started, setStarted] = useState(true);
-  const [phase, setPhase] = useState<"find" | "magnifier" | "flow">("find");
+  const [phase, setPhase] = useState<"find" | "magnifier" | "analyzing" | "flow">("find");
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
+  const [sendResult, setSendResult] = useState<SendResult | null>(null);
+  const [sending, setSending] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const speech = useSpeech();
   const navigate = useNavigate();
 
@@ -57,31 +62,34 @@ function ElderApp() {
   // Speak on step change (after user has tapped once)
   useEffect(() => {
     if (!started || phase !== "flow") return;
+    if (step === 4 && analysis?.elderMessage) {
+      // Use AI-generated elder line, spoken warmly via Deepgram (with fallback).
+      speakWarm(analysis.elderMessage);
+      return;
+    }
+    if (step === 5 && sendResult?.elderMessage) {
+      speakWarm(sendResult.elderMessage);
+      return;
+    }
     const lines: Record<Step, string> = {
       1: "Hi, I'm My Friend. Put your paper in the box, and I'll take a look.",
       2: "That was a little blurry. Hold steady, and let's try again.",
-      3: "I can see this clearly now. This is your FL-142 — your list of assets. I can see your name and your assets.",
-      4:
-        branch === "missing"
-          ? "I checked your form. I'm not sure this one is ready. There's no signature and no date. Do you want to fix it yourself, or should I send it to a person?"
-          : "I checked your form. This looks complete.",
-      5:
-        branch === "missing"
-          ? "I won't guess on something this important. I've sent it to your legal aid center so a real person can check it for you."
-          : "It looks complete. I've sent it to your legal aid center so a person can confirm it before you file.",
+      3: "I can see this clearly now.",
+      4: "I checked your form.",
+      5: "I've sent it to the Legal Aid Center so a real person can check it.",
       6: "My Friend gives accountable help.",
     };
     speech.speak(lines[step]);
-    if (step === 5) {
-      addCase(buildCase(branch));
-    }
-  }, [step, branch, started, phase]); // eslint-disable-line
+  }, [step, branch, started, phase, analysis, sendResult]); // eslint-disable-line
 
   const restart = () => {
     setStep(1);
     setStarted(true);
     setPhase("find");
-    clearCases();
+    setAnalysis(null);
+    setSendResult(null);
+    setCapturedImage(undefined);
+    setAnalyzeError(null);
     speech.cancel();
   };
 
@@ -97,6 +105,66 @@ function ElderApp() {
       }, 50);
     }
   };
+
+  async function handleCapture(image?: string) {
+    setCapturedImage(image);
+    if (!image) {
+      // No frame captured (camera not ready) — go to the manual review path.
+      setBranch("missing");
+      setPhase("flow");
+      setStep(5);
+      return;
+    }
+    setPhase("analyzing");
+    setAnalyzeError(null);
+    try {
+      const result = await analyzeDocument(image);
+      setAnalysis(result);
+      if (result.recommendedAction === "retake") {
+        setPhase("flow");
+        setStep(2);
+        return;
+      }
+      setBranch(result.possibleMissingFields.length > 0 ? "missing" : "complete");
+      setPhase("flow");
+      setStep(4);
+    } catch (e) {
+      console.error("analyze failed", e);
+      setAnalyzeError(e instanceof Error ? e.message : "Could not analyze right now.");
+      // Safe handoff path
+      setBranch("missing");
+      setPhase("flow");
+      setStep(4);
+    }
+  }
+
+  async function handleSend() {
+    if (sending) return;
+    setSending(true);
+    try {
+      const result = await sendToCenter({
+        image: capturedImage,
+        analysis:
+          analysis ?? {
+            readable: true,
+            documentType: "unknown",
+            documentName: "Unknown document",
+            confidence: 0.5,
+            plainEnglishSummary: "User submitted without automated analysis.",
+            possibleMissingFields: [],
+            recommendedAction: "human_review",
+            elderMessage: "Sent for human review.",
+          },
+      });
+      setSendResult(result);
+      setStep(5);
+    } catch (e) {
+      console.error("send failed", e);
+      setAnalyzeError(e instanceof Error ? e.message : "Could not send right now.");
+    } finally {
+      setSending(false);
+    }
+  }
 
 
 
