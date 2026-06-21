@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { DemoServices, type VoiceCommand } from "@/lib/services";
 import type { DocumentBounds } from "@/lib/cases";
 import { supabase } from "@/integrations/supabase/client";
-import { translateAsync, translateSync, getLang, getBCP47 } from "@/lib/i18n";
+import { translateAsync, translateSync, getLang, getBCP47, t, onLangChange } from "@/lib/i18n";
 
 
 type CaptureResult = {
