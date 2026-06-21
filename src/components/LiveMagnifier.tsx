@@ -124,8 +124,6 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         const lum = new Float32Array(W * H);
         const paperMask = new Uint8Array(W * H);
         let lumSum = 0, paperCount = 0;
-        const rowCounts = new Uint16Array(H);
-        const colCounts = new Uint16Array(W);
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
           const r = data[i], g = data[i + 1], b = data[i + 2];
           const y = 0.299 * r + 0.587 * g + 0.114 * b;
@@ -139,8 +137,6 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
           if (y > 145 && sat < 0.2 && !skinTone) {
             paperMask[p] = 1;
             paperCount++;
-            rowCounts[Math.floor(p / W)]++;
-            colCounts[p % W]++;
           }
         }
         const meanLum = lumSum / (W * H);
