@@ -108,7 +108,7 @@ function ElderApp() {
         (result.confidence ?? 0) >= 0.35;
       if (!looksLikeDoc) {
         setAnalysis(null);
-        speakWarm("I don't see a document yet — point the camera at your paper.");
+        speakWarm("I don't see a document yet — point at your paper.");
         setPhase("magnifier");
         return;
       }
@@ -758,7 +758,7 @@ function speakableForPhase(
     case "magnifier":
       return "Point the camera at your paper. Keep the corners inside the frame. I'll capture it when it looks clear.";
     case "analyzing":
-      return "Let me read this for you. Reading your paper carefully. This takes just a few seconds.";
+      return "Let me read this for you. Reading your document. One moment.";
     case "retake": {
       const why = ctx.analysis?.elderMessage
         ? `${ctx.analysis.elderMessage} `
