@@ -888,14 +888,14 @@ function ReviewScreen({
           style={{ background: "#fff", border: "1px solid #EFE6D6" }}
         >
           <p className="font-extrabold mb-2" style={{ fontSize: 20, color: "var(--color-elder-ink)" }}>
-            I couldn't read it clearly.
+            {t("couldnt_read")}
           </p>
           <p style={{ fontSize: 16, color: "#6b5d52" }}>
-            I'd rather not guess. You can try again, or send it for a person to look at.
+            {t("rather_not_guess")}
           </p>
           {analyzeError && (
             <p className="mt-2 text-sm" style={{ color: "#b91c1c" }}>
-              (Note: {analyzeError})
+              ({t("note_label")}: {analyzeError})
             </p>
           )}
         </div>
