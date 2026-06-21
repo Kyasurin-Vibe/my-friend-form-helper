@@ -106,10 +106,9 @@ function ElderApp() {
 
   useEffect(() => {
     if (!voiceOn) return;
-    // The language picker and the seeing-aid magnifier own their own speech
-    // and (for the magnifier) their own voice command loop — skip the global
-    // auto-speak on those screens to avoid two voices stepping on each other.
-    if (phase === "language" || phase === "viewer") return;
+    // The language picker owns its own greeting and locks the mic to
+    // Deepgram one-shot; skip the global auto-speak only on that screen.
+    if (phase === "language") return;
     const text = speakableForPhase(phase, { analysis, sendResult, analyzeError });
     if (text) speakWarm(text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -293,9 +292,9 @@ function ElderApp() {
           }}
         >
           <PersistentVoice
-            enabledFromMode={voiceOn && phase !== "language" && phase !== "viewer"}
-            paused={phase === "viewer" || phase === "magnifier" || phase === "language"}
-            speakable={phase === "language" || phase === "viewer" ? "" : speakableForPhase(phase, { analysis, sendResult, analyzeError })}
+            enabledFromMode={voiceOn && phase !== "language"}
+            paused={phase === "language"}
+            speakable={phase === "language" ? "" : speakableForPhase(phase, { analysis, sendResult, analyzeError })}
             helpHint={helpHintForPhase(phase)}
             onBack={getBackForPhase(phase, { setPhase, analysis, navigate })}
             onDone={() => { speech.cancel(); restart(); setPhase("home"); }}
