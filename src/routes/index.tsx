@@ -327,6 +327,14 @@ function ElderApp() {
           />
 
 
+          {phase !== "language" && phase !== "home" && (
+            <TopNav
+              onHome={() => { cancelSpeech(); speech.cancel(); restart(); setPhase("home"); }}
+              onLang={() => { cancelSpeech(); speech.cancel(); setPhase("language"); }}
+            />
+          )}
+
+
           <CaptionsContext.Provider value={showCaptions}>
            <VoiceOnContext.Provider value={voiceOn}>
             {phase === "language" ? (
@@ -1735,6 +1743,15 @@ function handlePhaseCommand(
   const yes = /\b(yes|yeah|yep|yup|sure|okay|ok|do it|go ahead|use this|use it|it's clear|its clear|looks good|good|send|send it|capture|take it|snap|take the picture|take the photo|connect me)\b/;
   const no = /\b(no|nope|nah|not yet|wait|keep looking|don't|dont)\b/;
 
+  // Global: "home" / "go home" returns to home from any non-language screen.
+  if (phase !== "home" && /\b(home|go home|main menu|back to home)\b/.test(t)) {
+    confirm("Going home.");
+    restart();
+    setPhase("home");
+    return true;
+  }
+
+
   switch (phase) {
     case "home": {
       if (/\b(see|look|magnify|magnifier|bigger|larger|zoom|read this|help me see|i wanna see|i want to see|i can'?t see|show me|seeing aid)\b/.test(t)) {
@@ -1910,6 +1927,33 @@ function runPhaseAction(
   }
 }
 
+
+function TopNav({ onHome, onLang }: { onHome: () => void; onLang: () => void }) {
+  const btn: React.CSSProperties = {
+    background: "rgba(255,255,255,0.95)",
+    color: "var(--color-elder-ink)",
+    border: "2px solid var(--color-elder-sky)",
+    borderRadius: 999,
+    padding: "6px 12px",
+    fontSize: 13,
+    fontWeight: 700,
+    boxShadow: "0 4px 12px rgba(47,111,176,0.18)",
+    backdropFilter: "blur(6px)",
+  };
+  return (
+    <div
+      className="absolute top-0 left-0 right-0 flex items-start justify-between pointer-events-none"
+      style={{ padding: "8px 10px", zIndex: 50 }}
+    >
+      <button type="button" onClick={onHome} aria-label="Home" className="pointer-events-auto active:scale-95" style={btn}>
+        {t("home_btn")}
+      </button>
+      <button type="button" onClick={onLang} aria-label="Language" className="pointer-events-auto active:scale-95" style={btn}>
+        {t("lang.change")}
+      </button>
+    </div>
+  );
+}
 
 function DoneButton({ onClick }: { onClick: () => void }) {
   return (
