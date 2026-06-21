@@ -71,7 +71,7 @@ async function callClaude(apiKey: string, model: string, parsed: { media_type: s
       },
       body: JSON.stringify({
         model,
-        max_tokens: 80,
+        max_tokens: 200,
         system: SYSTEM,
         tools: [TOOL],
         tool_choice: { type: "tool", name: "report_presence" },
