@@ -186,17 +186,34 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceArmed]);
 
+  function captureFrame(): string | undefined {
+    const v = videoRef.current;
+    if (!v || !v.videoWidth) return undefined;
+    const maxW = 1280;
+    const scale = Math.min(1, maxW / v.videoWidth);
+    const w = Math.round(v.videoWidth * scale);
+    const h = Math.round(v.videoHeight * scale);
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    if (!ctx) return undefined;
+    ctx.drawImage(v, 0, 0, w, h);
+    try { return c.toDataURL("image/jpeg", 0.85); } catch { return undefined; }
+  }
+
+  function doCapture() {
+    if (confirmedRef.current) return;
+    confirmedRef.current = true;
+    shouldListenRef.current = false;
+    try { DemoServices.voice.stop(); } catch { /* noop */ }
+    const frame = captureFrame();
+    setTimeout(() => onConfirm(frame), 0);
+  }
+
   function handleVoiceCommand(cmd: VoiceCommand) {
     switch (cmd) {
       case "yes": {
-        const d = detectedRef.current;
-        if (d && !confirmedRef.current) {
-          confirmedRef.current = true;
-          shouldListenRef.current = false;
-          try { DemoServices.voice.stop(); } catch {}
-          // Defer so we don't setState during a render in parent
-          setTimeout(() => onConfirm(d), 0);
-        }
+        doCapture();
         break;
       }
       case "no":
