@@ -76,7 +76,11 @@ function isValidBounds(b: DocumentBounds | null | undefined): boolean {
 
 function ElderApp() {
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
-  const [phase, setPhase] = useState<Phase>("home");
+  const [phase, setPhase] = useState<Phase>(
+    typeof window !== "undefined" && localStorage.getItem("mf_lang") ? "home" : "language",
+  );
+  const [, forceRerender] = useState(0);
+  useEffect(() => onLangChange(() => forceRerender((n) => n + 1)), []);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
   const [processedImage, setProcessedImage] = useState<string | undefined>(undefined);
