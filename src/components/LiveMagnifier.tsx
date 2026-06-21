@@ -7,7 +7,6 @@ import {
 type Props = {
   onConfirm: (image?: string) => void;
   onCancel: () => void;
-  onHandoff: () => void;
 };
 
 type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
@@ -41,7 +40,7 @@ function speak(text: string, onDone?: () => void) {
   synth.speak(u);
 }
 
-export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
+export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
