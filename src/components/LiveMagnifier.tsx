@@ -545,16 +545,16 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const hintText: Record<Hint, string> = {
     starting: "Starting camera…",
     tooDark: "💡 Too dark — move to better light",
-    empty: "📄 Show me your paper",
+    empty: "📄 Fit your paper inside the frame",
     possibleFace: "🙂 That looks like a face, not a document",
     moveCloser: "↕ Move a little closer",
-    holdStill: "✋ Hold still…",
-    documentDetected: "✅ Document detected — hold still",
+    holdStill: "✋ Hold still",
+    documentDetected: "✋ Hold still",
     aiChecking: "🔍 Checking your document…",
-    aiNoDoc: "📄 Point the camera at your paper",
+    aiNoDoc: "📄 Fit your paper inside the frame",
     aiUnreadable: "🔎 Move closer and hold still",
-    aiReady: "✅ Document detected — hold still",
-    aiUnavailable: "📸 You can tap Capture when ready",
+    aiReady: "✋ Hold still",
+    aiUnavailable: "📸 Say \"yes\" or tap Capture when ready",
   };
   const hintColor: Record<Hint, string> = {
     starting: "#6b5d52",
