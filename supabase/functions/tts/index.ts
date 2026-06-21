@@ -50,11 +50,11 @@ Deno.serve(async (req) => {
         text,
         model_id: "eleven_multilingual_v2",
         voice_settings: {
-          stability: 0.55,
-          similarity_boost: 0.8,
-          style: 0.25,
-          use_speaker_boost: true,
-          speed: 0.95,
+          stability: 0.85,
+          similarity_boost: 0.75,
+          style: 0.0,
+          use_speaker_boost: false,
+          speed: 0.85,
         },
       }),
     });
