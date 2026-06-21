@@ -97,70 +97,66 @@ function ElderApp() {
       setPhase("review");
       return;
     }
-    setCapturedImage(result.original);
-    setProcessedImage(result.processed);
-    setCapturedBounds(result.bounds);
+    const original = result.original;
+    const localBounds = result.bounds;
+    setCapturedImage(original);
+    setProcessedImage(undefined);
+    setCapturedBounds(localBounds);
     setAnalyzeError(null);
+    // Show "Reading your document…" while Claude analyzes the RAW frame.
+    setPhase("analyzing");
+
+    const startedAt = Date.now();
+    const minDisplay = 900;
+
+    // Centered A4-ish fallback box (normalized)
+    const centeredFallback: DocumentBounds = {
+      x: 0.08, y: 0.04, width: 0.84, height: 0.92, confidence: 0,
+    };
+
+    let analysisResult: AnalysisResult | null = null;
+    let cropBounds: DocumentBounds | null = null;
+
+    try {
+      analysisResult = await analyzeDocument(original);
+      cropBounds = analysisResult.documentBounds ?? localBounds ?? centeredFallback;
+    } catch (e) {
+      console.error("analyze failed", e);
+      setAnalyzeError(e instanceof Error ? e.message : "Could not analyze right now.");
+      cropBounds = localBounds ?? centeredFallback;
+    }
+
+    // Always produce a cropped preview — never show the raw frame.
+    let cropped = original;
+    try {
+      cropped = await cropToBounds(original, cropBounds, 0.03);
+    } catch {
+      cropped = original;
+    }
+    setProcessedImage(cropped);
+    setAnalysis(analysisResult);
+
+    const elapsed = Date.now() - startedAt;
+    if (elapsed < minDisplay) {
+      await new Promise((r) => setTimeout(r, minDisplay - elapsed));
+    }
     setPhase("preview");
   }
 
-  async function runAnalyze() {
-    // We send the already-cropped image (processedImage) to Claude so it focuses
-    // on the document, not hands/background.
-    const imageForClaude = processedImage ?? capturedImage;
-    if (!imageForClaude) {
-      setPhase("magnifier");
+  async function confirmPreview() {
+    // Claude analysis already ran during handleCapture.
+    // If it was unreadable, route through retake; otherwise send.
+    if (analyzeError && !analysis) {
+      setPhase("review");
       return;
     }
-    setPhase("analyzing");
-    setAnalyzeError(null);
-    const startedAt = Date.now();
-    const minDisplay = 1200;
-    try {
-      const result = await analyzeDocument(imageForClaude);
-      // Optional refinement: if Claude returns bounds, crop again (relative to
-      // the image we sent). If not, keep the frontend crop.
-      if (result.documentBounds) {
-        try {
-          const refined = await cropToBounds(imageForClaude, result.documentBounds, 0.03);
-          setProcessedImage(refined);
-        } catch { /* keep existing processedImage */ }
-      }
-      void capturedBounds;
-
-
-      const elapsed = Date.now() - startedAt;
-      if (elapsed < minDisplay) {
-        await new Promise((r) => setTimeout(r, minDisplay - elapsed));
-      }
-      const looksLikeDoc =
-        result.readable &&
-        result.documentType &&
-        result.documentType.toLowerCase() !== "unknown" &&
-        (result.confidence ?? 0) >= 0.35;
-      if (!looksLikeDoc) {
-        setAnalysis(null);
-        speakWarm("I don't see a document yet — point at your paper.");
-        setPhase("magnifier");
-        return;
-      }
-      setAnalysis(result);
-      if (result.recommendedAction === "retake") {
-        setPhase("retake");
-        return;
-      }
-      setPhase("review");
-    } catch (e) {
-      console.error("analyze failed", e);
-      const elapsed = Date.now() - startedAt;
-      if (elapsed < minDisplay) {
-        await new Promise((r) => setTimeout(r, minDisplay - elapsed));
-      }
-      setAnalyzeError(e instanceof Error ? e.message : "Could not analyze right now.");
-      setAnalysis(null);
-      setPhase("review");
+    if (analysis && analysis.recommendedAction === "retake") {
+      setPhase("retake");
+      return;
     }
+    await handleSend();
   }
+
 
 
   async function handleSend() {
