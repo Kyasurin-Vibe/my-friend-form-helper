@@ -203,7 +203,10 @@ export function PersistentVoice({
         onError: (e) => {
           if (/not-allowed|denied|blocked/i.test(e)) setBlocked(true);
         },
-        onTranscript: (t) => setTranscript(t),
+        onTranscript: (t) => {
+          if (isTTSPlaying()) { setTranscript(""); return; }
+          setTranscript(t);
+        },
         onCommand: (_c, raw) => handleTranscript(raw),
       });
     } catch { /* noop */ }
