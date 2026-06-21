@@ -3,6 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getLang, getBCP47, getTTSVoice, ttsSupportsDeepgram } from "@/lib/i18n";
+
 
 export type Branch = "missing" | "complete";
 
