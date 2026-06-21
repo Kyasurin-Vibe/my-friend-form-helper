@@ -3,8 +3,16 @@ import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
 import { useSpeech } from "@/lib/useSpeech";
-import { addCase, buildCase, clearCases, type Branch } from "@/lib/handoff";
+import {
+  analyzeDocument,
+  sendToCenter,
+  speakWarm,
+  type AnalysisResult,
+  type SendResult,
+} from "@/lib/cases";
 import { playWarning, playSuccess } from "@/lib/chime";
+
+type Branch = "missing" | "complete";
 
 
 export const Route = createFileRoute("/")({
