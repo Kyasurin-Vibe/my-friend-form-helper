@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  DemoServices,
-  type DetectedDoc,
-  type VoiceCommand,
-} from "@/lib/services";
+import { DemoServices, type VoiceCommand } from "@/lib/services";
 
 type Props = {
   onConfirm: (image?: string) => void;
   onCancel: () => void;
-  onHandoff: () => void;
 };
 
 type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
+type DetectionBox = { x: number; y: number; w: number; h: number };
 
 const GUIDANCE_TEXT: Record<Guidance, string> = {
   init: "Point the camera at your paper.",
@@ -22,45 +18,54 @@ const GUIDANCE_TEXT: Record<Guidance, string> = {
   detected: "Looks clear. Capturing automatically…",
 };
 
-// Lightweight TTS helper local to this screen, so it composes with the
-// outer useSpeech without fighting it for the queue.
+const ADJACENT_OFFSETS = [
+  { dx: -1, dy: 0 },
+  { dx: 1, dy: 0 },
+  { dx: 0, dy: -1 },
+  { dx: 0, dy: 1 },
+];
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
 function speak(text: string, onDone?: () => void) {
   if (typeof window === "undefined") return;
   const synth = window.speechSynthesis;
-  if (!synth) { onDone?.(); return; }
+  if (!synth) {
+    onDone?.();
+    return;
+  }
   synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 0.95;
-  u.pitch = 1.05;
-  u.onend = () => onDone?.();
-  u.onerror = () => onDone?.();
-  synth.speak(u);
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.95;
+  utterance.pitch = 1.05;
+  utterance.onend = () => onDone?.();
+  utterance.onerror = () => onDone?.();
+  synth.speak(utterance);
 }
 
-export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
+export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const autoRef = useRef({ zoom: 1.25, brightness: 1, contrast: 1 });
+  const confirmedRef = useRef(false);
+  const speakingRef = useRef(false);
+  const shouldListenRef = useRef(false);
+
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  // Auto-driven — no manual controls. Smoothed via EMA in the analysis loop.
-  const [zoom, setZoom] = useState(1.4);
+  const [zoom, setZoom] = useState(1.25);
   const [brightness, setBrightness] = useState(1);
   const [contrast, setContrast] = useState(1);
-  const autoRef = useRef({ zoom: 1.4, brightness: 1, contrast: 1 });
   const [guidance, setGuidance] = useState<Guidance>("init");
-  const [detected, setDetected] = useState<DetectedDoc | null>(null);
-  const [countdown, setCountdown] = useState(0); // seconds remaining
+  const [detectionBox, setDetectionBox] = useState<DetectionBox | null>(null);
+  const [countdown, setCountdown] = useState(0);
   const [listening, setListening] = useState(false);
   const [voiceArmed, setVoiceArmed] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [heard, setHeard] = useState<string>("");
-  const confirmedRef = useRef(false);
-  const detectedRef = useRef<DetectedDoc | null>(null);
-  const speakingRef = useRef(false);
-  const shouldListenRef = useRef(false);
-  useEffect(() => { detectedRef.current = detected; }, [detected]);
+  const [heard, setHeard] = useState("");
 
-  // === Camera + mic permission ===
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -69,90 +74,192 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
           setError("This device doesn't support the camera.");
           return;
         }
-        // Ask for camera AND mic in one prompt so voice works after.
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
           audio: true,
         });
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          stream.getTracks().forEach((track) => track.stop());
           return;
         }
-        // Stop the audio track right away — Web Speech opens its own.
-        stream.getAudioTracks().forEach((t) => t.stop());
+        stream.getAudioTracks().forEach((track) => track.stop());
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
+          await videoRef.current.play().catch(() => undefined);
         }
         setReady(true);
-        setVoiceArmed(true); // mic was just granted via user gesture
+        setVoiceArmed(true);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Camera unavailable";
-        setError(msg);
+        setError(e instanceof Error ? e.message : "Camera unavailable");
       }
     })();
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     };
   }, []);
 
-  // === Real frame analysis: only auto-capture when a paper-like, sharp,
-  // bright region fills enough of the frame. Faces / hands / room must NOT trigger. ===
   useEffect(() => {
     if (!ready) return;
-    const v = videoRef.current;
-    if (!v) return;
-    const W = 96, H = 72;
+    const video = videoRef.current;
+    if (!video) return;
+
+    const width = 128;
+    const height = 96;
     const canvas = document.createElement("canvas");
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
+
     let detectedStreak = 0;
     const id = window.setInterval(() => {
-      if (confirmedRef.current) return;
-      if (!v.videoWidth) return;
+      if (confirmedRef.current || !video.videoWidth) return;
       try {
-        ctx.drawImage(v, 0, 0, W, H);
-        const data = ctx.getImageData(0, 0, W, H).data;
-        const lum = new Float32Array(W * H);
-        let lumSum = 0, paperCount = 0;
+        ctx.drawImage(video, 0, 0, width, height);
+        const data = ctx.getImageData(0, 0, width, height).data;
+        const lum = new Float32Array(width * height);
+        const paperMask = new Uint8Array(width * height);
+        let lumSum = 0;
+        let paperCount = 0;
+
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-          const r = data[i], g = data[i + 1], b = data[i + 2];
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
           const y = 0.299 * r + 0.587 * g + 0.114 * b;
           const max = Math.max(r, g, b);
           const min = Math.min(r, g, b);
           const sat = max === 0 ? 0 : (max - min) / max;
+          const skinTone = r > 95 && g > 45 && b > 30 && r > g && r > b && r - b > 20 && sat > 0.12;
+
           lum[p] = y;
           lumSum += y;
-          // Paper-like: bright AND low color saturation (skin/walls are saturated or dim)
-          if (y > 140 && sat < 0.22) paperCount++;
+          if (y > 145 && sat < 0.2 && !skinTone) {
+            paperMask[p] = 1;
+            paperCount++;
+          }
         }
-        const meanLum = lumSum / (W * H);
-        const paperFrac = paperCount / (W * H);
-        // Sharpness: average gradient magnitude (rough Laplacian proxy)
-        let edgeSum = 0, edgeN = 0;
-        for (let y = 1; y < H - 1; y++) {
-          for (let x = 1; x < W - 1; x++) {
-            const p = y * W + x;
-            const dx = lum[p + 1] - lum[p - 1];
-            const dy = lum[p + W] - lum[p - W];
-            edgeSum += Math.abs(dx) + Math.abs(dy);
+
+        const meanLum = lumSum / (width * height);
+        const paperFrac = paperCount / (width * height);
+        let edgeSum = 0;
+        let edgeN = 0;
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const p = y * width + x;
+            edgeSum +=
+              Math.abs(lum[p + 1] - lum[p - 1]) + Math.abs(lum[p + width] - lum[p - width]);
             edgeN++;
           }
         }
         const sharp = edgeSum / edgeN;
 
+        const visited = new Uint8Array(width * height);
+        const queue = new Uint16Array(width * height);
+        let best = { count: 0, minX: width, maxX: -1, minY: height, maxY: -1 };
+
+        for (let start = 0; start < paperMask.length; start++) {
+          if (!paperMask[start] || visited[start]) continue;
+          let head = 0;
+          let tail = 0;
+          let count = 0;
+          let minX = width;
+          let maxX = -1;
+          let minY = height;
+          let maxY = -1;
+          queue[tail++] = start;
+          visited[start] = 1;
+
+          while (head < tail) {
+            const p = queue[head++];
+            const x = p % width;
+            const y = Math.floor(p / width);
+            count++;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+
+            for (const { dx, dy } of ADJACENT_OFFSETS) {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+              const n = ny * width + nx;
+              if (visited[n] || !paperMask[n]) continue;
+              visited[n] = 1;
+              queue[tail++] = n;
+            }
+          }
+
+          if (count > best.count) best = { count, minX, maxX, minY, maxY };
+        }
+
+        const boxW = Math.max(0, best.maxX - best.minX + 1);
+        const boxH = Math.max(0, best.maxY - best.minY + 1);
+        const boxArea = boxW * boxH;
+        const bandX = Math.max(2, Math.floor(boxW * 0.12));
+        const bandY = Math.max(2, Math.floor(boxH * 0.12));
+        let topPaper = 0;
+        let bottomPaper = 0;
+        let leftPaper = 0;
+        let rightPaper = 0;
+
+        if (boxArea > 0) {
+          for (let y = best.minY; y <= best.maxY; y++) {
+            for (let x = best.minX; x <= best.maxX; x++) {
+              if (!paperMask[y * width + x]) continue;
+              if (y < best.minY + bandY) topPaper++;
+              if (y > best.maxY - bandY) bottomPaper++;
+              if (x < best.minX + bandX) leftPaper++;
+              if (x > best.maxX - bandX) rightPaper++;
+            }
+          }
+        }
+
+        const boxAreaFrac = boxArea / (width * height);
+        const boxDensity = boxArea > 0 ? best.count / boxArea : 0;
+        const topFill = boxW * bandY > 0 ? topPaper / (boxW * bandY) : 0;
+        const bottomFill = boxW * bandY > 0 ? bottomPaper / (boxW * bandY) : 0;
+        const leftFill = boxH * bandX > 0 ? leftPaper / (boxH * bandX) : 0;
+        const rightFill = boxH * bandX > 0 ? rightPaper / (boxH * bandX) : 0;
+        const edgeFill = (topFill + bottomFill + leftFill + rightFill) / 4;
+        const rectangularEnough =
+          [topFill, bottomFill, leftFill, rightFill].filter((v) => v >= 0.34).length >= 3 &&
+          edgeFill >= 0.44;
+        const aspect = boxH > 0 ? boxW / boxH : 0;
+        const hasDocumentRegion =
+          meanLum >= 75 &&
+          paperFrac >= 0.3 &&
+          boxAreaFrac >= 0.38 &&
+          boxDensity >= 0.62 &&
+          rectangularEnough &&
+          aspect >= 0.48 &&
+          aspect <= 1.9;
+
         let next: Guidance;
-        if (meanLum < 70) next = "init"; // too dark / no view
-        else if (paperFrac < 0.28) next = "init"; // no paper-like region (face/room/hand)
-        else if (paperFrac < 0.45) next = "corners"; // partial paper — frame it
+        if (meanLum < 70 || !hasDocumentRegion) next = "init";
+        else if (paperFrac < 0.45 || boxAreaFrac < 0.48) next = "corners";
         else if (sharp < 5.5) next = "blurry";
         else next = "detected";
 
-        // Require 2 consecutive paper+sharp frames before triggering capture
+        setDetectionBox(
+          hasDocumentRegion
+            ? {
+                x: clamp(best.minX / width, 0.04, 0.86),
+                y: clamp(best.minY / height, 0.04, 0.86),
+                w: clamp(boxW / width, 0.12, 0.92),
+                h: clamp(boxH / height, 0.12, 0.92),
+              }
+            : null,
+        );
+
         if (next === "detected") {
           detectedStreak++;
           if (detectedStreak < 2) next = "hold-still";
@@ -162,32 +269,32 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
 
         setGuidance((prev) => (prev === next ? prev : next));
 
-        // === Auto-enhance (EMA-smoothed, subtle, no flicker) ===
-        // Target brightness: lift dark frames, leave bright ones alone.
-        const targetBrightness = Math.max(0.9, Math.min(1.45, 165 / Math.max(60, meanLum)));
-        // Target contrast: bump a touch when the frame is flat (low edges).
-        const targetContrast = Math.max(1, Math.min(1.35, 1 + (8 - Math.min(sharp, 8)) * 0.04));
-        // Target zoom: tighter once a document fills the frame.
+        const targetBrightness = clamp(165 / Math.max(60, meanLum), 0.9, 1.45);
+        const targetContrast = clamp(1 + (8 - Math.min(sharp, 8)) * 0.04, 1, 1.35);
         const targetZoom =
-          paperFrac >= 0.5 ? 1.85 : paperFrac >= 0.35 ? 1.6 : 1.4;
+          hasDocumentRegion && boxAreaFrac >= 0.5 ? 1.85 : hasDocumentRegion ? 1.6 : 1.15;
+        const current = autoRef.current;
+        current.brightness += (targetBrightness - current.brightness) * 0.18;
+        current.contrast += (targetContrast - current.contrast) * 0.18;
+        current.zoom += (targetZoom - current.zoom) * 0.18;
 
-        const a = 0.18; // EMA alpha — slow enough to avoid flicker
-        const cur = autoRef.current;
-        cur.brightness = cur.brightness + (targetBrightness - cur.brightness) * a;
-        cur.contrast = cur.contrast + (targetContrast - cur.contrast) * a;
-        cur.zoom = cur.zoom + (targetZoom - cur.zoom) * a;
-
-        // Only commit when change is meaningful — keeps DOM stable.
-        setBrightness((b) => (Math.abs(b - cur.brightness) > 0.03 ? +cur.brightness.toFixed(2) : b));
-        setContrast((c) => (Math.abs(c - cur.contrast) > 0.03 ? +cur.contrast.toFixed(2) : c));
-        setZoom((z) => (Math.abs(z - cur.zoom) > 0.04 ? +cur.zoom.toFixed(2) : z));
-      } catch { /* noop */ }
+        setBrightness((value) =>
+          Math.abs(value - current.brightness) > 0.03 ? +current.brightness.toFixed(2) : value,
+        );
+        setContrast((value) =>
+          Math.abs(value - current.contrast) > 0.03 ? +current.contrast.toFixed(2) : value,
+        );
+        setZoom((value) =>
+          Math.abs(value - current.zoom) > 0.04 ? +current.zoom.toFixed(2) : value,
+        );
+      } catch {
+        // Keep scanning; transient frame read failures are common on camera startup.
+      }
     }, 450);
+
     return () => window.clearInterval(id);
   }, [ready]);
 
-
-  // === Speak guidance prompts (and pause mic while TTS plays) ===
   useEffect(() => {
     if (guidance === "init" || guidance === "hold-still") return;
     const text =
@@ -197,51 +304,74 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
           ? "The picture is too blurry. Please try again."
           : GUIDANCE_TEXT[guidance];
     speakingRef.current = true;
-    try { DemoServices.voice.stop(); } catch { /* noop */ }
+    try {
+      DemoServices.voice.stop();
+    } catch {
+      // no-op
+    }
     speak(text, () => {
       speakingRef.current = false;
       if (shouldListenRef.current) startVoice();
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guidance]);
 
-  // === Auto-capture countdown when document looks clear ===
   useEffect(() => {
     if (guidance !== "detected") {
       setCountdown(0);
       return;
     }
     if (confirmedRef.current) return;
+
     setCountdown(3);
     const id = window.setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
+      setCountdown((current) => {
+        if (current <= 1) {
           window.clearInterval(id);
           doCapture();
           return 0;
         }
-        return c - 1;
+        return current - 1;
       });
     }, 1000);
+
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guidance]);
 
-  // === Voice recognition: start when armed, auto-restart on end ===
+  useEffect(() => {
+    if (!voiceArmed) return;
+    shouldListenRef.current = true;
+    startVoice();
+    return () => {
+      shouldListenRef.current = false;
+      try {
+        DemoServices.voice.stop();
+      } catch {
+        // no-op
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceArmed]);
+
   function startVoice() {
-    const svc = DemoServices.voice;
-    if (!svc.available()) {
+    const service = DemoServices.voice;
+    if (!service.available()) {
       setVoiceError("Voice not supported in this browser. Use the buttons.");
       return;
     }
-    if (speakingRef.current) return; // wait until TTS done
+    if (speakingRef.current) return;
+
     try {
-      svc.start({
-        onStart: () => { setListening(true); setVoiceError(null); },
+      service.start({
+        onStart: () => {
+          setListening(true);
+          setVoiceError(null);
+        },
         onEnd: () => {
           setListening(false);
-          // Chrome auto-ends every ~10s; restart if still wanted
           if (shouldListenRef.current && !speakingRef.current) {
-            setTimeout(() => startVoice(), 250);
+            window.setTimeout(() => startVoice(), 250);
           }
         },
         onError: (err) => {
@@ -253,57 +383,53 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
             setVoiceError(err);
           }
         },
-        onTranscript: (t) => setHeard(t),
+        onTranscript: (transcript) => setHeard(transcript),
         onCommand: (cmd) => handleVoiceCommand(cmd),
       });
-    } catch (e: any) {
-      setVoiceError(e?.message || "could not start mic");
+    } catch (e: unknown) {
+      setVoiceError(e instanceof Error ? e.message : "could not start mic");
     }
   }
 
-  useEffect(() => {
-    if (!voiceArmed) return;
-    shouldListenRef.current = true;
-    startVoice();
-    return () => {
-      shouldListenRef.current = false;
-      try { DemoServices.voice.stop(); } catch {}
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceArmed]);
-
   function captureFrame(): string | undefined {
-    const v = videoRef.current;
-    if (!v || !v.videoWidth) return undefined;
-    const maxW = 1280;
-    const scale = Math.min(1, maxW / v.videoWidth);
-    const w = Math.round(v.videoWidth * scale);
-    const h = Math.round(v.videoHeight * scale);
-    const c = document.createElement("canvas");
-    c.width = w; c.height = h;
-    const ctx = c.getContext("2d");
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return undefined;
+    const scale = Math.min(1, 1280 / video.videoWidth);
+    const width = Math.round(video.videoWidth * scale);
+    const height = Math.round(video.videoHeight * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
     if (!ctx) return undefined;
-    ctx.drawImage(v, 0, 0, w, h);
-    try { return c.toDataURL("image/jpeg", 0.85); } catch { return undefined; }
+    ctx.drawImage(video, 0, 0, width, height);
+    try {
+      return canvas.toDataURL("image/jpeg", 0.85);
+    } catch {
+      return undefined;
+    }
   }
 
   function doCapture() {
     if (confirmedRef.current) return;
     confirmedRef.current = true;
     shouldListenRef.current = false;
-    try { DemoServices.voice.stop(); } catch { /* noop */ }
+    try {
+      DemoServices.voice.stop();
+    } catch {
+      // no-op
+    }
     const frame = captureFrame();
-    setTimeout(() => onConfirm(frame), 0);
+    window.setTimeout(() => onConfirm(frame), 0);
   }
 
   function handleVoiceCommand(cmd: VoiceCommand) {
     switch (cmd) {
-      case "yes": {
+      case "yes":
         doCapture();
         break;
-      }
       case "no":
-        setDetected(null);
+        setDetectionBox(null);
         setCountdown(0);
         setGuidance("corners");
         break;
@@ -322,19 +448,22 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
       case "read":
         readDocAloud();
         break;
+      case "unknown":
+        break;
     }
   }
 
   function readDocAloud() {
     speakingRef.current = true;
-    try { DemoServices.voice.stop(); } catch {}
-    speak(
-      "Hold the paper steady inside the box. When it looks clear, I'll capture it and read it for you.",
-      () => {
-        speakingRef.current = false;
-        if (shouldListenRef.current) startVoice();
-      },
-    );
+    try {
+      DemoServices.voice.stop();
+    } catch {
+      // no-op
+    }
+    speak("Point the camera at your paper. I'll capture it when it looks clear.", () => {
+      speakingRef.current = false;
+      if (shouldListenRef.current) startVoice();
+    });
   }
 
   const filter = `brightness(${brightness}) contrast(${contrast})`;
@@ -373,7 +502,6 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         </span>
       </div>
 
-      {/* Camera stage */}
       <div
         className="mx-4 rounded-2xl overflow-hidden relative"
         style={{
@@ -383,11 +511,18 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         }}
       >
         {error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6" style={{ color: "#fff" }}>
-            <p className="font-extrabold" style={{ fontSize: 20 }}>I can't open the camera.</p>
-            <p className="mt-2" style={{ fontSize: 15, color: "#cbd2da" }}>{error}</p>
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center text-center p-6"
+            style={{ color: "#fff" }}
+          >
+            <p className="font-extrabold" style={{ fontSize: 20 }}>
+              I can't open the camera.
+            </p>
+            <p className="mt-2" style={{ fontSize: 15, color: "#cbd2da" }}>
+              {error}
+            </p>
             <p className="mt-2" style={{ fontSize: 14, color: "#9aa4b2" }}>
-              Please allow camera access in your browser, or tap "I already found it".
+              Please allow camera access in your browser.
             </p>
           </div>
         ) : (
@@ -396,7 +531,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
               ref={videoRef}
               muted
               playsInline
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-fill"
               style={{
                 transform: `scale(${zoom})`,
                 transformOrigin: "center",
@@ -404,44 +539,21 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
                 transition: "filter 0.15s, transform 0.15s",
               }}
             />
-            {/* Document frame guide */}
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                inset: 24,
-                border: `4px ${guidance === "detected" ? "solid" : "dashed"} ${
-                  guidance === "detected" ? "#22c55e" : "rgba(255,255,255,0.9)"
-                }`,
-                borderRadius: 14,
-                boxShadow: "0 0 0 9999px rgba(0,0,0,0.15)",
-                transition: "border-color 0.2s",
-              }}
-            />
-            {/* Corner ticks */}
-            {[
-              { top: 18, left: 18 },
-              { top: 18, right: 18 },
-              { bottom: 18, left: 18 },
-              { bottom: 18, right: 18 },
-            ].map((pos, i) => (
+            {detectionBox && (
               <div
-                key={i}
-                className="absolute"
+                className="absolute pointer-events-none"
                 style={{
-                  ...pos,
-                  width: 22,
-                  height: 22,
-                  borderColor: guidance === "detected" ? "#22c55e" : "#fff",
-                  borderStyle: "solid",
-                  borderWidth: 0,
-                  borderTopWidth: pos.top !== undefined ? 4 : 0,
-                  borderBottomWidth: pos.bottom !== undefined ? 4 : 0,
-                  borderLeftWidth: pos.left !== undefined ? 4 : 0,
-                  borderRightWidth: pos.right !== undefined ? 4 : 0,
+                  left: `${detectionBox.x * 100}%`,
+                  top: `${detectionBox.y * 100}%`,
+                  width: `${detectionBox.w * 100}%`,
+                  height: `${detectionBox.h * 100}%`,
+                  border: `5px solid ${guidance === "detected" ? "#22c55e" : "#fbbf24"}`,
+                  borderRadius: 12,
+                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.18)",
+                  transition: "all 0.18s ease-out",
                 }}
               />
-            ))}
-            {/* Countdown ring overlay */}
+            )}
             {countdown > 0 && (
               <div
                 className="absolute"
@@ -466,7 +578,10 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
               </div>
             )}
             {!ready && (
-              <div className="absolute inset-0 flex items-center justify-center" style={{ color: "#fff" }}>
+              <div
+                className="absolute inset-0 flex items-center justify-center"
+                style={{ color: "#fff" }}
+              >
                 Starting camera…
               </div>
             )}
@@ -474,7 +589,6 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         )}
       </div>
 
-      {/* Guidance caption */}
       <div className="px-4 pt-3">
         <p
           key={guidance}
@@ -492,17 +606,28 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
             className="text-center"
             style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}
           >
-            "{heard}"
+            &quot;{heard}&quot;
           </p>
         )}
         {voiceError && (
           <div className="text-center mt-1">
             <p style={{ fontSize: 13, color: "#b91c1c", fontWeight: 700 }}>{voiceError}</p>
             <button
-              onClick={() => { shouldListenRef.current = true; setVoiceArmed(true); setVoiceError(null); startVoice(); }}
+              onClick={() => {
+                shouldListenRef.current = true;
+                setVoiceArmed(true);
+                setVoiceError(null);
+                startVoice();
+              }}
               style={{
-                marginTop: 6, background: "var(--color-elder-primary)", color: "#fff",
-                border: 0, borderRadius: 12, padding: "8px 14px", fontWeight: 800, fontSize: 14,
+                marginTop: 6,
+                background: "var(--color-elder-primary)",
+                color: "#fff",
+                border: 0,
+                borderRadius: 12,
+                padding: "8px 14px",
+                fontWeight: 800,
+                fontSize: 14,
               }}
             >
               🎙 Tap to enable voice
@@ -511,8 +636,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         )}
       </div>
 
-      {/* Single fallback action — the app drives, the user follows. */}
-      <div className="px-4 pt-4 pb-5 mt-auto space-y-2">
+      <div className="px-4 pt-4 pb-5 mt-auto">
         <button
           onClick={doCapture}
           disabled={!!error}
@@ -530,22 +654,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
         >
           📸 Capture now
         </button>
-        <button
-          onClick={onHandoff}
-          className="w-full font-bold"
-          style={{
-            background: "#fff",
-            color: "var(--color-elder-ink)",
-            border: "2px solid #e7ddd0",
-            borderRadius: 18,
-            padding: "12px",
-            fontSize: 15,
-          }}
-        >
-          🤝 Not sure — send to a person
-        </button>
       </div>
     </div>
   );
 }
-
