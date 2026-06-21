@@ -58,7 +58,7 @@ export const CENTER_NAME = "Legal Aid Center";
 
 export async function analyzeDocument(imageDataUrl: string, userGoal?: string): Promise<AnalysisResult> {
   const { data, error } = await supabase.functions.invoke("analyze-document", {
-    body: { image: imageDataUrl, userGoal },
+    body: { image: imageDataUrl, userGoal, language: getLang() },
   });
   if (error) throw error;
   return data as AnalysisResult;
