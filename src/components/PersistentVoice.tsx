@@ -49,6 +49,7 @@ export function PersistentVoice({
 }: PersistentVoiceProps) {
   const [userOn, setUserOn] = useState(true);
   const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [blocked, setBlocked] = useState(false);
@@ -75,7 +76,11 @@ export function PersistentVoice({
   useEffect(() => { actionsRef.current = actions; }, [actions]);
   useEffect(() => { onActionRef.current = onAction; }, [onAction]);
 
-  const active = enabledFromMode && userOn && !paused;
+  // Voice is active on EVERY screen whenever the user keeps it on.
+  // `paused` is accepted for compatibility but does not stop listening — the
+  // big tap buttons still own each screen and voice runs alongside.
+  void paused;
+  const active = enabledFromMode && userOn;
 
   const speakConfirm = useCallback((msg: string) => {
     setConfirmation(msg);
