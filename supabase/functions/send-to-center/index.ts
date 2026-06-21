@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
       text:
         recipientKind === "trusted"
           ? `Elder chose to send to a trusted contact they picked themselves: ${trustedName} (${trustedRel}). NOT auto-filled.`
-          : `Elder chose to send to ${CENTER_NAME} (default, institutional).`,
+          : `Elder chose to send to ${centerName} (default, institutional accountable partner for need: ${needCategory}).`,
     });
     audit.push({
       time: stamp(),
@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
         elderMessage:
           recipientKind === "trusted"
             ? `I sent this to ${trustedName} (${trustedRel}). Your tracking number is ${trackingId}.`
-            : `I sent this to the ${CENTER_NAME}. Your tracking number is ${trackingId}.`,
+            : `I sent this to the ${centerName}. Your tracking number is ${trackingId}.`,
       },
       { headers: CORS },
     );
