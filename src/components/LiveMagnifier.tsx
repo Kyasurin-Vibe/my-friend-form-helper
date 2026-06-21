@@ -618,21 +618,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
               borderRadius: 12,
               boxShadow: "0 0 0 9999px rgba(0,0,0,0.22)",
             }} />
-            {/* Live detected document outline */}
-            {overlayBox && overlayBox.confidence > 0.15 && (
-              <div aria-hidden className="absolute pointer-events-none" style={{
-                left: `${overlayBox.x * 100}%`,
-                top: `${overlayBox.y * 100}%`,
-                width: `${overlayBox.width * 100}%`,
-                height: `${overlayBox.height * 100}%`,
-                border: `3px solid ${hint === "documentDetected" ? "#22c55e" : "#fbbf24"}`,
-                borderRadius: 10,
-                boxShadow: hint === "documentDetected"
-                  ? "0 0 0 3px rgba(34,197,94,0.25)"
-                  : "0 0 0 3px rgba(251,191,36,0.2)",
-                transition: "all 180ms ease-out",
-              }} />
-            )}
+            {/* Live document outline removed — static guide frame above is the only guide */}
             {countdown > 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ background: "rgba(0,0,0,0.35)" }}>
                 <div key={countdown} style={{
