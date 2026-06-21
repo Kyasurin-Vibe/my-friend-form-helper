@@ -6,11 +6,12 @@ type Props = {
   onCancel: () => void;
 };
 
-type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
+type Guidance = "init" | "no-doc" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
 type DetectionBox = { x: number; y: number; w: number; h: number };
 
 const GUIDANCE_TEXT: Record<Guidance, string> = {
   init: "Point the camera at your paper.",
+  "no-doc": "I don't see a document — point the camera at your paper.",
   "move-closer": "Move a little closer.",
   "hold-still": "Hold still…",
   corners: "Put all four corners inside the frame.",
@@ -119,6 +120,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     if (!ctx) return;
 
     let detectedStreak = 0;
+    let emptyStreak = 0;
     const id = window.setInterval(() => {
       if (confirmedRef.current || !video.videoWidth) return;
       try {
@@ -244,10 +246,16 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           aspect <= 1.9;
 
         let next: Guidance;
-        if (meanLum < 70 || !hasDocumentRegion) next = "init";
-        else if (paperFrac < 0.45 || boxAreaFrac < 0.48) next = "corners";
-        else if (sharp < 5.5) next = "blurry";
-        else next = "detected";
+        if (!hasDocumentRegion) {
+          emptyStreak++;
+          next = emptyStreak >= 5 ? "no-doc" : "init";
+        } else {
+          emptyStreak = 0;
+          if (meanLum < 70) next = "init";
+          else if (paperFrac < 0.45 || boxAreaFrac < 0.48) next = "corners";
+          else if (sharp < 5.5) next = "blurry";
+          else next = "detected";
+        }
 
         setDetectionBox(
           hasDocumentRegion
