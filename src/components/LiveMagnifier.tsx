@@ -11,16 +11,14 @@ type Props = {
   onHandoff: () => void;
 };
 
-type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "blurry" | "more-light" | "too-bright" | "detected";
+type Guidance = "init" | "move-closer" | "hold-still" | "corners" | "blurry" | "detected";
 
 const GUIDANCE_TEXT: Record<Guidance, string> = {
   init: "Point the camera at your paper.",
   "move-closer": "Move a little closer.",
   "hold-still": "Hold still…",
   corners: "Put all four corners inside the frame.",
-  blurry: "Hold steady — the picture is blurry.",
-  "more-light": "It's too dark. Find more light.",
-  "too-bright": "Too much glare. Tilt the paper.",
+  blurry: "The picture is too blurry. Please try again.",
   detected: "Looks clear. Capturing automatically…",
 };
 
@@ -100,94 +98,56 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     };
   }, []);
 
-  // === On-device frame analysis: sharpness (Laplacian variance) + brightness ===
-  // NO frames are sent to any API here. When a frame stays sharp for ~800ms,
-  // we auto-capture and the parent runs analyze-document ONCE on that frame.
+  // === Local-only guidance cycle. NO AI calls happen in the magnifier. ===
+  // Recognition runs only after the user taps "Capture & analyze" (handled in parent).
   useEffect(() => {
-    if (!ready || error) return;
-    const v = videoRef.current;
-    if (!v) return;
-    const W = 160, H = 120;
-    const canvas = document.createElement("canvas");
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
+    if (!ready) return;
+    const seq: Guidance[] = ["move-closer", "hold-still", "corners", "hold-still", "detected"];
+    let i = 0;
+    const id = window.setInterval(() => {
+      setGuidance(seq[Math.min(i, seq.length - 1)]);
+      i++;
+      if (i >= seq.length) window.clearInterval(id);
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, [ready]);
 
-    let stableSince = 0;
-    let timer: number | undefined;
-    let cancelled = false;
-
-    const tick = () => {
-      if (cancelled || confirmedRef.current) return;
-      if (!v.videoWidth) { timer = window.setTimeout(tick, 300); return; }
-      try {
-        ctx.drawImage(v, 0, 0, W, H);
-        const { data } = ctx.getImageData(0, 0, W, H);
-        const gray = new Float32Array(W * H);
-        let sum = 0;
-        for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-          const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-          gray[j] = g; sum += g;
-        }
-        const mean = sum / (W * H);
-        let lSum = 0, lSum2 = 0, n = 0;
-        for (let y = 1; y < H - 1; y++) {
-          for (let x = 1; x < W - 1; x++) {
-            const i = y * W + x;
-            const l = 4 * gray[i] - gray[i - 1] - gray[i + 1] - gray[i - W] - gray[i + W];
-            lSum += l; lSum2 += l * l; n++;
-          }
-        }
-        const lMean = lSum / n;
-        const lapVar = lSum2 / n - lMean * lMean;
-
-        const tooDark = mean < 55;
-        const tooBright = mean > 225;
-        const SHARP_T = 320; // conservative; never auto-capture blurry
-        const sharp = lapVar > SHARP_T;
-
-        let next: Guidance;
-        if (tooDark) next = "more-light";
-        else if (tooBright) next = "too-bright";
-        else if (!sharp) next = "blurry";
-        else next = "detected";
-        setGuidance((prev) => (prev === next ? prev : next));
-
-        const now = performance.now();
-        if (sharp && !tooDark && !tooBright) {
-          if (stableSince === 0) stableSince = now;
-          const held = now - stableSince;
-          setCountdown(Math.max(0, Math.ceil((800 - held) / 300)));
-          if (held >= 800 && !confirmedRef.current) {
-            doCapture();
-            return;
-          }
-        } else {
-          stableSince = 0;
-          setCountdown(0);
-        }
-      } catch { /* noop */ }
-      timer = window.setTimeout(tick, 350);
-    };
-    tick();
-    return () => {
-      cancelled = true;
-      if (timer) window.clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, error]);
 
   // === Speak guidance prompts (and pause mic while TTS plays) ===
   useEffect(() => {
     if (guidance === "init" || guidance === "hold-still") return;
+    const text =
+      guidance === "detected"
+        ? "Looks clear. Capturing now."
+        : guidance === "blurry"
+          ? "The picture is too blurry. Please try again."
+          : GUIDANCE_TEXT[guidance];
     speakingRef.current = true;
     try { DemoServices.voice.stop(); } catch { /* noop */ }
-    speak(GUIDANCE_TEXT[guidance], () => {
+    speak(text, () => {
       speakingRef.current = false;
       if (shouldListenRef.current) startVoice();
     });
   }, [guidance]);
 
+  // === Auto-capture countdown when document looks clear ===
+  useEffect(() => {
+    if (guidance !== "detected") return;
+    if (confirmedRef.current) return;
+    setCountdown(3);
+    const id = window.setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          window.clearInterval(id);
+          doCapture();
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guidance]);
 
   // === Voice recognition: start when armed, auto-restart on end ===
   function startVoice() {
