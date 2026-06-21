@@ -27,7 +27,11 @@ const TTS_VOICE: Record<Lang, string> = {
   tl: "aura-asteria-en",
 };
 
-let _lang: Lang = (typeof localStorage !== "undefined" && (localStorage.getItem("mf_lang") as Lang)) || "en";
+// Always default to English on load. The user must explicitly pick a
+// language on the first screen; we never restore a previously stored
+// language on reload (avoids half-applied UI/voice state).
+let _lang: Lang = "en";
+try { if (typeof localStorage !== "undefined") localStorage.removeItem("mf_lang"); } catch { /* noop */ }
 const listeners = new Set<(l: Lang) => void>();
 
 export function getLang(): Lang { return _lang; }

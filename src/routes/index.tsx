@@ -80,12 +80,8 @@ function ElderApp() {
   const [phase, setPhase] = useState<Phase>("language");
   const [, forceRerender] = useState(0);
   useEffect(() => {
-    // Read stored language after mount to avoid SSR hydration mismatch.
-    try {
-      if (typeof window !== "undefined" && localStorage.getItem("mf_lang")) {
-        setPhase("home");
-      }
-    } catch { /* noop */ }
+    // Always start on the language picker — language defaults to English
+    // and switches only after the user explicitly picks one.
     const off = onLangChange(() => forceRerender((n) => n + 1));
     const offT = onTranslate(() => forceRerender((n) => n + 1));
     return () => { off(); offT(); };
@@ -110,6 +106,9 @@ function ElderApp() {
 
   useEffect(() => {
     if (!voiceOn) return;
+    // The language picker speaks its own greeting and locks the mic to
+    // Deepgram; skip the global auto-speak/continuous-voice on that screen.
+    if (phase === "language") return;
     const text = speakableForPhase(phase, { analysis, sendResult, analyzeError });
     if (text) speakWarm(text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -293,9 +292,9 @@ function ElderApp() {
           }}
         >
           <PersistentVoice
-            enabledFromMode={voiceOn}
-            paused={phase === "viewer" || phase === "magnifier"}
-            speakable={speakableForPhase(phase, { analysis, sendResult, analyzeError })}
+            enabledFromMode={voiceOn && phase !== "language"}
+            paused={phase === "viewer" || phase === "magnifier" || phase === "language"}
+            speakable={phase === "language" ? "" : speakableForPhase(phase, { analysis, sendResult, analyzeError })}
             helpHint={helpHintForPhase(phase)}
             onBack={getBackForPhase(phase, { setPhase, analysis, navigate })}
             onDone={() => { speech.cancel(); restart(); setPhase("home"); }}
