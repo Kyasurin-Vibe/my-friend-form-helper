@@ -6,7 +6,7 @@ import {
 } from "@/lib/services";
 
 type Props = {
-  onConfirm: (detected?: DetectedDoc) => void;
+  onConfirm: (image?: string) => void;
   onCancel: () => void;
   onHandoff: () => void;
 };
