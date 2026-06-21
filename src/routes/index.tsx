@@ -602,12 +602,14 @@ function RetakeScreen({
   analysis,
   onRetry,
   onSendAnyway,
+  onDone,
   sending,
   speech,
 }: {
   analysis: AnalysisResult | null;
   onRetry: () => void;
   onSendAnyway: () => void;
+  onDone: () => void;
   sending: boolean;
   speech: ReturnType<typeof useSpeech>;
 }) {
