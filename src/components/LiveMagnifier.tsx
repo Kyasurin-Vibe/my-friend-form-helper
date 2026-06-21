@@ -1,18 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import { DemoServices, type VoiceCommand } from "@/lib/services";
+import type { DocumentBounds } from "@/lib/cases";
+
+type CaptureResult = {
+  processed: string; // cropped to detected (or guide) bounds
+  original: string;  // full frame
+  bounds: DocumentBounds | null;
+};
 
 type Props = {
-  onConfirm: (image?: string) => void;
+  onConfirm: (result?: CaptureResult) => void;
   onCancel: () => void;
 };
+
+type Hint =
+  | "starting"
+  | "tooDark"
+  | "empty"
+  | "possibleFace"
+  | "moveCloser"
+  | "holdStill"
+  | "documentDetected";
 
 function speak(text: string, onDone?: () => void) {
   if (typeof window === "undefined") return;
   const synth = window.speechSynthesis;
-  if (!synth) {
-    onDone?.();
-    return;
-  }
+  if (!synth) { onDone?.(); return; }
   synth.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.rate = 0.95;
@@ -22,14 +35,45 @@ function speak(text: string, onDone?: () => void) {
   synth.speak(utterance);
 }
 
+const GUIDE_WIDTH_PCT = 78;
+const GUIDE_ASPECT = 1.4142; // A4 portrait
+
+// A4 portrait centered fallback box in normalized coords (relative to full frame)
+function fallbackGuideBounds(videoW: number, videoH: number): DocumentBounds {
+  const frameAspect = videoW / videoH;
+  // Make a centered A4 portrait box that fits inside the frame.
+  // Target width ~ 78% of frame width, but limit by height.
+  let bw = 0.78;
+  let bh = bw * (videoW / videoH) * GUIDE_ASPECT; // bh in normalized height units
+  if (bh > 0.92) {
+    bh = 0.92;
+    bw = (bh * videoH) / (GUIDE_ASPECT * videoW);
+  }
+  // unused
+  void frameAspect;
+  return {
+    x: (1 - bw) / 2,
+    y: (1 - bh) / 2,
+    width: bw,
+    height: bh,
+    confidence: 0.2,
+  };
+}
+
 export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const confirmedRef = useRef(false);
   const speakingRef = useRef(false);
   const shouldListenRef = useRef(false);
-  const autoStableRef = useRef(0);
   const introSpokenRef = useRef(false);
+
+  // Detection state (in refs so the analysis loop doesn't trigger re-renders)
+  const smoothBoxRef = useRef<DocumentBounds | null>(null);
+  const stableSinceRef = useRef<number | null>(null);
+  const stableBoxRef = useRef<DocumentBounds | null>(null);
+  const smoothBrightnessRef = useRef(1);
+  const lastSpokenHintRef = useRef<Hint | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -39,8 +83,12 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const [voiceArmed, setVoiceArmed] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [heard, setHeard] = useState("");
+  const [hint, setHint] = useState<Hint>("starting");
+  const [overlayBox, setOverlayBox] = useState<DocumentBounds | null>(null);
+  const [zoom, setZoom] = useState<{ scale: number; ox: number; oy: number }>({ scale: 1, ox: 50, oy: 50 });
+  const [brightnessFilter, setBrightnessFilter] = useState(1);
 
-  // Open camera
+  // Camera
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -57,11 +105,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           },
           audio: true,
         });
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        stream.getAudioTracks().forEach((track) => track.stop());
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        stream.getAudioTracks().forEach((t) => t.stop());
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -75,12 +120,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     })();
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
   }, []);
 
-  // Speak intro once camera is ready
   useEffect(() => {
     if (!ready || introSpokenRef.current) return;
     introSpokenRef.current = true;
@@ -94,100 +138,214 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     );
   }, [ready]);
 
-  // Lightweight auto-capture: tiny sharpness-only check, ~1 Hz.
+  // ===== Lightweight per-frame analysis: 64x48 downsample, ~5 Hz =====
   useEffect(() => {
-    if (!ready || !autoCapture) return;
+    if (!ready) return;
     const video = videoRef.current;
     if (!video) return;
 
-    const w = 64;
-    const h = 48;
+    const W = 64, H = 48;
     const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
+    canvas.width = W;
+    canvas.height = H;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
 
     const id = window.setInterval(() => {
-      if (confirmedRef.current || countdown > 0 || !video.videoWidth) return;
+      if (confirmedRef.current || !video.videoWidth) return;
       try {
-        ctx.drawImage(video, 0, 0, w, h);
-        const data = ctx.getImageData(0, 0, w, h).data;
+        ctx.drawImage(video, 0, 0, W, H);
+        const data = ctx.getImageData(0, 0, W, H).data;
+
+        // Per-pixel stats
         let lumSum = 0;
-        const lum = new Float32Array(w * h);
-        for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-          const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-          lum[p] = y;
-          lumSum += y;
+        let paperCount = 0;
+        let skinCount = 0;
+        let minX = W, minY = H, maxX = -1, maxY = -1;
+        const lum = new Float32Array(W * H);
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            const i = (y * W + x) * 4;
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            const Y = 0.299 * r + 0.587 * g + 0.114 * b;
+            lum[y * W + x] = Y;
+            lumSum += Y;
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+            const sat = mx - mn;
+            const isPaper = Y > 140 && sat < 38;
+            if (isPaper) {
+              paperCount++;
+              if (x < minX) minX = x;
+              if (y < minY) minY = y;
+              if (x > maxX) maxX = x;
+              if (y > maxY) maxY = y;
+            }
+            // Crude skin heuristic
+            if (r > 95 && g > 40 && b > 20 && r > g && r > b && r - g > 15 && sat > 15 && sat < 90) {
+              skinCount++;
+            }
+          }
         }
-        const meanLum = lumSum / (w * h);
-        let edgeSum = 0;
-        let edgeN = 0;
-        for (let y = 1; y < h - 1; y++) {
-          for (let x = 1; x < w - 1; x++) {
-            const p = y * w + x;
-            edgeSum +=
-              Math.abs(lum[p + 1] - lum[p - 1]) + Math.abs(lum[p + w] - lum[p - w]);
+        const total = W * H;
+        const meanLum = lumSum / total;
+        const paperFrac = paperCount / total;
+        const skinFrac = skinCount / total;
+
+        // Edge / sharpness (skipped per pixel inside the loop above to keep it cheap)
+        let edgeSum = 0, edgeN = 0;
+        for (let y = 1; y < H - 1; y += 2) {
+          for (let x = 1; x < W - 1; x += 2) {
+            const p = y * W + x;
+            edgeSum += Math.abs(lum[p + 1] - lum[p - 1]) + Math.abs(lum[p + W] - lum[p - W]);
             edgeN++;
           }
         }
-        const sharp = edgeSum / edgeN;
-        const stable = meanLum > 80 && sharp > 5.5;
-        if (stable) {
-          autoStableRef.current++;
-          if (autoStableRef.current >= 3) {
-            autoStableRef.current = 0;
-            startCountdown();
+        const sharp = edgeSum / Math.max(1, edgeN);
+
+        // Smooth brightness filter
+        const targetBrightness = meanLum > 0
+          ? Math.max(1, Math.min(1.7, 165 / Math.max(40, meanLum)))
+          : 1;
+        smoothBrightnessRef.current = smoothBrightnessRef.current * 0.8 + targetBrightness * 0.2;
+        setBrightnessFilter(smoothBrightnessRef.current);
+
+        // Decide current bounding box (normalized)
+        let raw: DocumentBounds | null = null;
+        const hasBox = maxX >= minX && paperFrac > 0.08;
+        if (hasBox) {
+          raw = {
+            x: minX / W,
+            y: minY / H,
+            width: Math.max(1, maxX - minX + 1) / W,
+            height: Math.max(1, maxY - minY + 1) / H,
+            confidence: Math.min(1, paperFrac * 2),
+          };
+        }
+
+        // EMA smoothing
+        const prev = smoothBoxRef.current;
+        let smooth: DocumentBounds | null = null;
+        if (raw && prev) {
+          const a = 0.3;
+          smooth = {
+            x: prev.x * (1 - a) + raw.x * a,
+            y: prev.y * (1 - a) + raw.y * a,
+            width: prev.width * (1 - a) + raw.width * a,
+            height: prev.height * (1 - a) + raw.height * a,
+            confidence: prev.confidence * (1 - a) + raw.confidence * a,
+          };
+        } else if (raw) {
+          smooth = raw;
+        } else if (prev) {
+          // fade out gradually
+          smooth = { ...prev, confidence: prev.confidence * 0.7 };
+          if (smooth.confidence < 0.05) smooth = null;
+        }
+        smoothBoxRef.current = smooth;
+        setOverlayBox(smooth);
+
+        // Auto-zoom-follow
+        if (smooth && smooth.confidence > 0.15) {
+          const targetScale = Math.max(1, Math.min(1.5, 0.78 / Math.max(smooth.width, smooth.height / GUIDE_ASPECT)));
+          const cx = (smooth.x + smooth.width / 2) * 100;
+          const cy = (smooth.y + smooth.height / 2) * 100;
+          setZoom((prevZ) => ({
+            scale: prevZ.scale * 0.85 + targetScale * 0.15,
+            ox: prevZ.ox * 0.85 + cx * 0.15,
+            oy: prevZ.oy * 0.85 + cy * 0.15,
+          }));
+        } else {
+          setZoom((prevZ) => ({
+            scale: prevZ.scale * 0.9 + 1 * 0.1,
+            ox: prevZ.ox * 0.9 + 50 * 0.1,
+            oy: prevZ.oy * 0.9 + 50 * 0.1,
+          }));
+        }
+
+        // Decide hint
+        let nextHint: Hint = "starting";
+        if (meanLum < 65) nextHint = "tooDark";
+        else if (skinFrac > 0.22 && paperFrac < 0.18) nextHint = "possibleFace";
+        else if (!smooth || smooth.confidence < 0.18) nextHint = "empty";
+        else if (smooth.width * smooth.height < 0.18) nextHint = "moveCloser";
+        else if (sharp < 5.5) nextHint = "holdStill";
+        else nextHint = "documentDetected";
+        setHint(nextHint);
+
+        // Stability tracking for auto-capture
+        const now = performance.now();
+        if (nextHint === "documentDetected" && smooth) {
+          const sb = stableBoxRef.current;
+          const drift = sb
+            ? Math.abs(sb.x - smooth.x) + Math.abs(sb.y - smooth.y) +
+              Math.abs(sb.width - smooth.width) + Math.abs(sb.height - smooth.height)
+            : 999;
+          if (drift < 0.08 && sb) {
+            if (stableSinceRef.current == null) stableSinceRef.current = now;
+            if (autoCapture && countdown === 0 && now - (stableSinceRef.current ?? now) > 800) {
+              startCountdown();
+            }
+          } else {
+            stableBoxRef.current = smooth;
+            stableSinceRef.current = now;
           }
         } else {
-          autoStableRef.current = 0;
+          stableSinceRef.current = null;
+          stableBoxRef.current = null;
         }
       } catch {
         // transient
       }
-    }, 700);
+    }, 200);
 
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, autoCapture, countdown]);
 
+  // Speak hints (throttled to changes, not every frame)
+  useEffect(() => {
+    if (!ready || speakingRef.current) return;
+    if (hint === lastSpokenHintRef.current) return;
+    const messages: Partial<Record<Hint, string>> = {
+      tooDark: "Too dark. Move to better light.",
+      possibleFace: "That looks like a face, not a document.",
+      empty: "I don't see paper yet.",
+      moveCloser: "Move a little closer.",
+      holdStill: "Hold still.",
+      documentDetected: "Document detected.",
+    };
+    const msg = messages[hint];
+    if (msg) {
+      lastSpokenHintRef.current = hint;
+      // Keep TTS short and don't spam — small delay debounce via ref above.
+    }
+  }, [hint, ready]);
+
   function startCountdown() {
     if (confirmedRef.current || countdown > 0) return;
     setCountdown(3);
     speakingRef.current = true;
-    try {
-      DemoServices.voice.stop();
-    } catch {
-      // no-op
-    }
+    try { DemoServices.voice.stop(); } catch { /* noop */ }
     speak("Hold still… 3, 2, 1", () => {
       speakingRef.current = false;
       if (shouldListenRef.current) startVoice();
     });
     const id = window.setInterval(() => {
-      setCountdown((current) => {
-        if (current <= 1) {
-          window.clearInterval(id);
-          doCapture();
-          return 0;
-        }
-        return current - 1;
+      setCountdown((c) => {
+        if (c <= 1) { window.clearInterval(id); doCapture(); return 0; }
+        return c - 1;
       });
     }, 1000);
   }
 
-  // Voice listener
+  // Voice
   useEffect(() => {
     if (!voiceArmed) return;
     shouldListenRef.current = true;
     startVoice();
     return () => {
       shouldListenRef.current = false;
-      try {
-        DemoServices.voice.stop();
-      } catch {
-        // no-op
-      }
+      try { DemoServices.voice.stop(); } catch { /* noop */ }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceArmed]);
@@ -199,13 +357,9 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
       return;
     }
     if (speakingRef.current) return;
-
     try {
       service.start({
-        onStart: () => {
-          setListening(true);
-          setVoiceError(null);
-        },
+        onStart: () => { setListening(true); setVoiceError(null); },
         onEnd: () => {
           setListening(false);
           if (shouldListenRef.current && !speakingRef.current) {
@@ -221,7 +375,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
             setVoiceError(err);
           }
         },
-        onTranscript: (transcript) => setHeard(transcript),
+        onTranscript: (t) => setHeard(t),
         onCommand: (cmd) => handleVoiceCommand(cmd),
       });
     } catch (e: unknown) {
@@ -229,316 +383,234 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     }
   }
 
-  function captureFrame(): string | undefined {
+  function captureAndCrop(): CaptureResult | undefined {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return undefined;
+
+    // Full frame at reasonable resolution
     const scale = Math.min(1, 1600 / video.videoWidth);
-    const width = Math.round(video.videoWidth * scale);
-    const height = Math.round(video.videoHeight * scale);
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return undefined;
-    ctx.drawImage(video, 0, 0, width, height);
-    try {
-      return canvas.toDataURL("image/jpeg", 0.9);
-    } catch {
-      return undefined;
-    }
+    const fw = Math.round(video.videoWidth * scale);
+    const fh = Math.round(video.videoHeight * scale);
+    const fullCanvas = document.createElement("canvas");
+    fullCanvas.width = fw; fullCanvas.height = fh;
+    const fctx = fullCanvas.getContext("2d");
+    if (!fctx) return undefined;
+    fctx.drawImage(video, 0, 0, fw, fh);
+    const original = fullCanvas.toDataURL("image/jpeg", 0.9);
+
+    // Choose bounds: detected smooth box, else centered A4 fallback
+    const detected = smoothBoxRef.current;
+    const useDetected = detected && detected.confidence > 0.2 && detected.width * detected.height > 0.12;
+    const bounds = useDetected ? detected : fallbackGuideBounds(fw, fh);
+
+    // Apply ~3% padding, clamp
+    const pad = 0.03;
+    const x0 = Math.max(0, bounds.x - pad);
+    const y0 = Math.max(0, bounds.y - pad);
+    const x1 = Math.min(1, bounds.x + bounds.width + pad);
+    const y1 = Math.min(1, bounds.y + bounds.height + pad);
+    const sx = Math.round(x0 * fw);
+    const sy = Math.round(y0 * fh);
+    const sw = Math.max(1, Math.round((x1 - x0) * fw));
+    const sh = Math.max(1, Math.round((y1 - y0) * fh));
+
+    const cropCanvas = document.createElement("canvas");
+    cropCanvas.width = sw; cropCanvas.height = sh;
+    const cctx = cropCanvas.getContext("2d");
+    if (!cctx) return { processed: original, original, bounds: useDetected ? detected : null };
+    cctx.drawImage(fullCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    const processed = cropCanvas.toDataURL("image/jpeg", 0.9);
+
+    return { processed, original, bounds: useDetected ? detected : null };
   }
 
   function doCapture() {
     if (confirmedRef.current) return;
     confirmedRef.current = true;
     shouldListenRef.current = false;
-    try {
-      DemoServices.voice.stop();
-    } catch {
-      // no-op
-    }
-    const frame = captureFrame();
-    window.setTimeout(() => onConfirm(frame), 0);
+    try { DemoServices.voice.stop(); } catch { /* noop */ }
+    const result = captureAndCrop();
+    window.setTimeout(() => onConfirm(result), 0);
   }
 
   function handleVoiceCommand(cmd: VoiceCommand) {
     switch (cmd) {
-      case "yes":
-        doCapture();
-        break;
+      case "yes": doCapture(); break;
       case "no":
         setCountdown(0);
-        autoStableRef.current = 0;
+        stableSinceRef.current = null;
+        stableBoxRef.current = null;
         break;
       case "read":
         speakingRef.current = true;
-        try {
-          DemoServices.voice.stop();
-        } catch {
-          // no-op
-        }
+        try { DemoServices.voice.stop(); } catch { /* noop */ }
         speak("Point the camera at your paper. Fit all four corners inside the frame.", () => {
           speakingRef.current = false;
           if (shouldListenRef.current) startVoice();
         });
         break;
-      case "unknown":
-      case "zoom":
-      case "brighter":
-      case "contrast":
-        break;
+      default: break;
     }
   }
 
-  // A4 portrait ratio = 1 : 1.4142
-  const guideWidthPct = 78;
-  const guideAspect = 1.4142;
+  const hintText: Record<Hint, string> = {
+    starting: "Starting camera…",
+    tooDark: "💡 Too dark — move to better light",
+    empty: "📄 Show me your paper",
+    possibleFace: "🙂 That looks like a face, not a document",
+    moveCloser: "↕ Move a little closer",
+    holdStill: "✋ Hold still…",
+    documentDetected: "✅ Document detected — hold still",
+  };
+  const hintColor: Record<Hint, string> = {
+    starting: "#6b5d52",
+    tooDark: "#b45309",
+    empty: "#6b5d52",
+    possibleFace: "#b45309",
+    moveCloser: "#2563eb",
+    holdStill: "#2563eb",
+    documentDetected: "#16a34a",
+  };
 
   return (
     <div className="flex-1 flex flex-col" style={{ background: "var(--color-elder-bg)" }}>
       <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <button
-          onClick={onCancel}
-          className="font-bold"
-          style={{
-            background: "#fff",
-            border: "2px solid var(--color-elder-sky)",
-            color: "var(--color-elder-primary)",
-            borderRadius: 14,
-            padding: "8px 14px",
-            fontSize: 15,
-          }}
-        >
-          ← Back
-        </button>
-        <span className="font-extrabold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>
-          📷 Scanner
-        </span>
-        <span
-          title={listening ? "Listening" : "Mic off"}
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: listening ? "#16a34a" : "#8a7d6f",
-            minWidth: 64,
-            textAlign: "right",
-          }}
-        >
-          {listening ? "🎙 Listening" : "🎙 off"}
-        </span>
+        <button onClick={onCancel} className="font-bold" style={{
+          background: "#fff", border: "2px solid var(--color-elder-sky)",
+          color: "var(--color-elder-primary)", borderRadius: 14, padding: "8px 14px", fontSize: 15,
+        }}>← Back</button>
+        <span className="font-extrabold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>📷 Scanner</span>
+        <span style={{
+          fontSize: 13, fontWeight: 700,
+          color: listening ? "#16a34a" : "#8a7d6f",
+          minWidth: 64, textAlign: "right",
+        }}>{listening ? "🎙 Listening" : "🎙 off"}</span>
       </div>
 
-      <div
-        className="mx-4 rounded-2xl overflow-hidden relative"
-        style={{
-          background: "#111",
-          height: 360,
-          boxShadow: "0 10px 24px rgba(0,0,0,0.25)",
-        }}
-      >
+      <div className="mx-4 rounded-2xl overflow-hidden relative" style={{
+        background: "#111", height: 360, boxShadow: "0 10px 24px rgba(0,0,0,0.25)",
+      }}>
         {error ? (
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center text-center p-6"
-            style={{ color: "#fff" }}
-          >
-            <p className="font-extrabold" style={{ fontSize: 20 }}>
-              I can't open the camera.
-            </p>
-            <p className="mt-2" style={{ fontSize: 15, color: "#cbd2da" }}>
-              {error}
-            </p>
-            <p className="mt-2" style={{ fontSize: 14, color: "#9aa4b2" }}>
-              Please allow camera access in your browser.
-            </p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6" style={{ color: "#fff" }}>
+            <p className="font-extrabold" style={{ fontSize: 20 }}>I can't open the camera.</p>
+            <p className="mt-2" style={{ fontSize: 15, color: "#cbd2da" }}>{error}</p>
+            <p className="mt-2" style={{ fontSize: 14, color: "#9aa4b2" }}>Please allow camera access in your browser.</p>
           </div>
         ) : (
           <>
             <video
-              ref={videoRef}
-              muted
-              playsInline
+              ref={videoRef} muted playsInline
               className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                transform: `scale(${zoom.scale})`,
+                transformOrigin: `${zoom.ox}% ${zoom.oy}%`,
+                filter: `brightness(${brightnessFilter})`,
+                transition: "transform 280ms ease-out, filter 400ms ease-out",
+              }}
             />
             {/* A4 portrait guide frame */}
-            <div
-              aria-hidden
-              className="absolute pointer-events-none"
-              style={{
-                left: "50%",
-                top: "50%",
-                width: `${guideWidthPct}%`,
-                aspectRatio: `1 / ${guideAspect}`,
-                transform: "translate(-50%, -50%)",
-                border: "3px dashed rgba(255,255,255,0.85)",
-                borderRadius: 12,
-                boxShadow: "0 0 0 9999px rgba(0,0,0,0.28)",
-              }}
-            >
-              {/* Corner ticks */}
-              {[
-                { top: -4, left: -4, borderTop: 4, borderLeft: 4 },
-                { top: -4, right: -4, borderTop: 4, borderRight: 4 },
-                { bottom: -4, left: -4, borderBottom: 4, borderLeft: 4 },
-                { bottom: -4, right: -4, borderBottom: 4, borderRight: 4 },
-              ].map((s, i) => (
-                <span
-                  key={i}
-                  style={{
-                    position: "absolute",
-                    width: 28,
-                    height: 28,
-                    borderColor: "#fff",
-                    borderStyle: "solid",
-                    borderWidth: 0,
-                    ...s,
-                  }}
-                />
-              ))}
-            </div>
+            <div aria-hidden className="absolute pointer-events-none" style={{
+              left: "50%", top: "50%",
+              width: `${GUIDE_WIDTH_PCT}%`,
+              aspectRatio: `1 / ${GUIDE_ASPECT}`,
+              transform: "translate(-50%, -50%)",
+              border: "3px dashed rgba(255,255,255,0.6)",
+              borderRadius: 12,
+              boxShadow: "0 0 0 9999px rgba(0,0,0,0.22)",
+            }} />
+            {/* Live detected document outline */}
+            {overlayBox && overlayBox.confidence > 0.15 && (
+              <div aria-hidden className="absolute pointer-events-none" style={{
+                left: `${overlayBox.x * 100}%`,
+                top: `${overlayBox.y * 100}%`,
+                width: `${overlayBox.width * 100}%`,
+                height: `${overlayBox.height * 100}%`,
+                border: `3px solid ${hint === "documentDetected" ? "#22c55e" : "#fbbf24"}`,
+                borderRadius: 10,
+                boxShadow: hint === "documentDetected"
+                  ? "0 0 0 3px rgba(34,197,94,0.25)"
+                  : "0 0 0 3px rgba(251,191,36,0.2)",
+                transition: "all 180ms ease-out",
+              }} />
+            )}
             {countdown > 0 && (
-              <div
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                style={{ background: "rgba(0,0,0,0.35)" }}
-              >
-                <div
-                  key={countdown}
-                  style={{
-                    color: "#fff",
-                    fontWeight: 900,
-                    fontSize: 200,
-                    lineHeight: 1,
-                    textShadow: "0 8px 30px rgba(0,0,0,0.6)",
-                    animation: "countdown-pop 0.6s ease-out",
-                  }}
-                >
-                  {countdown}
-                </div>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ background: "rgba(0,0,0,0.35)" }}>
+                <div key={countdown} style={{
+                  color: "#fff", fontWeight: 900, fontSize: 200, lineHeight: 1,
+                  textShadow: "0 8px 30px rgba(0,0,0,0.6)",
+                  animation: "countdown-pop 0.6s ease-out",
+                }}>{countdown}</div>
               </div>
             )}
             {!ready && (
-              <div
-                className="absolute inset-0 flex items-center justify-center"
-                style={{ color: "#fff" }}
-              >
-                Starting camera…
-              </div>
+              <div className="absolute inset-0 flex items-center justify-center" style={{ color: "#fff" }}>Starting camera…</div>
             )}
           </>
         )}
       </div>
 
       <div className="px-4 pt-3">
-        <p
-          className="text-center font-bold"
-          style={{
-            fontSize: 18,
-            color: "var(--color-elder-ink)",
-            minHeight: 48,
-          }}
-        >
+        <p className="text-center font-bold" style={{
+          fontSize: 18, color: hintColor[hint], minHeight: 26, transition: "color 200ms",
+        }}>{hintText[hint]}</p>
+        <p className="text-center" style={{ fontSize: 14, color: "#6b5d52", minHeight: 20 }}>
           Fit your paper inside the frame. {autoCapture ? "I'll capture automatically." : "Tap the red button when ready."}
         </p>
         {heard && listening && (
-          <p
-            className="text-center"
-            style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}
-          >
+          <p className="text-center" style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}>
             &quot;{heard}&quot;
           </p>
         )}
         {voiceError && (
           <div className="text-center mt-1">
             <p style={{ fontSize: 13, color: "#b91c1c", fontWeight: 700 }}>{voiceError}</p>
-            <button
-              onClick={() => {
-                shouldListenRef.current = true;
-                setVoiceArmed(true);
-                setVoiceError(null);
-                startVoice();
-              }}
-              style={{
-                marginTop: 6,
-                background: "var(--color-elder-primary)",
-                color: "#fff",
-                border: 0,
-                borderRadius: 12,
-                padding: "8px 14px",
-                fontWeight: 800,
-                fontSize: 14,
-              }}
-            >
-              🎙 Tap to enable voice
-            </button>
+            <button onClick={() => {
+              shouldListenRef.current = true; setVoiceArmed(true); setVoiceError(null); startVoice();
+            }} style={{
+              marginTop: 6, background: "var(--color-elder-primary)", color: "#fff", border: 0,
+              borderRadius: 12, padding: "8px 14px", fontWeight: 800, fontSize: 14,
+            }}>🎙 Tap to enable voice</button>
           </div>
         )}
       </div>
 
       <div className="px-4 pt-2 flex justify-center gap-2 flex-wrap">
-        <button
-          onClick={() => {
-            setAutoCapture((v) => !v);
-            autoStableRef.current = 0;
-          }}
-          aria-pressed={autoCapture}
-          style={{
-            background: autoCapture ? "var(--color-elder-teal)" : "#fff",
-            color: autoCapture ? "#fff" : "var(--color-elder-ink)",
-            border: "2px solid var(--color-elder-teal)",
-            borderRadius: 999,
-            padding: "8px 14px",
-            fontWeight: 800,
-            fontSize: 14,
-          }}
-        >
-          ⏱ Auto-capture {autoCapture ? "ON" : "OFF"}
-        </button>
-        <button
-          onClick={() => {
-            if (voiceArmed) {
-              shouldListenRef.current = false;
-              try { DemoServices.voice.stop(); } catch { /* no-op */ }
-              setVoiceArmed(false);
-              setListening(false);
-            } else {
-              setVoiceError(null);
-              setVoiceArmed(true);
-            }
-          }}
-          aria-pressed={voiceArmed}
-          style={{
-            background: voiceArmed ? (listening ? "#16a34a" : "var(--color-elder-primary)") : "#fff",
-            color: voiceArmed ? "#fff" : "var(--color-elder-ink)",
-            border: "2px solid var(--color-elder-primary)",
-            borderRadius: 999,
-            padding: "8px 14px",
-            fontWeight: 800,
-            fontSize: 14,
-            boxShadow: voiceArmed && listening ? "0 0 0 6px rgba(34,197,94,0.18)" : "none",
-            transition: "all 0.2s",
-          }}
-        >
-          🎙 Voice {voiceArmed ? "ON" : "OFF"}
-        </button>
+        <button onClick={() => {
+          setAutoCapture((v) => !v);
+          stableSinceRef.current = null;
+          stableBoxRef.current = null;
+        }} aria-pressed={autoCapture} style={{
+          background: autoCapture ? "var(--color-elder-teal)" : "#fff",
+          color: autoCapture ? "#fff" : "var(--color-elder-ink)",
+          border: "2px solid var(--color-elder-teal)",
+          borderRadius: 999, padding: "8px 14px", fontWeight: 800, fontSize: 14,
+        }}>⏱ Auto-capture {autoCapture ? "ON" : "OFF"}</button>
+        <button onClick={() => {
+          if (voiceArmed) {
+            shouldListenRef.current = false;
+            try { DemoServices.voice.stop(); } catch { /* noop */ }
+            setVoiceArmed(false); setListening(false);
+          } else {
+            setVoiceError(null); setVoiceArmed(true);
+          }
+        }} aria-pressed={voiceArmed} style={{
+          background: voiceArmed ? (listening ? "#16a34a" : "var(--color-elder-primary)") : "#fff",
+          color: voiceArmed ? "#fff" : "var(--color-elder-ink)",
+          border: "2px solid var(--color-elder-primary)",
+          borderRadius: 999, padding: "8px 14px", fontWeight: 800, fontSize: 14,
+          boxShadow: voiceArmed && listening ? "0 0 0 6px rgba(34,197,94,0.18)" : "none",
+          transition: "all 0.2s",
+        }}>🎙 Voice {voiceArmed ? "ON" : "OFF"}</button>
       </div>
 
       <div className="px-4 pt-3 pb-5 mt-auto">
-        <button
-          onClick={doCapture}
-          disabled={!!error}
+        <button onClick={doCapture} disabled={!!error}
           className="w-full font-extrabold animate-button-pop-red"
           style={{
-            background: "var(--color-elder-red)",
-            color: "#fff",
-            borderRadius: 22,
-            padding: "20px",
-            fontSize: 22,
-            minHeight: 78,
-            boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
-            opacity: error ? 0.5 : 1,
-          }}
-        >
-          📸 Capture now
-        </button>
+            background: "var(--color-elder-red)", color: "#fff", borderRadius: 22,
+            padding: "20px", fontSize: 22, minHeight: 78,
+            boxShadow: "0 14px 30px rgba(0,0,0,0.18)", opacity: error ? 0.5 : 1,
+          }}>📸 Capture now</button>
       </div>
     </div>
   );
