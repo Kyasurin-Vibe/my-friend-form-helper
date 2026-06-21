@@ -80,7 +80,10 @@ function ElderApp() {
     typeof window !== "undefined" && localStorage.getItem("mf_lang") ? "home" : "language",
   );
   const [, forceRerender] = useState(0);
-  useEffect(() => onLangChange(() => forceRerender((n) => n + 1)), []);
+  useEffect(() => {
+    const off = onLangChange(() => forceRerender((n) => n + 1));
+    return () => { off(); };
+  }, []);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
   const [processedImage, setProcessedImage] = useState<string | undefined>(undefined);
