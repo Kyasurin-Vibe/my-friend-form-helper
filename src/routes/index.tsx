@@ -416,6 +416,56 @@ function ElderApp() {
     </div>
   );
 }
+function LanguagePickerScreen({ onPick }: { onPick: (l: Lang) => void }) {
+  const langs: Lang[] = ["en", "es", "zh", "vi", "tl"];
+  const speakLabel = (l: Lang) => {
+    try {
+      const u = new SpeechSynthesisUtterance(LANG_LABELS[l].native);
+      u.rate = 0.95; u.pitch = 1.05;
+      const bcp: Record<Lang, string> = { en: "en-US", es: "es-ES", zh: "zh-CN", vi: "vi-VN", tl: "fil-PH" };
+      u.lang = bcp[l];
+      try {
+        const v = window.speechSynthesis.getVoices().find((vv) => vv.lang?.toLowerCase().startsWith(u.lang.toLowerCase().slice(0, 2)));
+        if (v) u.voice = v;
+      } catch { /* noop */ }
+      window.speechSynthesis.speak(u);
+    } catch { /* noop */ }
+  };
+  return (
+    <div className="flex-1 flex flex-col items-center p-6 text-center">
+      <Mascot mode="idle" size={120} />
+      <h1 className="mt-3 font-extrabold" style={{ fontSize: 22, color: "var(--color-elder-ink)", lineHeight: 1.35 }}>
+        What language do you speak?<br />
+        <span style={{ fontSize: 16, fontWeight: 700, color: "#6b5d52" }}>
+          ¿Qué idioma habla? · 您说什么语言? · Bạn nói ngôn ngữ nào? · Anong wika ang gusto mo?
+        </span>
+      </h1>
+      <div className="w-full space-y-3 mt-5">
+        {langs.map((l) => (
+          <button
+            key={l}
+            onClick={() => { speakLabel(l); setTimeout(() => onPick(l), 250); }}
+            onFocus={() => speakLabel(l)}
+            className="w-full font-extrabold active:scale-[0.96] animate-button-pop"
+            style={{
+              background: "#fff",
+              color: "var(--color-elder-ink)",
+              border: "3px solid var(--color-elder-sky)",
+              borderRadius: 22,
+              padding: "20px 22px",
+              fontSize: 26,
+              minHeight: 78,
+              boxShadow: "0 6px 18px rgba(47,111,176,0.12)",
+            }}
+          >
+            {LANG_LABELS[l].native}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
   const choose = (mode: A11yMode) => {
