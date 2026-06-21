@@ -154,7 +154,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         for (let y = 1; y < height - 1; y++) {
           for (let x = 1; x < width - 1; x++) {
             const p = y * width + x;
-            edgeSum += Math.abs(lum[p + 1] - lum[p - 1]) + Math.abs(lum[p + width] - lum[p - width]);
+            edgeSum +=
+              Math.abs(lum[p + 1] - lum[p - 1]) + Math.abs(lum[p + width] - lum[p - width]);
             edgeN++;
           }
         }
@@ -230,7 +231,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         const rightFill = boxH * bandX > 0 ? rightPaper / (boxH * bandX) : 0;
         const edgeFill = (topFill + bottomFill + leftFill + rightFill) / 4;
         const rectangularEnough =
-          [topFill, bottomFill, leftFill, rightFill].filter((v) => v >= 0.34).length >= 3 && edgeFill >= 0.44;
+          [topFill, bottomFill, leftFill, rightFill].filter((v) => v >= 0.34).length >= 3 &&
+          edgeFill >= 0.44;
         const aspect = boxH > 0 ? boxW / boxH : 0;
         const hasDocumentRegion =
           meanLum >= 75 &&
@@ -269,15 +271,22 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
 
         const targetBrightness = clamp(165 / Math.max(60, meanLum), 0.9, 1.45);
         const targetContrast = clamp(1 + (8 - Math.min(sharp, 8)) * 0.04, 1, 1.35);
-        const targetZoom = hasDocumentRegion && boxAreaFrac >= 0.5 ? 1.85 : hasDocumentRegion ? 1.6 : 1.15;
+        const targetZoom =
+          hasDocumentRegion && boxAreaFrac >= 0.5 ? 1.85 : hasDocumentRegion ? 1.6 : 1.15;
         const current = autoRef.current;
         current.brightness += (targetBrightness - current.brightness) * 0.18;
         current.contrast += (targetContrast - current.contrast) * 0.18;
         current.zoom += (targetZoom - current.zoom) * 0.18;
 
-        setBrightness((value) => (Math.abs(value - current.brightness) > 0.03 ? +current.brightness.toFixed(2) : value));
-        setContrast((value) => (Math.abs(value - current.contrast) > 0.03 ? +current.contrast.toFixed(2) : value));
-        setZoom((value) => (Math.abs(value - current.zoom) > 0.04 ? +current.zoom.toFixed(2) : value));
+        setBrightness((value) =>
+          Math.abs(value - current.brightness) > 0.03 ? +current.brightness.toFixed(2) : value,
+        );
+        setContrast((value) =>
+          Math.abs(value - current.contrast) > 0.03 ? +current.contrast.toFixed(2) : value,
+        );
+        setZoom((value) =>
+          Math.abs(value - current.zoom) > 0.04 ? +current.zoom.toFixed(2) : value,
+        );
       } catch {
         // Keep scanning; transient frame read failures are common on camera startup.
       }
