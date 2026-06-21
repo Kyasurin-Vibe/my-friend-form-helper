@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, createContext, useContext } from "react";
 import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
+import { SimpleMagnifier } from "@/components/SimpleMagnifier";
 import { VoiceBar } from "@/components/VoiceBar";
 import { useSpeech } from "@/lib/useSpeech";
 import {
@@ -40,6 +41,8 @@ export const Route = createFileRoute("/")({
 export type A11yMode = "voice" | "text" | "both";
 type Phase =
   | "start"
+  | "home"
+  | "viewer"
   | "find"
   | "magnifier"
   | "preview"
@@ -70,7 +73,7 @@ function isValidBounds(b: DocumentBounds | null | undefined): boolean {
 
 function ElderApp() {
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
-  const [phase, setPhase] = useState<Phase>("find");
+  const [phase, setPhase] = useState<Phase>("home");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
   const [processedImage, setProcessedImage] = useState<string | undefined>(undefined);
@@ -278,8 +281,18 @@ function ElderApp() {
               <StartGate
                 onStart={(mode) => {
                   setA11yMode(mode);
-                  setPhase("find");
+                  setPhase("home");
                 }}
+              />
+            ) : phase === "home" ? (
+              <HomeScreen
+                onMagnifier={() => setPhase("viewer")}
+                onScanner={() => setPhase("find")}
+              />
+            ) : phase === "viewer" ? (
+              <SimpleMagnifier
+                onBack={() => setPhase("home")}
+                onQuestion={() => setPhase("find")}
               />
             ) : phase === "find" ? (
               <FindDocGate onOpenMagnifier={() => setPhase("magnifier")} />
@@ -391,6 +404,78 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
         {choice("📝  Show me words", "I'll show big captions, no sound.", "text")}
         {choice("🔊📝  Both", "Voice and captions together.", "both")}
       </div>
+    </div>
+  );
+}
+
+function HomeScreen({
+  onMagnifier,
+  onScanner,
+}: {
+  onMagnifier: () => void;
+  onScanner: () => void;
+}) {
+  const voiceOn = useContext(VoiceOnContext);
+  return (
+    <div className="flex-1 flex flex-col items-center p-6 text-center">
+      <div className="flex-1 flex flex-col items-center justify-center w-full">
+        <Mascot mode="idle" size={130} />
+        <h1 className="mt-3 font-extrabold" style={{ fontSize: 30, color: "var(--color-elder-ink)" }}>
+          My Friend
+        </h1>
+        <p className="mt-1 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
+          How can I help you today?
+        </p>
+        <div className="w-full space-y-4">
+          <button
+            onClick={() => { cancelSpeech(); onMagnifier(); }}
+            className="w-full font-extrabold animate-button-pop active:scale-[0.96] text-left"
+            style={{
+              background: "#fff",
+              color: "var(--color-elder-ink)",
+              border: "3px solid var(--color-elder-sky)",
+              borderRadius: 24,
+              padding: "22px 22px",
+              fontSize: 22,
+              minHeight: 96,
+              boxShadow: "0 8px 22px rgba(47,111,176,0.14)",
+            }}
+          >
+            <div style={{ fontSize: 26 }}>🔍 Help me see this</div>
+            <div style={{ fontSize: 15, color: "#6b5d52", fontWeight: 600, marginTop: 4 }}>
+              Open the magnifier — just look, no upload.
+            </div>
+          </button>
+          <button
+            onClick={() => { cancelSpeech(); onScanner(); }}
+            className="w-full font-extrabold animate-button-pop-red active:scale-[0.96] text-left"
+            style={{
+              background: "var(--color-elder-red)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 24,
+              padding: "22px 22px",
+              fontSize: 22,
+              minHeight: 96,
+              boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div style={{ fontSize: 26 }}>❓ I have a question about a document</div>
+            <div style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", fontWeight: 600, marginTop: 4 }}>
+              Scan it and I'll read it out and find help.
+            </div>
+          </button>
+        </div>
+      </div>
+      <VoiceBar
+        speakableText={speakableForPhase("home", { analysis: null, sendResult: null, analyzeError: null })}
+        voiceOn={voiceOn}
+        actions={[
+          { id: "see", label: "Help me see this", description: "Open the magnifier" },
+          { id: "question", label: "I have a question", description: "Scan a document" },
+        ]}
+        onAction={(id) => { if (id === "see") onMagnifier(); else if (id === "question") onScanner(); }}
+      />
     </div>
   );
 }
@@ -1298,6 +1383,10 @@ function speakableForPhase(
   switch (phase) {
     case "start":
       return "My Friend. How would you like me to help? Tap Talk to me to hear everything out loud. Tap Show me words for big captions with no sound. Tap Both for voice and captions together.";
+    case "home":
+      return "My Friend. How can I help today? Tap Help me see this to open the magnifier, or say see. Tap I have a question about a document to scan it, or say question.";
+    case "viewer":
+      return "Magnifier. Point your camera at anything you'd like to see bigger. Say back to return home, or say I have a question to scan a document.";
     case "find":
       return "Ready to find your document? I'll open the magnifier so you can see clearly first. Nothing is uploaded yet. Tap the red Open Magnifier button when you're ready, or say yes.";
     case "magnifier":
