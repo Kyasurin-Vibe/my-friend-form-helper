@@ -636,7 +636,42 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         )}
       </div>
 
-      <div className="px-4 pt-4 pb-5 mt-auto">
+      <div className="px-4 pt-3 flex justify-center">
+        <button
+          onClick={() => {
+            if (voiceArmed) {
+              shouldListenRef.current = false;
+              try { DemoServices.voice.stop(); } catch { /* no-op */ }
+              setVoiceArmed(false);
+              setListening(false);
+            } else {
+              setVoiceError(null);
+              setVoiceArmed(true);
+            }
+          }}
+          aria-pressed={voiceArmed}
+          aria-label={voiceArmed ? "Turn voice control off" : "Turn voice control on"}
+          style={{
+            background: voiceArmed ? (listening ? "#16a34a" : "var(--color-elder-primary)") : "#fff",
+            color: voiceArmed ? "#fff" : "var(--color-elder-ink)",
+            border: "2px solid var(--color-elder-primary)",
+            borderRadius: 999,
+            padding: "10px 18px",
+            fontWeight: 800,
+            fontSize: 15,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            boxShadow: voiceArmed && listening ? "0 0 0 6px rgba(34,197,94,0.18)" : "none",
+            transition: "all 0.2s",
+          }}
+        >
+          <span style={{ fontSize: 18 }}>🎙</span>
+          {voiceArmed ? (listening ? "Listening… say \u201Cyes\u201D to capture" : "Voice on") : "Tap for voice control"}
+        </button>
+      </div>
+
+      <div className="px-4 pt-3 pb-5 mt-auto">
         <button
           onClick={doCapture}
           disabled={!!error}
