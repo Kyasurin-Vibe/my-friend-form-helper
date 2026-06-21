@@ -137,24 +137,28 @@ const DICT: Record<string, Partial<Record<Lang, string>>> = {
   mic_or_type:      { en: "Tap the microphone and say it, or type it.", es: "Toque el micrófono y dígalo, o escríbalo.", zh: "点击麦克风说出来,或者输入。", vi: "Nhấn micrô và nói, hoặc gõ vào.", tl: "Pindutin ang mikropono at sabihin, o i-type." },
   email_or_phone:   { en: "Their email or phone", es: "Su correo o teléfono", zh: "他们的邮箱或电话", vi: "Email hoặc điện thoại của họ", tl: "Email o telepono nila" },
   camera_only_device: { en: "The magnifier uses your camera only on this device.", es: "La lupa usa su cámara solo en este dispositivo.", zh: "放大镜只在本设备上使用相机。", vi: "Kính lúp chỉ dùng máy ảnh trên thiết bị này.", tl: "Ang magnifier ay gumagamit ng camera mo sa device na ito lamang." },
+
+  // Greetings, magnifier intro, scan flow, voice feedback
+  greeting_home:    { en: "Hi, I'm My Friend. How can I help?", es: "Hola, soy Mi Amigo. ¿Cómo puedo ayudar?", zh: "你好,我是你的朋友。需要帮什么?", vi: "Chào bạn, tôi là Người Bạn. Tôi giúp gì được?", tl: "Kumusta, ako si Kaibigan. Paano kita matutulungan?" },
+  magnifier_intro:  { en: "I'll make things bigger and clearer. Say bigger, smaller, or brighter.", es: "Haré las cosas más grandes y claras. Diga más grande, más pequeño o más brillante.", zh: "我会帮你放大、变清楚。说「放大」「缩小」或「更亮」。", vi: "Tôi sẽ làm to và rõ hơn. Hãy nói lớn hơn, nhỏ hơn, hoặc sáng hơn.", tl: "Palalakihin at lilinawin ko. Sabihin mong palakihin, paliitin, o mas maliwanag." },
+  fit_paper:        { en: "Fit your paper inside the frame", es: "Coloque su papel dentro del marco", zh: "把纸放进框里", vi: "Đặt giấy vào trong khung", tl: "Ilagay ang papel sa loob ng frame" },
+  send_q:           { en: "Send this to a person?", es: "¿Enviar esto a una persona?", zh: "把这个发给一个人吗?", vi: "Gửi cái này cho một người nhé?", tl: "Ipadala ito sa isang tao?" },
+  yes_send:         { en: "Yes, send it", es: "Sí, enviarlo", zh: "好,发送", vi: "Được, gửi đi", tl: "Oo, ipadala" },
+  no_keep:          { en: "No, keep looking", es: "No, seguir mirando", zh: "先不,继续看", vi: "Không, xem tiếp", tl: "Hindi, magpatuloy" },
+  good_day:         { en: "Alright, have a good day.", es: "Muy bien, que tenga buen día.", zh: "好的,祝你今天愉快。", vi: "Được rồi, chúc bạn một ngày tốt lành.", tl: "Sige, magandang araw sa iyo." },
+  didnt_catch:      { en: "Sorry, I didn't catch that — you can tap a button.", es: "Perdón, no entendí — puede tocar un botón.", zh: "抱歉,我没听清——你可以点一个按钮。", vi: "Xin lỗi, tôi không nghe rõ — bạn có thể chạm vào nút.", tl: "Pasensya, hindi ko narinig — pwede kang pumindot ng button." },
+  pause:            { en: "Pause", es: "Pausa", zh: "暂停", vi: "Tạm dừng", tl: "I-pause" },
+  continue:         { en: "Continue", es: "Continuar", zh: "继续", vi: "Tiếp tục", tl: "Magpatuloy" },
+  next:             { en: "Next", es: "Siguiente", zh: "下一句", vi: "Tiếp theo", tl: "Susunod" },
 };
 
 export function t(key: string, lang: Lang = _lang): string {
   const entry = DICT[key];
   const english = entry?.en ?? key;
   if (lang === "en") return english;
-  // Prefer a hand-authored translation in the dictionary.
-  const dict = entry?.[lang];
-  if (dict) return dict;
-  // Fall back to the translate cache; kick off a one-time async fetch
-  // if missing. Listeners re-render when the translation arrives.
-  const cached = cache.get(cacheKey(english, lang));
-  if (cached) return cached;
-  if (english) {
-    // Fire and forget — translateAsync handles dedup + cache + notify.
-    void translateAsync(english, lang);
-  }
-  return english;
+  // Pure static lookup. If a translation is missing, fall back to English —
+  // never call the AI/translate API at runtime for UI strings.
+  return entry?.[lang] ?? english;
 }
 
 export function onTranslate(fn: () => void): () => void {
