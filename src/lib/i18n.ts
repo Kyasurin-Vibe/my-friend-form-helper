@@ -46,9 +46,8 @@ export function onLangChange(fn: (l: Lang) => void): () => void {
 }
 export function getBCP47(l: Lang = _lang): string { return BCP[l] || "en-US"; }
 export function getTTSVoice(l: Lang = _lang): string { return TTS_VOICE[l] || "aura-asteria-en"; }
-// Aura v1 currently only supports English well; for other langs let the
-// browser handle TTS in the matching language voice.
-export function ttsSupportsDeepgram(l: Lang = _lang): boolean { return l === "en"; }
+// ElevenLabs multilingual v2 covers all 5 supported languages with one warm voice.
+export function ttsSupportsDeepgram(_l: Lang = _lang): boolean { return true; }
 
 // Full dictionary for fixed UI strings in all 5 supported languages.
 // Pre-translated so language switch is instant (no API roundtrip).
