@@ -77,6 +77,9 @@ Deno.serve(async (req) => {
       processedImage?: string;
       analysis: Analysis;
       initials?: string;
+      recipient?:
+        | { kind: "center" }
+        | { kind: "trusted"; name?: string; relationship?: string };
     };
     const { analysis, initials } = body;
     const originalImage = body.originalImage ?? body.image;
@@ -85,6 +88,25 @@ Deno.serve(async (req) => {
     if (!analysis || typeof analysis !== "object") {
       return Response.json({ error: "analysis required" }, { status: 400, headers: CORS });
     }
+
+    // Resolve recipient — default to the institutional Legal Aid Center.
+    const rawRecipient = body.recipient;
+    let recipientKind: "center" | "trusted" = "center";
+    let trustedName = "";
+    let trustedRel = "";
+    if (rawRecipient && rawRecipient.kind === "trusted") {
+      const n = String(rawRecipient.name ?? "").trim();
+      const r = String(rawRecipient.relationship ?? "").trim();
+      if (n && r) {
+        recipientKind = "trusted";
+        trustedName = n.slice(0, 80);
+        trustedRel = r.slice(0, 80);
+      }
+    }
+    const recipientLabel =
+      recipientKind === "trusted"
+        ? `trusted contact (${trustedName} — ${trustedRel})`
+        : CENTER_NAME;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -131,9 +153,13 @@ Deno.serve(async (req) => {
     audit.push({
       time: stamp(),
       text:
-        status === "sent_to_center"
-          ? `Sent to ${CENTER_NAME} for confirmation.`
-          : `Routed to ${CENTER_NAME} for human review.`,
+        recipientKind === "trusted"
+          ? `Elder chose to send to a trusted contact they picked themselves: ${trustedName} (${trustedRel}). NOT auto-filled.`
+          : `Elder chose to send to ${CENTER_NAME} (default, institutional).`,
+    });
+    audit.push({
+      time: stamp(),
+      text: `Sent to: ${recipientLabel}.`,
     });
 
     const { error: insErr } = await supabase.from("cases").insert({
@@ -161,11 +187,15 @@ Deno.serve(async (req) => {
       {
         trackingId,
         status,
-        centerName: CENTER_NAME,
-        elderMessage: `I sent this to the ${CENTER_NAME}. Your tracking number is ${trackingId}.`,
+        centerName: recipientLabel,
+        elderMessage:
+          recipientKind === "trusted"
+            ? `I sent this to ${trustedName} (${trustedRel}). Your tracking number is ${trackingId}.`
+            : `I sent this to the ${CENTER_NAME}. Your tracking number is ${trackingId}.`,
       },
       { headers: CORS },
     );
+
   } catch (e) {
     console.error("send-to-center fatal", e);
     return Response.json({ error: String(e) }, { status: 500, headers: CORS });
