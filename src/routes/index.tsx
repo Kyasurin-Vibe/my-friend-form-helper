@@ -14,6 +14,7 @@ import {
   type DocumentBounds,
   type SendResult,
 } from "@/lib/cases";
+import { getResources } from "@/lib/resources";
 import { cancelSpeech, type VoiceIntent } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
@@ -497,7 +498,7 @@ function RetakeScreen({
       <div className="space-y-2 mt-auto">
         <BigButton variant="danger" onClick={onRetry}>📷 Try again</BigButton>
         <BigButton variant="ghost" onClick={onSendAnyway}>
-          {sending ? "Sending…" : "🤝 Send for human review"}
+          {sending ? "Sending…" : "🤝 Connect me with a person"}
         </BigButton>
         <VoiceBar
           speakableText={speakableForPhase("retake", { analysis, sendResult: null, analyzeError: null })}
@@ -560,7 +561,7 @@ function ReviewScreen({
         <div className="space-y-2 mt-auto">
           <BigButton variant="ghost" onClick={onRetake}>📷 Retake</BigButton>
           <BigButton variant="danger" onClick={onSend}>
-            {sending ? "Sending…" : "🤝 Send for review"}
+            {sending ? "Sending…" : "🤝 Connect me with a person"}
           </BigButton>
           <VoiceBar
             speakableText={speakableForPhase("review", { analysis: null, sendResult: null, analyzeError })}
@@ -632,13 +633,64 @@ function ReviewScreen({
           </p>
         )}
       </div>
+      <div
+        className="rounded-3xl p-4 mb-3"
+        style={{
+          background: "#fff",
+          border: "1px solid #EFE6D6",
+          boxShadow: "0 8px 24px rgba(36,31,26,0.06)",
+        }}
+      >
+        <p
+          className="text-xs uppercase font-bold tracking-wide mb-2"
+          style={{ color: "#6b5d52" }}
+        >
+          Here&apos;s help available for you
+        </p>
+        <div className="space-y-3">
+          {getResources(analysis.documentType).map((r, i) => (
+            <div
+              key={i}
+              className="rounded-2xl p-3"
+              style={{
+                background: "#FDFBF7",
+                border: "1px solid #EFE6D6",
+              }}
+            >
+              <p
+                className="font-extrabold"
+                style={{ fontSize: 18, color: "var(--color-elder-ink)" }}
+              >
+                {r.name}
+              </p>
+              <p className="mt-1" style={{ fontSize: 16, color: "#6b5d52" }}>
+                {r.helpsWith}
+              </p>
+              {r.contact && (
+                <p
+                  className="mt-1 font-semibold"
+                  style={{ fontSize: 15, color: "var(--color-elder-primary)" }}
+                >
+                  {r.contact}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="space-y-2 mt-auto">
-        <BigButton variant="ghost" onClick={onRetake}>📷 Retake</BigButton>
+        <BigButton variant="ghost" onClick={onRetake}>
+          📷 Retake
+        </BigButton>
         <BigButton variant="danger" onClick={onSend}>
-          {sending ? "Sending…" : "🤝 Send it"}
+          {sending ? "Sending…" : "🤝 Connect me with a person"}
         </BigButton>
         <VoiceBar
-          speakableText={speakableForPhase("review", { analysis, sendResult: null, analyzeError: null })}
+          speakableText={speakableForPhase("review", {
+            analysis,
+            sendResult: null,
+            analyzeError: null,
+          })}
           voiceOn={voiceOn}
           onIntent={handleIntent}
         />
@@ -904,12 +956,12 @@ function speakableForPhase(
       const why = ctx.analysis?.elderMessage
         ? `${ctx.analysis.elderMessage} `
         : "";
-      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Send for human review to let a real person look at it, or say yes.`;
+      return `I couldn't read it clearly. ${why}Try holding still, with more light, and keep the corners in the box. Tap Try again to take another photo, or say no. Or tap Connect me with a person to let a real person look at it, or say yes.`;
     }
     case "review": {
       if (!ctx.analysis) {
         const err = ctx.analyzeError ? ` Note: ${ctx.analyzeError}.` : "";
-        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Send for review to send it to a person at the Legal Aid Center, or say yes.`;
+        return `I couldn't read it clearly. I'd rather not guess.${err} Tap Retake to try again, or say no. Tap Connect me with a person to send it to a person at the Legal Aid Center, or say yes.`;
       }
       const a = ctx.analysis;
       const title = a.documentName || a.documentType || "a document";
@@ -919,7 +971,11 @@ function speakableForPhase(
         missing.length > 0
           ? ` I see some spots that may need attention: ${missing.join("; ")}.`
           : " Nothing obviously missing. A person will still confirm before anything is filed.";
-      return `This looks like ${title}.${summary}${missingPart} Tap Retake to take another photo, or say no. Tap Send it to send to the Legal Aid Center, or say yes.`;
+      const resources = getResources(a.documentType);
+      const resourcesIntro = resources.length > 0
+        ? ` Here are some places that can help you with this: ${resources.slice(0, 2).map(r => r.name + (r.contact ? ` — ${r.contact}` : "")).join(". ")}.`
+        : "";
+      return `This looks like ${title}.${summary}${missingPart}${resourcesIntro} Tap Retake to take another photo, or say no. Tap Connect me with a person to send to the Legal Aid Center, or say yes.`;
     }
     case "sent": {
       const r = ctx.sendResult;
