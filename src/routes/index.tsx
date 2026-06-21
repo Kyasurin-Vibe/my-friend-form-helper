@@ -764,7 +764,7 @@ function speakableForPhase(
     case "magnifier":
       return "Point the camera at your paper. Keep the corners inside the frame. I'll capture it when it looks clear.";
     case "analyzing":
-      return "Let me look at this. Reading your paper carefully. This takes just a few seconds.";
+      return "Let me read this for you. Reading your paper carefully. This takes just a few seconds.";
     case "retake": {
       const why = ctx.analysis?.elderMessage
         ? `${ctx.analysis.elderMessage} `
