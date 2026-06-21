@@ -945,7 +945,7 @@ function ReviewScreen({
         {missing.length > 0 ? (
           <>
             <p className="font-bold mb-2" style={{ fontSize: 18, color: "#7a5a1c" }}>
-              I see some spots that may need attention:
+              {t("attention_spots")}
             </p>
             <ul className="space-y-2">
               {missing.map((m, i) => (
@@ -973,7 +973,7 @@ function ReviewScreen({
           </>
         ) : (
           <p className="font-semibold" style={{ fontSize: 18, color: "var(--color-elder-teal)" }}>
-            ✓ Nothing obviously missing. A person will still confirm before anything is filed.
+            {t("nothing_missing")}
           </p>
         )}
       </div>
@@ -1081,12 +1081,12 @@ function SentScreen({
 
 
   const log = [
-    "Photo captured on this device",
-    `Identified as ${analysis?.documentName ?? analysis?.documentType ?? "unknown document"}`,
+    t("photo_captured"),
+    `${t("identified_as")} ${analysis?.documentName ?? analysis?.documentType ?? "—"}`,
     isReview
-      ? `Flagged ${missingCount} spot(s) for human review`
-      : "No obvious missing fields",
-    `Sent to ${centerName}`,
+      ? (missingCount === 1 ? t("flagged_spots_one") : t("flagged_spots_n").replace("{n}", String(missingCount)))
+      : t("no_missing_short"),
+    `${t("sent_to")} ${centerName}`,
   ];
 
   return (
@@ -1102,7 +1102,7 @@ function SentScreen({
       >
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm" style={{ color: "#6b5d52" }}>
-            Tracking number
+            {t("tracking_number")}
           </span>
           <span className="font-extrabold" style={{ fontSize: 22, letterSpacing: 0.5 }}>
             {trackingId}
@@ -1116,16 +1116,14 @@ function SentScreen({
             fontSize: 16,
           }}
         >
-          📨 Delivered to {centerName}
+          {t("delivered_to")} {centerName}
         </div>
         <p className="mt-3 font-semibold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>
-          {isReview
-            ? "I won't guess on something this important. A real person will check it for you."
-            : "A person will confirm it before anything is filed."}
+          {isReview ? t("will_check") : t("will_confirm")}
         </p>
         <div className="mt-3">
           <p className="text-xs uppercase font-bold tracking-wide" style={{ color: "#6b5d52" }}>
-            What I did
+            {t("what_i_did")}
           </p>
           <ul className="mt-1 space-y-1">
             {log.map((s, i) => (
@@ -1141,11 +1139,11 @@ function SentScreen({
         className="text-center mt-4 mb-3 font-semibold"
         style={{ fontSize: 20, color: "var(--color-elder-ink)" }}
       >
-        You don't have to do anything else right now.
+        {t("nothing_more")}
       </p>
       <div className="space-y-2 mt-auto">
-        <BigButton variant="ghost" onClick={onRestart}>↻ Start over</BigButton>
-        <BigButton variant="danger" onClick={onGoCenter}>See the center's side →</BigButton>
+        <BigButton variant="ghost" onClick={onRestart}>{t("start_over")}</BigButton>
+        <BigButton variant="danger" onClick={onGoCenter}>{t("see_center")}</BigButton>
         <VoiceBar
           speakableText={speakableForPhase("sent", { analysis, sendResult, analyzeError: null })}
           voiceOn={voiceOn}
@@ -1198,32 +1196,32 @@ function ChooseRecipientScreen({
           className="text-center font-extrabold mt-2 mb-1"
           style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
         >
-          Who should I send this to?
+          {t("who_send")}
         </h2>
         <p
           className="text-center mb-4"
           style={{ fontSize: 16, color: "#6b5d52" }}
         >
-          Pick the person YOU trust. You're in charge.
+          {t("pick_trust")}
         </p>
         <div className="space-y-3 mt-auto">
           <BigButton variant="danger" onClick={() => onPick({ kind: "center" })}>
-            {sending ? "Sending…" : `🤝 ${partner.label}`}
+            {sending ? t("sending") : `🤝 ${partner.label}`}
           </BigButton>
           <p
             className="text-center"
             style={{ fontSize: 13, color: "#8a7d6f", marginTop: -4 }}
           >
-            Recommended. An accountable institution.
+            {t("recommended_inst")}
           </p>
           <BigButton variant="ghost" onClick={() => setMode("trusted")}>
-            👪 Send to my trusted person
+            {t("send_trusted")}
           </BigButton>
           <p
             className="text-center"
             style={{ fontSize: 13, color: "#8a7d6f", marginTop: -4 }}
           >
-            Someone YOU pick — your own attorney or a family member you trust.
+            {t("trusted_hint")}
           </p>
           <BigButton variant="ghost" onClick={onBack}>{t("back")}</BigButton>
           <VoiceBar
@@ -1312,7 +1310,7 @@ function TrustedPersonForm({
         className="text-center mb-4"
         style={{ fontSize: 15, color: "#6b5d52" }}
       >
-        Tap the microphone and say it, or type it.
+        {t("mic_or_type")}
       </p>
       <label
         className="font-bold"
@@ -1342,7 +1340,7 @@ function TrustedPersonForm({
         className="font-bold mt-3"
         style={{ fontSize: 16, color: "var(--color-elder-ink)" }}
       >
-        Their email or phone
+        {t("email_or_phone")}
       </label>
       <VoiceField
         value={email}
