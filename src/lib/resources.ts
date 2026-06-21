@@ -1,6 +1,8 @@
 // Curated, deterministic resource lists keyed by resource category.
 // Demo-safe: NO live search. Claude classifies the document; this maps it to real help.
 
+import { t } from "./i18n";
+
 export type Resource = { name: string; helpsWith: string; contact?: string };
 
 const RESOURCES_BY_CATEGORY: Record<string, Resource[]> = {
@@ -35,18 +37,20 @@ export function getResources(category?: string | null): Resource[] {
   return RESOURCES_BY_CATEGORY[key] ?? RESOURCES_BY_CATEGORY.general;
 }
 
+const PARTNER_KEYS: Record<string, { nameKey: string; labelKey: string }> = {
+  legal:       { nameKey: "partner_legal_aid",     labelKey: "partner_connect_legal_aid" },
+  benefits:    { nameKey: "partner_benefits",      labelKey: "partner_connect_benefits" },
+  housing:     { nameKey: "partner_housing",       labelKey: "partner_connect_housing" },
+  healthcare:  { nameKey: "partner_health",        labelKey: "partner_connect_health" },
+  immigration: { nameKey: "partner_immigration",   labelKey: "partner_connect_immigration" },
+  general:     { nameKey: "partner_social_worker", labelKey: "partner_connect_social_worker" },
+  none:        { nameKey: "partner_social_worker", labelKey: "partner_connect_social_worker" },
+};
+
 export function getAccountablePartner(category?: string | null): { name: string; label: string } {
   const key = (category ?? "general").toLowerCase().trim();
-  const map: Record<string, { name: string; label: string }> = {
-    legal:       { name: "Legal Aid Center",        label: "Connect me with the Legal Aid Center" },
-    benefits:    { name: "Benefits Caseworker",     label: "Connect me with a Benefits Caseworker" },
-    housing:     { name: "Housing Advocate",        label: "Connect me with a Housing Advocate" },
-    healthcare:  { name: "Community Health Worker", label: "Connect me with a Community Health Worker" },
-    immigration: { name: "Immigration Legal Aid",   label: "Connect me with Immigration Legal Aid" },
-    general:     { name: "Social Worker",           label: "Connect me with a Social Worker" },
-    none:        { name: "Social Worker",           label: "Connect me with a Social Worker" },
-  };
-  return map[key] ?? map.general;
+  const k = PARTNER_KEYS[key] ?? PARTNER_KEYS.general;
+  return { name: t(k.nameKey), label: t(k.labelKey) };
 }
 
 /** Convert spoken-email dictation into a real email-ish string.

@@ -150,6 +150,28 @@ const DICT: Record<string, Partial<Record<Lang, string>>> = {
   pause:            { en: "Pause", es: "Pausa", zh: "暂停", vi: "Tạm dừng", tl: "I-pause" },
   continue:         { en: "Continue", es: "Continuar", zh: "继续", vi: "Tiếp tục", tl: "Magpatuloy" },
   next:             { en: "Next", es: "Siguiente", zh: "下一句", vi: "Tiếp theo", tl: "Susunod" },
+
+  scan_hint:        { en: 'Fit your paper inside the frame. Say "yes" or tap the red button when ready.', es: 'Coloque su papel dentro del marco. Diga "sí" o toque el botón rojo cuando esté listo.', zh: '把纸放进框里。准备好了就说「好」或点红色按钮。', vi: 'Đặt giấy vào khung. Khi sẵn sàng, nói "có" hoặc chạm nút đỏ.', tl: 'Ilagay ang papel sa frame. Sabihin mong "oo" o pindutin ang pulang button kapag handa na.' },
+  photo_captured:   { en: "Photo captured on this device", es: "Foto capturada en este dispositivo", zh: "已在本设备拍下照片", vi: "Ảnh đã chụp trên thiết bị này", tl: "Nakuha ang larawan sa device na ito" },
+  no_missing_short: { en: "No obvious missing fields", es: "Sin campos faltantes evidentes", zh: "没有明显缺失的字段", vi: "Không có trường nào thiếu rõ ràng", tl: "Walang halatang nawawalang field" },
+  sent_to:          { en: "Sent to", es: "Enviado a", zh: "已发送至", vi: "Đã gửi đến", tl: "Naipadala kay" },
+  identified_as:    { en: "Identified as", es: "Identificado como", zh: "识别为", vi: "Đã nhận dạng là", tl: "Natukoy bilang" },
+  flagged_spots_one:{ en: "Flagged 1 spot for human review", es: "1 punto marcado para revisión humana", zh: "标记 1 处供人工审核", vi: "Đánh dấu 1 chỗ để người xem xét", tl: "Minarkahan ang 1 lugar para sa pagsusuri ng tao" },
+  flagged_spots_n:  { en: "Flagged {n} spots for human review", es: "{n} puntos marcados para revisión humana", zh: "标记 {n} 处供人工审核", vi: "Đánh dấu {n} chỗ để người xem xét", tl: "Minarkahan ang {n} lugar para sa pagsusuri ng tao" },
+
+  partner_social_worker:      { en: "Social Worker", es: "Trabajador Social", zh: "社工", vi: "Nhân viên xã hội", tl: "Social Worker" },
+  partner_legal_aid:          { en: "Legal Aid Center", es: "Centro de Ayuda Legal", zh: "法律援助中心", vi: "Trung tâm Trợ giúp Pháp lý", tl: "Legal Aid Center" },
+  partner_housing:            { en: "Housing Advocate", es: "Defensor de Vivienda", zh: "住房权益顾问", vi: "Người hỗ trợ nhà ở", tl: "Tagapagtaguyod sa Pabahay" },
+  partner_health:             { en: "Community Health Worker", es: "Trabajador de Salud Comunitaria", zh: "社区健康工作者", vi: "Nhân viên y tế cộng đồng", tl: "Manggagawa sa Kalusugan ng Komunidad" },
+  partner_immigration:        { en: "Immigration Legal Aid", es: "Ayuda Legal de Inmigración", zh: "移民法律援助", vi: "Trợ giúp Pháp lý Di trú", tl: "Legal na Tulong sa Imigrasyon" },
+  partner_benefits:           { en: "Benefits Caseworker", es: "Trabajador de Beneficios", zh: "福利申办员", vi: "Nhân viên Phúc lợi", tl: "Caseworker ng Benepisyo" },
+
+  partner_connect_social_worker: { en: "Connect me with a Social Worker", es: "Conécteme con un Trabajador Social", zh: "帮我联系一位社工", vi: "Kết nối tôi với một Nhân viên xã hội", tl: "Ikonekta mo ako sa isang Social Worker" },
+  partner_connect_legal_aid:     { en: "Connect me with the Legal Aid Center", es: "Conécteme con el Centro de Ayuda Legal", zh: "帮我联系法律援助中心", vi: "Kết nối tôi với Trung tâm Trợ giúp Pháp lý", tl: "Ikonekta mo ako sa Legal Aid Center" },
+  partner_connect_housing:       { en: "Connect me with a Housing Advocate", es: "Conécteme con un Defensor de Vivienda", zh: "帮我联系住房权益顾问", vi: "Kết nối tôi với Người hỗ trợ nhà ở", tl: "Ikonekta mo ako sa Tagapagtaguyod sa Pabahay" },
+  partner_connect_health:        { en: "Connect me with a Community Health Worker", es: "Conécteme con un Trabajador de Salud Comunitaria", zh: "帮我联系社区健康工作者", vi: "Kết nối tôi với Nhân viên y tế cộng đồng", tl: "Ikonekta mo ako sa Manggagawa sa Kalusugan" },
+  partner_connect_immigration:   { en: "Connect me with Immigration Legal Aid", es: "Conécteme con Ayuda Legal de Inmigración", zh: "帮我联系移民法律援助", vi: "Kết nối tôi với Trợ giúp Pháp lý Di trú", tl: "Ikonekta mo ako sa Legal na Tulong sa Imigrasyon" },
+  partner_connect_benefits:      { en: "Connect me with a Benefits Caseworker", es: "Conécteme con un Trabajador de Beneficios", zh: "帮我联系福利申办员", vi: "Kết nối tôi với một Nhân viên Phúc lợi", tl: "Ikonekta mo ako sa Caseworker ng Benepisyo" },
 };
 
 export function t(key: string, lang: Lang = _lang): string {
