@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { DemoServices, type VoiceCommand } from "@/lib/services";
 import type { DocumentBounds } from "@/lib/cases";
+import { supabase } from "@/integrations/supabase/client";
+
 
 type CaptureResult = {
   processed: string; // cropped to detected (or guide) bounds
