@@ -1383,6 +1383,10 @@ function speakableForPhase(
   switch (phase) {
     case "start":
       return "My Friend. How would you like me to help? Tap Talk to me to hear everything out loud. Tap Show me words for big captions with no sound. Tap Both for voice and captions together.";
+    case "home":
+      return "My Friend. How can I help today? Tap Help me see this to open the magnifier, or say see. Tap I have a question about a document to scan it, or say question.";
+    case "viewer":
+      return "Magnifier. Point your camera at anything you'd like to see bigger. Say back to return home, or say I have a question to scan a document.";
     case "find":
       return "Ready to find your document? I'll open the magnifier so you can see clearly first. Nothing is uploaded yet. Tap the red Open Magnifier button when you're ready, or say yes.";
     case "magnifier":
