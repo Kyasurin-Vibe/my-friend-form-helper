@@ -982,7 +982,7 @@ function TrustedPersonForm({
   useEffect(() => {
     if (voiceOn) {
       speakWarm(
-        "Who do you trust with this? Tap the microphone and say their name, then tell me how you know them.",
+        "Who do you trust with this? Tap the microphone and say their name, their email or phone, then tell me how you know them.",
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
