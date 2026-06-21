@@ -321,7 +321,11 @@ function ElderApp() {
 
           <CaptionsContext.Provider value={showCaptions}>
            <VoiceOnContext.Provider value={voiceOn}>
-            {phase === "start" ? (
+            {phase === "language" ? (
+              <LanguagePickerScreen
+                onPick={(l) => { setLang(l); setPhase("home"); }}
+              />
+            ) : phase === "start" ? (
               <StartGate
                 onStart={(mode) => {
                   setA11yMode(mode);
