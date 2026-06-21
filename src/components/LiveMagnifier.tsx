@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { DemoServices, type VoiceCommand } from "@/lib/services";
+import {
+  loadJscanify,
+  extractPaperDataUrl,
+  findPaperCornersNormalized,
+  type PaperCorners,
+} from "@/lib/jscanify";
 
 type Props = {
   onConfirm: (image?: string) => void;
@@ -64,6 +70,8 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const confirmedRef = useRef(false);
   const speakingRef = useRef(false);
   const shouldListenRef = useRef(false);
+  const jscanRef = useRef<Awaited<ReturnType<typeof loadJscanify>> | null>(null);
+  const [paperCorners, setPaperCorners] = useState<PaperCorners | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -328,6 +336,30 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     return () => window.clearInterval(id);
   }, [ready]);
 
+  // Lazy-load jscanify+OpenCV. If it loads, run a slower polygon detection loop
+  // to render snapped corner overlay and enable extractPaper on capture.
+  // If it fails to load, the existing yellow/green box and raw-frame capture stay.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    let intervalId: number | undefined;
+    loadJscanify().then((inst) => {
+      if (cancelled || !inst) return;
+      jscanRef.current = inst;
+      intervalId = window.setInterval(() => {
+        if (confirmedRef.current) return;
+        const video = videoRef.current;
+        if (!video || !video.videoWidth) return;
+        const corners = findPaperCornersNormalized(inst, video);
+        setPaperCorners(corners);
+      }, 700);
+    });
+    return () => {
+      cancelled = true;
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+    };
+  }, [ready]);
+
   useEffect(() => {
     if (guidance === "init" || guidance === "hold-still") return;
     const text =
@@ -427,6 +459,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   function captureFrame(): string | undefined {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return undefined;
+    // Try jscanify cropped+deskewed first (additive enhancement).
+    if (jscanRef.current) {
+      const cropped = extractPaperDataUrl(jscanRef.current, video, 1280);
+      if (cropped) return cropped;
+    }
     const scale = Math.min(1, 1280 / video.videoWidth);
     const width = Math.round(video.videoWidth * scale);
     const height = Math.round(video.videoHeight * scale);
@@ -572,7 +609,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
                 transition: "filter 0.15s, transform 0.15s",
               }}
             />
-            {detectionBox && (
+            {detectionBox && !paperCorners && (
               <div
                 className="absolute pointer-events-none"
                 style={{
@@ -586,6 +623,22 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
                   transition: "all 0.18s ease-out",
                 }}
               />
+            )}
+            {paperCorners && (
+              <svg
+                className="absolute inset-0 w-full h-full pointer-events-none"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <polygon
+                  points={`${paperCorners.topLeftCorner.x * 100},${paperCorners.topLeftCorner.y * 100} ${paperCorners.topRightCorner.x * 100},${paperCorners.topRightCorner.y * 100} ${paperCorners.bottomRightCorner.x * 100},${paperCorners.bottomRightCorner.y * 100} ${paperCorners.bottomLeftCorner.x * 100},${paperCorners.bottomLeftCorner.y * 100}`}
+                  fill="rgba(34,197,94,0.08)"
+                  stroke={guidance === "detected" ? "#22c55e" : "#fbbf24"}
+                  strokeWidth="0.8"
+                  vectorEffect="non-scaling-stroke"
+                  style={{ transition: "all 0.2s ease-out" }}
+                />
+              </svg>
             )}
             {countdown > 0 && (
               <div
