@@ -97,65 +97,61 @@ function ElderApp() {
       setPhase("review");
       return;
     }
-    const original = result.original;
-    const localBounds = result.bounds;
-    setCapturedImage(original);
-    setProcessedImage(undefined);
-    setCapturedBounds(localBounds);
+    // Capture ONLY. Do NOT analyze. Show cropped preview for user confirmation.
+    setCapturedImage(result.original);
+    setProcessedImage(result.processed);
+    setCapturedBounds(result.bounds);
+    setAnalysis(null);
     setAnalyzeError(null);
-    // Show "Reading your document…" while Claude analyzes the RAW frame.
+    setPhase("preview");
+  }
+
+  async function confirmPreview() {
+    // User confirmed the preview. NOW run Claude analyze-document on the full-res image.
+    if (!capturedImage) {
+      setPhase("review");
+      return;
+    }
     setPhase("analyzing");
-
+    setAnalyzeError(null);
     const startedAt = Date.now();
-    const minDisplay = 900;
+    const minDisplay = 700;
 
-    // Centered A4-ish fallback box (normalized)
     const centeredFallback: DocumentBounds = {
       x: 0.08, y: 0.04, width: 0.84, height: 0.92, confidence: 0,
     };
 
     let analysisResult: AnalysisResult | null = null;
-    let cropBounds: DocumentBounds | null = null;
-
     try {
-      analysisResult = await analyzeDocument(original);
-      cropBounds = analysisResult.documentBounds ?? localBounds ?? centeredFallback;
+      analysisResult = await analyzeDocument(capturedImage);
+      setAnalysis(analysisResult);
+
+      // Refine the stored crop using Claude's bounds if provided.
+      const refineBounds = analysisResult.documentBounds ?? capturedBounds ?? centeredFallback;
+      try {
+        const refined = await cropToBounds(capturedImage, refineBounds, 0.03);
+        setProcessedImage(refined);
+      } catch {
+        // keep existing processedImage
+      }
     } catch (e) {
       console.error("analyze failed", e);
       setAnalyzeError(e instanceof Error ? e.message : "Could not analyze right now.");
-      cropBounds = localBounds ?? centeredFallback;
     }
-
-    // Always produce a cropped preview — never show the raw frame.
-    let cropped = original;
-    try {
-      cropped = await cropToBounds(original, cropBounds, 0.03);
-    } catch {
-      cropped = original;
-    }
-    setProcessedImage(cropped);
-    setAnalysis(analysisResult);
 
     const elapsed = Date.now() - startedAt;
     if (elapsed < minDisplay) {
       await new Promise((r) => setTimeout(r, minDisplay - elapsed));
     }
-    setPhase("preview");
+
+    // Go to review — user must explicitly confirm before send-to-center.
+    if (analysisResult && analysisResult.recommendedAction === "retake") {
+      setPhase("retake");
+    } else {
+      setPhase("review");
+    }
   }
 
-  async function confirmPreview() {
-    // Claude analysis already ran during handleCapture.
-    // If it was unreadable, route through retake; otherwise send.
-    if (analyzeError && !analysis) {
-      setPhase("review");
-      return;
-    }
-    if (analysis && analysis.recommendedAction === "retake") {
-      setPhase("retake");
-      return;
-    }
-    await handleSend();
-  }
 
 
 
