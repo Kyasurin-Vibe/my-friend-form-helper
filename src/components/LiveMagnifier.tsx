@@ -279,23 +279,11 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, autoCapture, countdown]);
 
-  // Speak hints (throttled to changes, not every frame)
+  // Hint debounce — voice prompts are spoken by the global PersistentVoice.
   useEffect(() => {
-    if (!ready || speakingRef.current) return;
+    if (!ready) return;
     if (hint === lastSpokenHintRef.current) return;
-    const messages: Partial<Record<Hint, string>> = {
-      tooDark: "Too dark. Move to better light.",
-      possibleFace: "That looks like a face, not a document.",
-      empty: "I don't see paper yet.",
-      moveCloser: "Move a little closer.",
-      holdStill: "Hold still.",
-      documentDetected: "Document detected.",
-    };
-    const msg = messages[hint];
-    if (msg) {
-      lastSpokenHintRef.current = hint;
-      // Keep TTS short and don't spam — small delay debounce via ref above.
-    }
+    lastSpokenHintRef.current = hint;
   }, [hint, ready]);
 
   // ===== Claude polling (~1.5s) for auto-capture decisions =====
