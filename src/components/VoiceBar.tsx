@@ -137,7 +137,7 @@ export function VoiceBar({
             minHeight: 52,
           }}
         >
-          🔊 {lblReadAgain.replace(/^🔊\s*/, "")}
+          {lblReadAgain}
         </button>
         {!hideMic && (
           <button
