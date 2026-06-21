@@ -1,33 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DemoServices } from "@/lib/services";
-import { translateAsync, translateSync, getLang, getBCP47, useTranslated, useT } from "@/lib/i18n";
+import { speakWarm } from "@/lib/cases";
+import { getLang, t, useT } from "@/lib/i18n";
+import { useVoiceLoop } from "@/lib/voice-loop";
 
 type Props = {
   onBack: () => void;
   onQuestion: () => void;
 };
-
-function speak(text: string, onDone?: () => void) {
-  if (typeof window === "undefined") return;
-  const synth = window.speechSynthesis;
-  if (!synth) { onDone?.(); return; }
-  synth.cancel();
-  const lang = getLang();
-  const startSpeak = (final: string) => {
-    const u = new SpeechSynthesisUtterance(final);
-    u.rate = 0.95;
-    u.pitch = 1.05;
-    try { u.lang = getBCP47(); } catch { /* noop */ }
-    u.onend = () => onDone?.();
-    u.onerror = () => onDone?.();
-    synth.speak(u);
-  };
-  if (lang === "en") { startSpeak(text); return; }
-  const cached = translateSync(text, lang);
-  if (cached !== text) { startSpeak(cached); return; }
-  translateAsync(text, lang).then((tr) => startSpeak(tr || text)).catch(() => startSpeak(text));
-}
-
 
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 5;
@@ -37,21 +16,20 @@ const BRIGHT_MAX = 2.2;
 const BRIGHT_STEP = 0.2;
 
 /**
- * Pure seeing aid. Opens camera. Voice + buttons control zoom + brightness.
- * No capture, no AI.
+ * Pure seeing aid. Camera + zoom + brightness. No capture, no AI.
+ * Voice is handled entirely by the global PersistentVoice via useVoiceLoop —
+ * this component implements no voice loop of its own.
  */
 export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const introSpokenRef = useRef(false);
-  const speakingRef = useRef(false);
-  const shouldListenRef = useRef(false);
-  const lastCmdAtRef = useRef(0);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [brightness, setBrightness] = useState(1);
+
   const lblStarting = useT("starting_camera");
   const lblQuestion = useT("i_have_question");
   const lblBackHome = useT("back_home");
@@ -78,7 +56,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
           },
           audio: false,
         });
-        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        if (cancelled) { stream.getTracks().forEach((tr) => tr.stop()); return; }
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -91,139 +69,47 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
     })();
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((tr) => tr.stop());
       streamRef.current = null;
     };
   }, []);
 
-  const speakConfirm = useCallback((text: string) => {
-    speakingRef.current = true;
-    try { DemoServices.voice.stop(); } catch { /* noop */ }
-    speak(text, () => {
-      speakingRef.current = false;
-      if (shouldListenRef.current) startVoice();
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const doBigger = useCallback(() => {
-    const next = Math.min(ZOOM_MAX, +(zoomRef.current + ZOOM_STEP).toFixed(2));
-    if (next === zoomRef.current) { speakConfirm("That's as big as it goes."); return; }
-    setZoom(next);
-    speakConfirm("Okay — bigger.");
-  }, [speakConfirm]);
-
-  const doSmaller = useCallback(() => {
-    const next = Math.max(ZOOM_MIN, +(zoomRef.current - ZOOM_STEP).toFixed(2));
-    if (next === zoomRef.current) { speakConfirm("That's the smallest."); return; }
-    setZoom(next);
-    speakConfirm("Smaller.");
-  }, [speakConfirm]);
-
-  const doBrighter = useCallback(() => {
-    const next = Math.min(BRIGHT_MAX, +(brightRef.current + BRIGHT_STEP).toFixed(2));
-    if (next === brightRef.current) { speakConfirm("That's as bright as it goes."); return; }
-    setBrightness(next);
-    speakConfirm("Brighter now.");
-  }, [speakConfirm]);
-
-  const doDimmer = useCallback(() => {
-    const next = Math.max(BRIGHT_MIN, +(brightRef.current - BRIGHT_STEP).toFixed(2));
-    if (next === brightRef.current) { speakConfirm("That's the dimmest."); return; }
-    setBrightness(next);
-    speakConfirm("Dimmer.");
-  }, [speakConfirm]);
-
-  // Intro + start listening
+  // Spoken intro in the chosen language (static i18n key, no AI).
   useEffect(() => {
     if (!ready || introSpokenRef.current) return;
     introSpokenRef.current = true;
-    speakingRef.current = true;
-    speak(
-      "I'll make things bigger and clearer. If it's hard to see, just say 'bigger', 'smaller', or 'brighter'.",
-      () => {
-        speakingRef.current = false;
-        if (shouldListenRef.current) startVoice();
-      },
-    );
-    shouldListenRef.current = true;
-    startVoice();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void speakWarm(t("magnifier_intro"), { skipTranslate: true });
   }, [ready]);
 
-  useEffect(() => {
-    return () => {
-      shouldListenRef.current = false;
-      try { DemoServices.voice.stop(); } catch { /* noop */ }
-      try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
-    };
+  const doBigger = useCallback(() => {
+    setZoom((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)));
+  }, []);
+  const doSmaller = useCallback(() => {
+    setZoom((z) => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)));
+  }, []);
+  const doBrighter = useCallback(() => {
+    setBrightness((b) => Math.min(BRIGHT_MAX, +(b + BRIGHT_STEP).toFixed(2)));
+  }, []);
+  const doDimmer = useCallback(() => {
+    setBrightness((b) => Math.max(BRIGHT_MIN, +(b - BRIGHT_STEP).toFixed(2)));
   }, []);
 
-  function startVoice() {
-    const service = DemoServices.voice;
-    if (!service.available()) return;
-    if (speakingRef.current) return;
-    try {
-      service.start({
-        onStart: () => { /* listening */ },
-        onEnd: () => {
-          if (shouldListenRef.current && !speakingRef.current) {
-            window.setTimeout(() => startVoice(), 250);
-          }
-        },
-        onError: () => { /* swallow */ },
-        onTranscript: () => undefined,
-        onCommand: (_cmd, raw) => {
-          const t = (raw || "").toLowerCase().trim();
-          if (!t) return;
-          // de-dupe rapid duplicate fires
-          const now = Date.now();
-          if (now - lastCmdAtRef.current < 400) return;
-
-          // Navigation intents first
-          if (/\b(question|document|scan|paper|form|read|help me read)\b/.test(t)) {
-            lastCmdAtRef.current = now;
-            shouldListenRef.current = false;
-            try { service.stop(); } catch { /* noop */ }
-            onQuestion();
-            return;
-          }
-          if (/\b(go back|back to home|home|exit|cancel|quit|done|return)\b/.test(t)) {
-            lastCmdAtRef.current = now;
-            shouldListenRef.current = false;
-            try { service.stop(); } catch { /* noop */ }
-            onBack();
-            return;
-          }
-
-          // Brightness intents — check DIMMER first (more specific phrases),
-          // and be generous with how speech-to-text mis-hears "dimmer".
-          if (/\b(dim|dimmer|dimer|dimmed|demure|dimm|too bright|too light|too white|darker|darken|less light|less bright|lower brightness|reduce (the )?light|reduce brightness|make it darker|make it dimmer|tone it down)\b/.test(t)) {
-            lastCmdAtRef.current = now;
-            doDimmer();
-            return;
-          }
-          if (/\b(bright|brighter|too dark|more light|lighter|light it up|brighten|can't see it|cant see it|still can't see|still cant see)\b/.test(t)) {
-            lastCmdAtRef.current = now;
-            doBrighter();
-            return;
-          }
-
-          // Zoom intents
-          if (/\b(smaller|too big|zoom out|further|farther|back out|less)\b/.test(t)) {
-            lastCmdAtRef.current = now;
-            doSmaller();
-            return;
-          }
-          if (/\b(bigger|larger|zoom in|closer|enlarge|magnify|more|can't see|cant see|hard to see)\b/.test(t)) {
-            lastCmdAtRef.current = now;
-            doBigger();
-            return;
-          }
-        },
-      });
-    } catch { /* noop */ }
-  }
+  // Register voice actions with the shared loop. STT + interpret-intent + TTS
+  // are owned by the global PersistentVoice.
+  useVoiceLoop({
+    screen: "magnifier",
+    language: getLang(),
+    enabled: true,
+    actions: {
+      bigger: doBigger,
+      smaller: doSmaller,
+      brighter: doBrighter,
+      dimmer: doDimmer,
+      scan: onQuestion,
+      back: onBack,
+      home: onBack,
+    },
+  });
 
   const btn = (label: string, onClick: () => void, big = false) => (
     <button
@@ -273,7 +159,6 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
           🔍 {zoom.toFixed(1)}× · ☀ {Math.round(brightness * 100)}%
         </div>
 
-        {/* Floating control row on top of camera */}
         <div className="absolute bottom-3 left-3 right-3 flex gap-2">
           {btn("➖", doSmaller, true)}
           {btn("➕", doBigger, true)}
