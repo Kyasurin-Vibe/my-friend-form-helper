@@ -52,6 +52,9 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [brightness, setBrightness] = useState(1);
+  const lblStarting = useTranslated("Starting camera…");
+  const lblQuestion = useTranslated("I have a question");
+  const lblBackHome = useTranslated("Back to home");
 
   const zoomRef = useRef(zoom);
   const brightRef = useRef(brightness);
@@ -260,7 +263,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
         />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center text-white text-lg">
-            {error ?? useTranslated("Starting camera…")}
+            {error ?? lblStarting}
           </div>
         )}
         <div
@@ -294,7 +297,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
             boxShadow: "0 10px 24px rgba(0,0,0,0.35)",
           }}
         >
-          ❓ {useTranslated("I have a question")}
+          ❓ {lblQuestion}
         </button>
         <button
           onClick={onBack}
@@ -309,7 +312,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
             minHeight: 72,
           }}
         >
-          ↩ {useTranslated("Back to home")}
+          ↩ {lblBackHome}
         </button>
       </div>
     </div>
