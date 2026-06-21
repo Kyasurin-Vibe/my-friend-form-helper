@@ -98,9 +98,23 @@ export function PersistentVoice({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const isTTSPlaying = useCallback((): boolean => {
+    if (typeof window === "undefined") return false;
+    try {
+      if (window.speechSynthesis?.speaking) return true;
+      const w = window as unknown as { __mfTtsAudio?: HTMLAudioElement };
+      const a = w.__mfTtsAudio;
+      if (a && !a.paused && !a.ended) return true;
+    } catch { /* noop */ }
+    return speakingRef.current;
+  }, []);
+
   const handleTranscript = useCallback((raw: string) => {
     const t = (raw || "").toLowerCase().trim();
     if (!t) return;
+    // Drop transcripts captured while our own TTS is talking — the mic was
+    // hearing the app's voice, not the user.
+    if (isTTSPlaying()) { setTranscript(""); return; }
     const now = Date.now();
     if (now - lastCmdAtRef.current < 500) return;
 
@@ -189,7 +203,10 @@ export function PersistentVoice({
         onError: (e) => {
           if (/not-allowed|denied|blocked/i.test(e)) setBlocked(true);
         },
-        onTranscript: (t) => setTranscript(t),
+        onTranscript: (t) => {
+          if (isTTSPlaying()) { setTranscript(""); return; }
+          setTranscript(t);
+        },
         onCommand: (_c, raw) => handleTranscript(raw),
       });
     } catch { /* noop */ }
@@ -209,6 +226,24 @@ export function PersistentVoice({
       try { DemoServices.voice.stop(); } catch { /* noop */ }
     };
   }, [active, startLoop]);
+
+  // When our own TTS just finished, flush the recognition session — its
+  // buffer is full of our own voice. Restart cleanly so the next user word
+  // is the first thing it hears.
+  useEffect(() => {
+    if (!active) return;
+    let wasPlaying = false;
+    const iv = window.setInterval(() => {
+      const playing = isTTSPlaying();
+      if (wasPlaying && !playing && shouldRunRef.current) {
+        try { DemoServices.voice.stop(); } catch { /* noop */ }
+        setTranscript("");
+        window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 200);
+      }
+      wasPlaying = playing;
+    }, 250);
+    return () => window.clearInterval(iv);
+  }, [active, startLoop, isTTSPlaying]);
 
   // When voice is enabled and not running because mode says off, hide everything.
   if (!enabledFromMode) return null;

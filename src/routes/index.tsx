@@ -1432,7 +1432,7 @@ function speakableForPhase(
     case "start":
       return "My Friend. How would you like me to help? Tap Talk to me to hear everything out loud. Tap Show me words for big captions with no sound. Tap Both for voice and captions together.";
     case "home":
-      return "My Friend. How can I help today? Tap Help me see this to open the magnifier, or say see. Tap I have a question about a document to scan it, or say question.";
+      return "How can I help? Say 'see' for the magnifier, or 'question' to scan a document.";
     case "viewer":
       return "Magnifier. Point your camera at anything you'd like to see bigger. Say back to return home, or say I have a question to scan a document.";
     case "find":
@@ -1557,12 +1557,12 @@ function handlePhaseCommand(
 
   switch (phase) {
     case "home": {
-      if (/\b(see|bigger|magnify|magnifier|read this|help me see)\b/.test(t)) {
+      if (/\b(see|look|magnify|magnifier|bigger|larger|zoom|read this|help me see|i wanna see|i want to see|i can'?t see|show me|seeing aid)\b/.test(t)) {
         confirm("Opening the magnifier.");
         setPhase("viewer");
         return true;
       }
-      if (/\b(question|document|scan|paper|form|help me with this|read it|help with)\b/.test(t)) {
+      if (/\b(question|document|scan|paper|my paper|form|help me with this|read it|help with|ask)\b/.test(t)) {
         confirm("Okay — let's scan it.");
         setPhase("find");
         return true;
