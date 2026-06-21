@@ -41,6 +41,7 @@ export function PersistentVoice({
   speakable,
   helpHint,
   onBack,
+  onDone,
   onCommand,
   screenId,
   actions,
@@ -58,6 +59,7 @@ export function PersistentVoice({
   const speakableRef = useRef(speakable);
   const onCommandRef = useRef(onCommand);
   const onBackRef = useRef(onBack);
+  const onDoneRef = useRef(onDone);
   const helpRef = useRef(helpHint);
   const screenRef = useRef(screenId);
   const actionsRef = useRef(actions);
@@ -67,6 +69,7 @@ export function PersistentVoice({
   useEffect(() => { speakableRef.current = speakable; }, [speakable]);
   useEffect(() => { onCommandRef.current = onCommand; }, [onCommand]);
   useEffect(() => { onBackRef.current = onBack; }, [onBack]);
+  useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
   useEffect(() => { helpRef.current = helpHint; }, [helpHint]);
   useEffect(() => { screenRef.current = screenId; }, [screenId]);
   useEffect(() => { actionsRef.current = actions; }, [actions]);
