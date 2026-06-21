@@ -2,6 +2,7 @@
 // constrained intent mapping. The frontend never sees DEEPGRAM_API_KEY.
 
 import { supabase } from "@/integrations/supabase/client";
+import { getLang } from "@/lib/i18n";
 
 export type VoiceIntent = "confirm" | "cancel" | "repeat" | "unknown";
 
