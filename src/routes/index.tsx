@@ -1444,6 +1444,8 @@ function speakableForPhase(
   },
 ): string {
   switch (phase) {
+    case "language":
+      return "What language do you speak? ¿Qué idioma habla? 您说什么语言?";
     case "start":
       return "My Friend. How would you like me to help? Tap Talk to me to hear everything out loud. Tap Show me words for big captions with no sound. Tap Both for voice and captions together.";
     case "home":
