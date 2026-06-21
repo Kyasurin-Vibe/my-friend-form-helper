@@ -178,30 +178,18 @@ export function createMockVisionService(): VisionService {
   };
 }
 
-// Lovable AI Gateway vision (Gemini multimodal). Server function handles the API key.
+// Vision now goes through the analyze-document edge function (Claude) only.
+// This export is kept as a no-op shim for any legacy importer; it falls back
+// to the mock so it can never silently call a non-existent Gemini path.
 export function createLovableVisionService(): VisionService {
   return {
-    name: "lovable-ai",
-    async detect(frame) {
-      if (typeof frame !== "string" || !frame.startsWith("data:")) {
-        return createMockVisionService().detect();
-      }
-      try {
-        const { analyzeDocumentImage } = await import("./vision.functions");
-        const r = await analyzeDocumentImage({ data: { imageDataUrl: frame } });
-        return {
-          code: r.code,
-          title: r.title,
-          confidence: r.confidence,
-          fields: r.fields,
-        };
-      } catch (e) {
-        console.warn("[vision] AI call failed, falling back to mock:", e);
-        return createMockVisionService().detect();
-      }
+    name: "mock-shim",
+    async detect() {
+      return createMockVisionService().detect();
     },
   };
 }
+
 
 // ============ Upload Service ============
 

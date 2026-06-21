@@ -249,7 +249,7 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     speakingRef.current = true;
     try { DemoServices.voice.stop(); } catch {}
     speak(
-      "Schedule of Assets and Debts, form F L one forty two. I see sections for property, accounts, debts, signature, and date.",
+      "Hold the paper steady inside the box. When it looks clear, I'll capture it and read it for you.",
       () => {
         speakingRef.current = false;
         if (shouldListenRef.current) startVoice();

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext, useContext } from "react";
 import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
 import { useSpeech } from "@/lib/useSpeech";
@@ -10,10 +10,7 @@ import {
   type AnalysisResult,
   type SendResult,
 } from "@/lib/cases";
-import { playWarning, playSuccess } from "@/lib/chime";
-
-type Branch = "missing" | "complete";
-
+import { playWarning } from "@/lib/chime";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -34,15 +31,21 @@ export const Route = createFileRoute("/")({
   component: ElderApp,
 });
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6;
 export type A11yMode = "voice" | "text" | "both";
+type Phase =
+  | "start"
+  | "find"
+  | "magnifier"
+  | "analyzing"
+  | "retake"
+  | "review"
+  | "sent";
+
+const CaptionsContext = createContext<boolean>(true);
 
 function ElderApp() {
-  const [step, setStep] = useState<Step>(1);
-  const [branch, setBranch] = useState<Branch>("missing");
   const [a11yMode, setA11yMode] = useState<A11yMode>("both");
-  const [started, setStarted] = useState(true);
-  const [phase, setPhase] = useState<"find" | "magnifier" | "analyzing" | "flow">("find");
+  const [phase, setPhase] = useState<Phase>("find");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
@@ -51,7 +54,6 @@ function ElderApp() {
   const speech = useSpeech();
   const navigate = useNavigate();
 
-
   const voiceOn = a11yMode !== "text";
   const showCaptions = a11yMode !== "voice";
 
@@ -59,32 +61,17 @@ function ElderApp() {
     speech.setEnabled(voiceOn);
   }, [voiceOn, speech]);
 
-  // Speak on step change (after user has tapped once)
   useEffect(() => {
-    if (!started || phase !== "flow") return;
-    if (step === 4 && analysis?.elderMessage) {
-      // Use AI-generated elder line, spoken warmly via Deepgram (with fallback).
+    if (phase === "review" && analysis?.elderMessage) {
       speakWarm(analysis.elderMessage);
-      return;
-    }
-    if (step === 5 && sendResult?.elderMessage) {
+    } else if (phase === "sent" && sendResult?.elderMessage) {
       speakWarm(sendResult.elderMessage);
-      return;
+    } else if (phase === "retake") {
+      speech.speak("That was a little hard to read. Let's try again, holding steady.");
     }
-    const lines: Record<Step, string> = {
-      1: "Hi, I'm My Friend. Put your paper in the box, and I'll take a look.",
-      2: "That was a little blurry. Hold steady, and let's try again.",
-      3: "I can see this clearly now.",
-      4: "I checked your form.",
-      5: "I've sent it to the Legal Aid Center so a real person can check it.",
-      6: "My Friend gives accountable help.",
-    };
-    speech.speak(lines[step]);
-  }, [step, branch, started, phase, analysis, sendResult]); // eslint-disable-line
+  }, [phase, analysis, sendResult]); // eslint-disable-line
 
   const restart = () => {
-    setStep(1);
-    setStarted(true);
     setPhase("find");
     setAnalysis(null);
     setSendResult(null);
@@ -93,26 +80,12 @@ function ElderApp() {
     speech.cancel();
   };
 
-  const start = (mode: A11yMode) => {
-    setA11yMode(mode);
-    setStarted(true);
-    setPhase("find");
-    if (mode !== "text") {
-      setTimeout(() => {
-        speech.speak(
-          "Ready to find your document? Open the magnifier, or tap I already found it.",
-        );
-      }, 50);
-    }
-  };
-
   async function handleCapture(image?: string) {
     setCapturedImage(image);
     if (!image) {
-      // No frame captured (camera not ready) — go to the manual review path.
-      setBranch("missing");
-      setPhase("flow");
-      setStep(5);
+      // Camera failed — go straight to human review path.
+      setAnalysis(null);
+      setPhase("review");
       return;
     }
     setPhase("analyzing");
@@ -120,21 +93,16 @@ function ElderApp() {
     try {
       const result = await analyzeDocument(image);
       setAnalysis(result);
-      if (result.recommendedAction === "retake") {
-        setPhase("flow");
-        setStep(2);
+      if (result.recommendedAction === "retake" || !result.readable) {
+        setPhase("retake");
         return;
       }
-      setBranch(result.possibleMissingFields.length > 0 ? "missing" : "complete");
-      setPhase("flow");
-      setStep(4);
+      setPhase("review");
     } catch (e) {
       console.error("analyze failed", e);
       setAnalyzeError(e instanceof Error ? e.message : "Could not analyze right now.");
-      // Safe handoff path
-      setBranch("missing");
-      setPhase("flow");
-      setStep(4);
+      setAnalysis(null);
+      setPhase("review");
     }
   }
 
@@ -146,18 +114,18 @@ function ElderApp() {
         image: capturedImage,
         analysis:
           analysis ?? {
-            readable: true,
+            readable: false,
             documentType: "unknown",
             documentName: "Unknown document",
-            confidence: 0.5,
-            plainEnglishSummary: "User submitted without automated analysis.",
-            possibleMissingFields: [],
+            confidence: 0,
+            plainEnglishSummary: "User submitted without successful automated analysis.",
+            possibleMissingFields: ["Automated analysis unavailable"],
             recommendedAction: "human_review",
             elderMessage: "Sent for human review.",
           },
       });
       setSendResult(result);
-      setStep(5);
+      setPhase("sent");
     } catch (e) {
       console.error("send failed", e);
       setAnalyzeError(e instanceof Error ? e.message : "Could not send right now.");
@@ -165,8 +133,6 @@ function ElderApp() {
       setSending(false);
     }
   }
-
-
 
   return (
     <div
@@ -178,24 +144,14 @@ function ElderApp() {
         color: "var(--color-elder-ink)",
       }}
     >
-      <PresenterBar
-        step={step}
-        setStep={setStep}
-        branch={branch}
-        setBranch={setBranch}
-        a11yMode={a11yMode}
-        setA11yMode={setA11yMode}
-        restart={restart}
-      />
-
       {/* Phone frame */}
       <div
-        className="relative mt-3"
+        className="relative"
         style={{
           width: 400,
           maxWidth: "96vw",
           height: 820,
-          maxHeight: "calc(100dvh - 120px)",
+          maxHeight: "calc(100dvh - 80px)",
           background: "#1a1a1a",
           borderRadius: 52,
           padding: 14,
@@ -209,55 +165,54 @@ function ElderApp() {
             borderRadius: 40,
           }}
         >
-          {!started ? (
-            <StartGate onStart={start} />
-          ) : phase === "find" ? (
-            <FindDocGate
-              onOpenMagnifier={() => setPhase("magnifier")}
-              onAlreadyFound={() => {
-                setPhase("flow");
-                setStep(1);
-              }}
-            />
-          ) : phase === "magnifier" ? (
-            <LiveMagnifier
-              onCancel={() => setPhase("find")}
-              onConfirm={(img) => handleCapture(img)}
-              onHandoff={() => {
-                setBranch("missing");
-                setAnalysis({
-                  readable: true,
-                  documentType: "unknown",
-                  documentName: "Unknown document",
-                  confidence: 0.5,
-                  plainEnglishSummary: "User asked for a person to review without analysis.",
-                  possibleMissingFields: ["user requested human review"],
-                  recommendedAction: "human_review",
-                  elderMessage: "Okay. I'll send this to the Legal Aid Center for a person to look at.",
-                });
-                handleSend();
-                setPhase("flow");
-                setStep(5);
-              }}
-            />
-          ) : phase === "analyzing" ? (
-            <AnalyzingScreen />
-          ) : (
-            <ScreenRouter
-              step={step}
-              setStep={setStep}
-              branch={branch}
-              speech={speech}
-              showCaptions={showCaptions}
-              analysis={analysis}
-              sendResult={sendResult}
-              sending={sending}
-              analyzeError={analyzeError}
-              onSend={handleSend}
-              onGoCenter={() => navigate({ to: "/center" })}
-            />
-          )}
-
+          <CaptionsContext.Provider value={showCaptions}>
+            {phase === "start" ? (
+              <StartGate
+                onStart={(mode) => {
+                  setA11yMode(mode);
+                  setPhase("find");
+                }}
+              />
+            ) : phase === "find" ? (
+              <FindDocGate onOpenMagnifier={() => setPhase("magnifier")} />
+            ) : phase === "magnifier" ? (
+              <LiveMagnifier
+                onCancel={() => setPhase("find")}
+                onConfirm={(img) => handleCapture(img)}
+                onHandoff={() => {
+                  setAnalysis(null);
+                  handleSend();
+                }}
+              />
+            ) : phase === "analyzing" ? (
+              <AnalyzingScreen />
+            ) : phase === "retake" ? (
+              <RetakeScreen
+                analysis={analysis}
+                onRetry={() => setPhase("magnifier")}
+                onSendAnyway={handleSend}
+                sending={sending}
+                speech={speech}
+              />
+            ) : phase === "review" ? (
+              <ReviewScreen
+                analysis={analysis}
+                sending={sending}
+                analyzeError={analyzeError}
+                onSend={handleSend}
+                onRetake={() => setPhase("magnifier")}
+                speech={speech}
+              />
+            ) : (
+              <SentScreen
+                sendResult={sendResult}
+                analysis={analysis}
+                speech={speech}
+                onGoCenter={() => navigate({ to: "/center" })}
+                onRestart={restart}
+              />
+            )}
+          </CaptionsContext.Provider>
         </div>
       </div>
 
@@ -271,76 +226,6 @@ function ElderApp() {
     </div>
   );
 }
-
-function PresenterBar({
-  step,
-  setStep,
-  branch,
-  setBranch,
-  a11yMode,
-  setA11yMode,
-  restart,
-}: {
-  step: Step;
-  setStep: (s: Step) => void;
-  branch: Branch;
-  setBranch: (b: Branch) => void;
-  a11yMode: A11yMode;
-  setA11yMode: (m: A11yMode) => void;
-  restart: () => void;
-}) {
-  const chip = (label: string, active: boolean, onClick: () => void) => (
-    <button
-      onClick={onClick}
-      className="px-3 py-1.5 rounded-full text-xs font-semibold border transition"
-      style={{
-        background: active ? "var(--color-elder-primary)" : "#fff",
-        color: active ? "#fff" : "var(--color-elder-ink)",
-        borderColor: active ? "var(--color-elder-primary)" : "#e7ddd0",
-      }}
-    >
-      {label}
-    </button>
-  );
-  return (
-    <div
-      className="flex flex-wrap gap-2 items-center justify-center rounded-full px-3 py-2 text-xs"
-      style={{
-        background: "#fff",
-        border: "1px solid #e7ddd0",
-        fontFamily: "var(--font-center)",
-        color: "#6b5d52",
-      }}
-    >
-      <b className="px-1">Presenter</b>
-      {[1, 2, 3, 4, 5, 6].map((n) =>
-        chip(`Step ${n}`, step === n, () => setStep(n as Step))
-      )}
-      <span className="mx-1 opacity-40">|</span>
-      <b>Branch</b>
-      {chip("① Missing", branch === "missing", () => setBranch("missing"))}
-      {chip("② Complete", branch === "complete", () => setBranch("complete"))}
-      <span className="mx-1 opacity-40">|</span>
-      <b>Mode</b>
-      {chip("🔊 Voice", a11yMode === "voice", () => setA11yMode("voice"))}
-      {chip("📝 Text", a11yMode === "text", () => setA11yMode("text"))}
-      {chip("🔊📝 Both", a11yMode === "both", () => setA11yMode("both"))}
-      <button
-        onClick={restart}
-        className="px-3 py-1.5 rounded-full text-xs font-semibold"
-        style={{ background: "#faf6f0", border: "1px solid #e7ddd0" }}
-      >
-        ↻ Restart
-      </button>
-    </div>
-  );
-}
-
-const CaptionsCtx = ({ children, value }: { children: React.ReactNode; value: boolean }) => (
-  <CaptionsContext.Provider value={value}>{children}</CaptionsContext.Provider>
-);
-import { createContext, useContext } from "react";
-const CaptionsContext = createContext<boolean>(true);
 
 function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
   const choose = (mode: A11yMode) => {
@@ -386,13 +271,7 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
   );
 }
 
-function FindDocGate({
-  onOpenMagnifier,
-  onAlreadyFound,
-}: {
-  onOpenMagnifier: () => void;
-  onAlreadyFound: () => void;
-}) {
+function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
       <Mascot mode="idle" size={130} />
@@ -402,46 +281,28 @@ function FindDocGate({
       <p className="mt-2 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
         I'll open the magnifier so you can see clearly first. Nothing is uploaded yet.
       </p>
-      <div className="w-full space-y-3">
-        <button
-          onClick={onOpenMagnifier}
-          className="w-full font-extrabold animate-button-pop-red active:scale-[0.96]"
-          style={{
-            background: "var(--color-elder-red)",
-            color: "#fff",
-            border: "none",
-            borderRadius: 26,
-            padding: "24px",
-            fontSize: 24,
-            minHeight: 88,
-            boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
-          }}
-        >
-          🔍 Open Magnifier
-        </button>
-        <button
-          onClick={onAlreadyFound}
-          className="w-full font-extrabold active:scale-[0.96]"
-          style={{
-            background: "#fff",
-            color: "var(--color-elder-primary)",
-            border: "3px solid var(--color-elder-sky)",
-            borderRadius: 26,
-            padding: "22px",
-            fontSize: 22,
-            minHeight: 80,
-          }}
-        >
-          📄 I already found it
-        </button>
-      </div>
+      <button
+        onClick={onOpenMagnifier}
+        className="w-full font-extrabold animate-button-pop-red active:scale-[0.96]"
+        style={{
+          background: "var(--color-elder-red)",
+          color: "#fff",
+          border: "none",
+          borderRadius: 26,
+          padding: "24px",
+          fontSize: 24,
+          minHeight: 88,
+          boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
+        }}
+      >
+        🔍 Open Magnifier
+      </button>
       <p className="mt-4" style={{ fontSize: 13, color: "#8a7d6f" }}>
         The magnifier uses your camera only on this device.
       </p>
     </div>
   );
 }
-
 
 function AnalyzingScreen() {
   return (
@@ -471,72 +332,260 @@ function AnalyzingScreen() {
   );
 }
 
-function ScreenRouter({
-  step,
-  setStep,
-  branch,
-  speech,
-  showCaptions,
+function RetakeScreen({
   analysis,
-  sendResult,
+  onRetry,
+  onSendAnyway,
   sending,
-  analyzeError,
-  onSend,
-  onGoCenter,
+  speech,
 }: {
-  step: Step;
-  setStep: (s: Step) => void;
-  branch: Branch;
-  speech: ReturnType<typeof useSpeech>;
-  showCaptions: boolean;
   analysis: AnalysisResult | null;
-  sendResult: SendResult | null;
+  onRetry: () => void;
+  onSendAnyway: () => void;
   sending: boolean;
-  analyzeError: string | null;
-  onSend: () => void;
-  onGoCenter: () => void;
+  speech: ReturnType<typeof useSpeech>;
 }) {
-  const next = (n: Step) => setStep(n);
+  useEffect(() => {
+    playWarning();
+  }, []);
   return (
-    <CaptionsCtx value={showCaptions}>
-      {(() => {
-        switch (step) {
-          case 1:
-            return <Screen1 onNext={() => next(2)} speech={speech} />;
-          case 2:
-            return <Screen2 onNext={() => next(3)} speech={speech} />;
-          case 3:
-            return <Screen3 onNext={() => next(4)} speech={speech} />;
-          case 4:
-            return (
-              <Screen4
-                branch={branch}
-                analysis={analysis}
-                sending={sending}
-                analyzeError={analyzeError}
-                onSendToCenter={onSend}
-                onFixSelf={() => setStep(1)}
-                speech={speech}
-              />
-            );
-          case 5:
-            return (
-              <Screen5
-                branch={branch}
-                sendResult={sendResult}
-                analysis={analysis}
-                onGoCenter={onGoCenter}
-                speech={speech}
-              />
-            );
-          case 6:
-            return <Screen6 />;
-        }
-      })()}
-    </CaptionsCtx>
+    <div className="flex-1 flex flex-col p-6">
+      <MascotHeader speech={speech} face="x" />
+      <div
+        className="rounded-2xl p-4 my-3"
+        style={{ background: "#FFF6E5", border: "1px solid #F5DDA8" }}
+      >
+        <p className="font-bold mb-1" style={{ fontSize: 20, color: "#7a5a1c" }}>
+          I couldn't read it clearly.
+        </p>
+        {analysis?.elderMessage && (
+          <p className="mb-2" style={{ fontSize: 16, color: "#6b5d52" }}>
+            {analysis.elderMessage}
+          </p>
+        )}
+        <ul className="space-y-1" style={{ fontSize: 17 }}>
+          <li>✋ Hold still</li>
+          <li>💡 More light</li>
+          <li>🟦 Keep the corners in the box</li>
+        </ul>
+      </div>
+      <div className="space-y-2 mt-auto">
+        <BigButton variant="danger" onClick={onRetry}>📷 Try again</BigButton>
+        <BigButton variant="ghost" onClick={onSendAnyway}>
+          {sending ? "Sending…" : "🤝 Send for human review"}
+        </BigButton>
+      </div>
+    </div>
   );
 }
 
+function ReviewScreen({
+  analysis,
+  sending,
+  analyzeError,
+  onSend,
+  onRetake,
+  speech,
+}: {
+  analysis: AnalysisResult | null;
+  sending: boolean;
+  analyzeError: string | null;
+  onSend: () => void;
+  onRetake: () => void;
+  speech: ReturnType<typeof useSpeech>;
+}) {
+  const missing = analysis?.possibleMissingFields ?? [];
+  useEffect(() => {
+    if (missing.length > 0) playWarning();
+  }, [missing.length]);
+
+  // No analysis available — show honest fallback, do NOT fake check rows.
+  if (!analysis) {
+    return (
+      <div className="flex-1 flex flex-col p-6 overflow-y-auto">
+        <MascotHeader speech={speech} small face="surprised" />
+        <div
+          className="rounded-3xl p-4 mt-3 mb-3"
+          style={{ background: "#fff", border: "1px solid #EFE6D6" }}
+        >
+          <p className="font-extrabold mb-2" style={{ fontSize: 20, color: "var(--color-elder-ink)" }}>
+            I couldn't read it clearly.
+          </p>
+          <p style={{ fontSize: 16, color: "#6b5d52" }}>
+            I'd rather not guess. You can try again, or send it for a person at the Legal Aid Center to look at.
+          </p>
+          {analyzeError && (
+            <p className="mt-2 text-sm" style={{ color: "#b91c1c" }}>
+              (Note: {analyzeError})
+            </p>
+          )}
+        </div>
+        <div className="space-y-2 mt-auto">
+          <BigButton variant="ghost" onClick={onRetake}>📷 Retake</BigButton>
+          <BigButton variant="danger" onClick={onSend}>
+            {sending ? "Sending…" : "🤝 Send for review"}
+          </BigButton>
+        </div>
+      </div>
+    );
+  }
+
+  const docTitle = analysis.documentName || analysis.documentType || "Document";
+
+  return (
+    <div className="flex-1 flex flex-col p-6 overflow-y-auto">
+      <MascotHeader speech={speech} small face={missing.length ? "surprised" : "smile"} />
+      <div
+        className="rounded-3xl p-4 mt-3 mb-3"
+        style={{
+          background: "#fff",
+          border: "1px solid #EFE6D6",
+          boxShadow: "0 8px 24px rgba(36,31,26,0.06)",
+        }}
+      >
+        <p className="text-xs uppercase font-bold tracking-wide mb-1" style={{ color: "#6b5d52" }}>
+          Document
+        </p>
+        <p className="font-extrabold mb-3" style={{ fontSize: 19, color: "var(--color-elder-ink)" }}>
+          {docTitle}
+        </p>
+        {analysis.plainEnglishSummary && (
+          <p className="mb-3" style={{ fontSize: 16, color: "#6b5d52" }}>
+            {analysis.plainEnglishSummary}
+          </p>
+        )}
+        {missing.length > 0 ? (
+          <>
+            <p className="font-bold mb-2" style={{ fontSize: 18, color: "#7a5a1c" }}>
+              I see some spots that may need attention:
+            </p>
+            <ul className="space-y-2">
+              {missing.map((m, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-3"
+                  style={{ fontSize: 18, fontWeight: 600 }}
+                >
+                  <span
+                    aria-hidden
+                    className="inline-flex items-center justify-center shrink-0"
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 10,
+                      background: "#FBEBD8",
+                      color: "var(--color-elder-amber)",
+                      fontWeight: 800,
+                    }}
+                  >!</span>
+                  <span style={{ color: "#7a5a1c" }}>{m}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="font-semibold" style={{ fontSize: 18, color: "var(--color-elder-teal)" }}>
+            ✓ Nothing obviously missing. A person will still confirm before anything is filed.
+          </p>
+        )}
+      </div>
+      <div className="space-y-2 mt-auto">
+        <BigButton variant="ghost" onClick={onRetake}>📷 Retake</BigButton>
+        <BigButton variant="danger" onClick={onSend}>
+          {sending ? "Sending…" : "🤝 Send it"}
+        </BigButton>
+      </div>
+    </div>
+  );
+}
+
+function SentScreen({
+  sendResult,
+  analysis,
+  speech,
+  onGoCenter,
+  onRestart,
+}: {
+  sendResult: SendResult | null;
+  analysis: AnalysisResult | null;
+  speech: ReturnType<typeof useSpeech>;
+  onGoCenter: () => void;
+  onRestart: () => void;
+}) {
+  const trackingId = sendResult?.trackingId ?? "—";
+  const centerName = sendResult?.centerName ?? "Legal Aid Center";
+  const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
+  const missingCount = analysis?.possibleMissingFields.length ?? 0;
+
+  const log = [
+    "Photo captured on this device",
+    `Identified as ${analysis?.documentName ?? analysis?.documentType ?? "unknown document"}`,
+    isReview
+      ? `Flagged ${missingCount} spot(s) for human review`
+      : "No obvious missing fields",
+    `Sent to ${centerName}`,
+  ];
+  return (
+    <div className="flex-1 flex flex-col p-6 overflow-y-auto">
+      <MascotHeader speech={speech} small face={isReview ? "x" : "smile"} />
+      <div
+        className="rounded-3xl p-4 mt-3"
+        style={{
+          background: "#fff",
+          border: "1px solid #EFE6D6",
+          boxShadow: "0 8px 24px rgba(36,31,26,0.06)",
+        }}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm" style={{ color: "#6b5d52" }}>
+            Tracking number
+          </span>
+          <span className="font-extrabold" style={{ fontSize: 22, letterSpacing: 0.5 }}>
+            {trackingId}
+          </span>
+        </div>
+        <div
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-full font-bold"
+          style={{
+            background: "#E6F3EE",
+            color: "var(--color-elder-teal)",
+            fontSize: 16,
+          }}
+        >
+          📨 Delivered to {centerName}
+        </div>
+        <p className="mt-3 font-semibold" style={{ fontSize: 18, color: "var(--color-elder-ink)" }}>
+          {isReview
+            ? "I won't guess on something this important. A real person will check it for you."
+            : "A person will confirm it before anything is filed."}
+        </p>
+        <div className="mt-3">
+          <p className="text-xs uppercase font-bold tracking-wide" style={{ color: "#6b5d52" }}>
+            What I did
+          </p>
+          <ul className="mt-1 space-y-1">
+            {log.map((s, i) => (
+              <li key={i} className="flex gap-3 text-[15px]">
+                <span style={{ color: "#6b5d52", minWidth: 16 }}>{i + 1}.</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <p
+        className="text-center mt-4 mb-3 font-semibold"
+        style={{ fontSize: 20, color: "var(--color-elder-ink)" }}
+      >
+        You don't have to do anything else right now.
+      </p>
+      <div className="space-y-2 mt-auto">
+        <BigButton variant="ghost" onClick={onRestart}>↻ Start over</BigButton>
+        <BigButton variant="danger" onClick={onGoCenter}>See the center's side →</BigButton>
+      </div>
+    </div>
+  );
+}
 
 // ===== Shared building blocks =====
 
@@ -561,7 +610,7 @@ function MascotHeader({
           key={speech.caption}
           className="mt-3 px-2 text-center font-semibold animate-fade-up"
           style={{
-            fontSize: 26,
+            fontSize: 22,
             lineHeight: 1.35,
             color: "var(--color-elder-ink)",
           }}
@@ -596,504 +645,13 @@ function BigButton({
         color: primary || danger ? "#fff" : "var(--color-elder-primary)",
         border: primary || danger ? "none" : "2px solid var(--color-elder-sky)",
         borderRadius: 26,
-        padding: "26px",
-        fontSize: 26,
-        minHeight: 88,
+        padding: "22px",
+        fontSize: 22,
+        minHeight: 78,
         boxShadow: primary || danger ? "0 14px 30px rgba(0,0,0,0.18)" : "none",
       }}
     >
       {children}
     </button>
-  );
-}
-
-function VoiceControls({
-  speech,
-}: {
-  speech: ReturnType<typeof useSpeech>;
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-2 mt-2 mb-2">
-      <button
-        onClick={() => speech.repeat()}
-        className="font-bold"
-        style={{
-          background: "#fff",
-          border: "2px solid var(--color-elder-sky)",
-          borderRadius: 16,
-          padding: "14px",
-          fontSize: 17,
-          color: "var(--color-elder-primary)",
-        }}
-      >
-        🔊 Say it again
-      </button>
-      <button
-        onClick={() =>
-          speech.speak(
-            "Tap the big blue button at the bottom to keep going. I'll help you each step."
-          )
-        }
-        className="font-bold"
-        style={{
-          background: "#fff",
-          border: "2px solid var(--color-elder-sky)",
-          borderRadius: 16,
-          padding: "14px",
-          fontSize: 17,
-          color: "var(--color-elder-primary)",
-        }}
-      >
-        ❓ What do I do?
-      </button>
-    </div>
-  );
-}
-
-// ===== Screens =====
-
-function Screen1({
-  onNext,
-  speech,
-}: {
-  onNext: () => void;
-  speech: ReturnType<typeof useSpeech>;
-}) {
-  return (
-    <div className="flex-1 flex flex-col p-6">
-      <h2
-        className="text-center font-extrabold"
-        style={{ fontSize: 28, color: "var(--color-elder-ink)" }}
-      >
-        My Friend
-      </h2>
-      <p className="text-center" style={{ color: "#6b5d52", fontSize: 16 }}>
-        Let's take a photo of your paper.
-      </p>
-      <MascotHeader speech={speech} small />
-      <Viewfinder variant="empty" />
-      <p
-        className="text-center font-bold mb-3"
-        style={{ fontSize: 24, color: "var(--color-elder-ink)" }}
-      >
-        Put your paper in the box.
-      </p>
-      <VoiceControls speech={speech} />
-      <BigButton variant="danger" onClick={onNext}>📷 Take the photo</BigButton>
-    </div>
-  );
-}
-
-function Screen2({
-  onNext,
-  speech,
-}: {
-  onNext: () => void;
-  speech: ReturnType<typeof useSpeech>;
-}) {
-  useEffect(() => {
-    playWarning();
-    speech.speak("A few tips: hold still, add more light, and keep the corners in the box.");
-  }, []); // eslint-disable-line
-  return (
-    <div className="flex-1 flex flex-col p-6">
-      <MascotHeader speech={speech} face="x" />
-      <Viewfinder variant="blurry" />
-      <div
-        className="rounded-2xl p-3 mb-2"
-        style={{ background: "#FFF6E5", border: "1px solid #F5DDA8" }}
-      >
-        <p className="font-bold mb-1" style={{ fontSize: 18 }}>
-          A few tips:
-        </p>
-        <ul className="space-y-1" style={{ fontSize: 17 }}>
-          <li>✋ Hold still</li>
-          <li>💡 More light</li>
-          <li>🟦 Keep the corners in the box</li>
-        </ul>
-      </div>
-      <VoiceControls speech={speech} />
-      <BigButton variant="danger" onClick={onNext}>Try again</BigButton>
-    </div>
-  );
-}
-
-function Screen3({
-  onNext,
-  speech,
-}: {
-  onNext: () => void;
-  speech: ReturnType<typeof useSpeech>;
-}) {
-  useEffect(() => { playSuccess(); }, []);
-  const readDoc = () => {
-    speech.speak(
-      "This looks like a Schedule of Assets and Debts, form F L one forty two. I see your name, the case number, your assets, and your debts. There is also a place for your signature and the date at the bottom.",
-    );
-  };
-  return (
-    <div className="flex-1 flex flex-col p-6">
-      <MascotHeader speech={speech} small face="smile" />
-      <Viewfinder variant="clear" />
-      <p
-        className="text-center font-bold mb-2"
-        style={{ fontSize: 22, color: "var(--color-elder-ink)" }}
-      >
-        I can read this clearly.
-      </p>
-      <p
-        className="text-center mb-3"
-        style={{ fontSize: 17, color: "#6b6256" }}
-      >
-        This looks like <strong>FL-142 — Schedule of Assets and Debts</strong>. I made the text larger so it's easier to see.
-      </p>
-      <VoiceControls speech={speech} />
-      <BigButton variant="ghost" onClick={readDoc}>
-        🔊 Read the paper to me
-      </BigButton>
-      <BigButton variant="danger" onClick={onNext}>Check my form</BigButton>
-    </div>
-  );
-}
-
-function Screen4({
-  branch,
-  analysis,
-  sending,
-  analyzeError,
-  onSendToCenter,
-  onFixSelf,
-  speech,
-}: {
-  branch: Branch;
-  analysis: AnalysisResult | null;
-  sending: boolean;
-  analyzeError: string | null;
-  onSendToCenter: () => void;
-  onFixSelf: () => void;
-  speech: ReturnType<typeof useSpeech>;
-}) {
-  useEffect(() => {
-    if (branch === "missing") playWarning();
-  }, [branch]);
-
-  const missing = analysis?.possibleMissingFields ?? (branch === "missing" ? ["Signature area appears blank", "Date area appears blank"] : []);
-  const docTitle = analysis ? `${analysis.documentType} — ${analysis.documentName}` : "FL-142 — Schedule of Assets and Debts";
-
-  return (
-    <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-      <MascotHeader speech={speech} small face={missing.length ? "surprised" : "smile"} />
-      <div
-        className="rounded-3xl p-4 mt-3 mb-3"
-        style={{
-          background: "#fff",
-          border: "1px solid #EFE6D6",
-          boxShadow: "0 8px 24px rgba(36,31,26,0.06)",
-        }}
-      >
-        <p className="text-xs uppercase font-bold tracking-wide mb-1" style={{ color: "#6b5d52" }}>
-          Document
-        </p>
-        <p className="font-extrabold mb-3" style={{ fontSize: 19, color: "var(--color-elder-ink)" }}>
-          {docTitle}
-        </p>
-        {analysis?.plainEnglishSummary && (
-          <p className="mb-3" style={{ fontSize: 16, color: "#6b5d52" }}>
-            {analysis.plainEnglishSummary}
-          </p>
-        )}
-        {missing.length > 0 ? (
-          <>
-            <p className="font-bold mb-2" style={{ fontSize: 18, color: "#7a5a1c" }}>
-              I see some spots that may be blank:
-            </p>
-            <ul className="space-y-2">
-              {missing.map((m, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-3"
-                  style={{ fontSize: 18, fontWeight: 600 }}
-                >
-                  <span
-                    aria-hidden
-                    className="inline-flex items-center justify-center shrink-0"
-                    style={{
-                      width: 30, height: 30, borderRadius: 10,
-                      background: "#FBEBD8", color: "var(--color-elder-amber)",
-                      fontWeight: 800,
-                    }}
-                  >!</span>
-                  <span style={{ color: "#7a5a1c" }}>{m}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="font-semibold" style={{ fontSize: 18, color: "var(--color-elder-teal)" }}>
-            ✓ Nothing obviously missing. A person will still confirm before anything is filed.
-          </p>
-        )}
-        {analyzeError && (
-          <p className="mt-2 text-sm" style={{ color: "#b91c1c" }}>
-            (Note: {analyzeError})
-          </p>
-        )}
-      </div>
-      <VoiceControls speech={speech} />
-      {missing.length > 0 ? (
-        <div className="space-y-2">
-          <BigButton
-            variant="ghost"
-            onClick={() => {
-              speech.speak("Okay, I'll wait here. Fix it on your paper, then tap to scan again.");
-              onFixSelf();
-            }}
-          >
-            ✍️ No, keep looking
-          </BigButton>
-          <BigButton variant="danger" onClick={onSendToCenter}>
-            {sending ? "Sending…" : "🤝 Yes, send it"}
-          </BigButton>
-        </div>
-      ) : (
-        <BigButton variant="danger" onClick={onSendToCenter}>
-          {sending ? "Sending…" : "✓ Yes, send it"}
-        </BigButton>
-      )}
-    </div>
-  );
-}
-
-function Screen5({
-  branch,
-  sendResult,
-  analysis,
-  onGoCenter,
-  speech,
-}: {
-  branch: Branch;
-  sendResult: SendResult | null;
-  analysis: AnalysisResult | null;
-  onGoCenter: () => void;
-  speech: ReturnType<typeof useSpeech>;
-}) {
-  const trackingId = sendResult?.trackingId ?? "—";
-  const centerName = sendResult?.centerName ?? "Legal Aid Center";
-  const isReview = (sendResult?.status ?? "needs_review") === "needs_review";
-
-  const log = [
-    "Photo captured on this device",
-    `Identified as ${analysis?.documentType ?? "unknown document"}`,
-    isReview
-      ? `Flagged ${analysis?.possibleMissingFields.length ?? 0} spot(s) for human review`
-      : "No obvious missing fields",
-    `Sent to ${centerName}`,
-  ];
-  return (
-    <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-      <MascotHeader speech={speech} small face={branch === "missing" ? "x" : "smile"} />
-      <div
-        className="rounded-3xl p-4 mt-3"
-        style={{
-          background: "#fff",
-          border: "1px solid #EFE6D6",
-          boxShadow: "0 8px 24px rgba(36,31,26,0.06)",
-        }}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm" style={{ color: "#6b5d52" }}>
-            Tracking number
-          </span>
-          <span
-            className="font-extrabold"
-            style={{ fontSize: 22, letterSpacing: 0.5 }}
-          >
-            {trackingId}
-          </span>
-        </div>
-        <div
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-full font-bold"
-          style={{
-            background: "#E6F3EE",
-            color: "var(--color-elder-teal)",
-            fontSize: 16,
-          }}
-        >
-          📨 Delivered to {centerName}
-        </div>
-        <p
-          className="mt-3 font-semibold"
-          style={{ fontSize: 18, color: "var(--color-elder-ink)" }}
-        >
-          {isReview
-            ? "I won't guess on something this important. A real person will check it for you."
-            : "A person will confirm it before anything is filed."}
-        </p>
-        <div className="mt-3">
-          <p className="text-xs uppercase font-bold tracking-wide" style={{ color: "#6b5d52" }}>
-            What I did
-          </p>
-          <ul className="mt-1 space-y-1">
-            {log.map((s, i) => (
-              <li key={i} className="flex gap-3 text-[15px]">
-                <span style={{ color: "#6b5d52", minWidth: 16 }}>{i + 1}.</span>
-                <span>{s}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-      <p
-        className="text-center mt-4 mb-3 font-semibold"
-        style={{ fontSize: 20, color: "var(--color-elder-ink)" }}
-      >
-        You don't have to do anything else right now.
-      </p>
-      <VoiceControls speech={speech} />
-      <BigButton variant="danger" onClick={onGoCenter}>See the center's side →</BigButton>
-    </div>
-  );
-}
-
-function Screen6() {
-  return (
-    <div
-      className="flex-1 flex flex-col items-center justify-center text-center p-8"
-      style={{ background: "#1a1a1a", color: "#fff" }}
-    >
-      <p
-        className="font-bold animate-fade-up"
-        style={{ fontSize: 28, color: "#cfd8e6" }}
-      >
-        Generic AI gives answers.
-      </p>
-      <p
-        className="font-extrabold mt-4 animate-fade-up"
-        style={{ fontSize: 36, color: "#fff", animationDelay: "0.4s" }}
-      >
-        My Friend gives{" "}
-        <span style={{ color: "var(--color-elder-coral)" }}>accountable</span> help.
-      </p>
-      <p
-        className="mt-10 max-w-[300px] animate-fade-up"
-        style={{ fontSize: 15, color: "#9aa4b2", animationDelay: "1s" }}
-      >
-        Equality hands everyone the same form. Equity gives them the help they actually
-        need to use it.
-      </p>
-    </div>
-  );
-}
-
-// ===== Viewfinder =====
-
-function Viewfinder({ variant }: { variant: "empty" | "blurry" | "clear" }) {
-  return (
-    <div
-      className="relative my-3 rounded-2xl overflow-hidden flex items-center justify-center"
-      style={{
-        height: 260,
-        background:
-          "linear-gradient(160deg, #2a2a2a 0%, #3d3d3d 60%, #2a2a2a 100%)",
-      }}
-    >
-      {/* dashed frame */}
-      <div
-        className="absolute"
-        style={{
-          inset: 22,
-          border: "3px dashed rgba(255,255,255,0.85)",
-          borderRadius: 14,
-        }}
-      />
-      {/* big green checkmark fills screen when frame is aligned (clear) */}
-      {variant === "clear" && (
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ background: "rgba(34,197,94,0.18)", zIndex: 10 }}
-          aria-hidden
-        >
-          <span
-            style={{
-              width: 120,
-              height: 120,
-              borderRadius: "50%",
-              background: "#22c55e",
-              color: "white",
-              fontSize: 72,
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              lineHeight: 1,
-              boxShadow: "0 12px 40px rgba(34,197,94,0.35)",
-            }}
-          >
-            ✓
-          </span>
-        </div>
-      )}
-      {variant !== "empty" && <DocPaper blurry={variant === "blurry"} />}
-      {variant === "empty" && (
-        <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 14 }}>
-          Camera preview
-        </p>
-      )}
-    </div>
-  );
-}
-
-function DocPaper({ blurry }: { blurry: boolean }) {
-  return (
-    <div
-      className="relative"
-      style={{
-        width: "75%",
-        height: "82%",
-        background: "#fdfaf3",
-        borderRadius: 6,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
-        padding: "14px 16px",
-        filter: blurry ? "blur(3.5px)" : "none",
-        transition: "filter 0.4s",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 9,
-          fontWeight: 700,
-          color: "#241F1A",
-          textAlign: "center",
-          marginBottom: 6,
-        }}
-      >
-        FL-142 — SCHEDULE OF ASSETS AND DEBTS
-      </div>
-      {[
-        "Petitioner: Rosa M. ____________",
-        "Assets:",
-        " • Bank account .............. $4,210",
-        " • 2008 sedan ................ $3,500",
-        " • Household items ........... $1,200",
-        "Debts:",
-        " • Credit card ............... $1,840",
-        " • Medical .................... $620",
-        "",
-        "Signature: ____________________",
-        "Date: ________________________",
-      ].map((line, i) => (
-        <div
-          key={i}
-          style={{
-            fontSize: 8.5,
-            lineHeight: 1.45,
-            color: "#3a322b",
-            fontFamily: "ui-monospace, Menlo, monospace",
-          }}
-        >
-          {line || "\u00A0"}
-        </div>
-      ))}
-    </div>
   );
 }
