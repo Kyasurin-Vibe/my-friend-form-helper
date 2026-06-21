@@ -900,9 +900,9 @@ function ReviewScreen({
           )}
         </div>
         <div className="space-y-2 mt-auto">
-          <BigButton variant="ghost" onClick={onRetake}>📷 Retake</BigButton>
+          <BigButton variant="ghost" onClick={onRetake}>📷 {t("retake")}</BigButton>
           <BigButton variant="danger" onClick={onSend}>
-            {sending ? "Sending…" : "🤝 Connect me with a person"}
+            {sending ? t("sending") : t("connect_person")}
           </BigButton>
           <DoneButton onClick={onDone} />
           <VoiceBar
