@@ -22,6 +22,7 @@ import { cancelSpeech, startRecording, transcribeAudio, type VoiceAction } from 
 import { playWarning } from "@/lib/chime";
 import { LANG_LABELS, type Lang, setLang, t, onLangChange, onTranslate, aiText } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { unlockAudio } from "@/lib/audio-unlock";
 
 export const Route = createFileRoute("/")({
   head: () => ({
