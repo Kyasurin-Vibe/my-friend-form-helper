@@ -181,7 +181,7 @@ const DICT: Record<string, Partial<Record<Lang, string>>> = {
   camera_unavailable:{ en: "I can't open the camera.", es: "No puedo abrir la cámara.", zh: "我打不开相机。", vi: "Tôi không mở được máy ảnh.", tl: "Hindi ko mabuksan ang camera." },
   allow_camera:     { en: "Please allow camera access in your browser.", es: "Permita el acceso a la cámara en su navegador.", zh: "请在浏览器中允许使用相机。", vi: "Vui lòng cho phép truy cập máy ảnh trong trình duyệt.", tl: "Pakipayagan ang access sa camera sa iyong browser." },
   enable_voice:     { en: "🎙 Tap to enable voice", es: "🎙 Toque para activar la voz", zh: "🎙 点击开启语音", vi: "🎙 Nhấn để bật giọng nói", tl: "🎙 Pindutin para i-on ang boses" },
-  capture_now:      { en: "📸 Capture now", es: "📸 Capturar ahora", zh: "📸 现在拍照", vi: "📸 Chụp ngay", tl: "📸 Kunan ngayon" },
+  capture_now_btn:  { en: "📸 Capture now", es: "📸 Capturar ahora", zh: "📸 现在拍照", vi: "📸 Chụp ngay", tl: "📸 Kunan ngayon" },
   hint_too_dark:    { en: "💡 Too dark — move to better light", es: "💡 Demasiado oscuro — busque mejor luz", zh: "💡 太暗了 — 换到光线更好的地方", vi: "💡 Quá tối — di chuyển đến nơi sáng hơn", tl: "💡 Masyadong madilim — lumipat sa mas maliwanag" },
   hint_empty:       { en: "📄 Fit your paper inside the frame", es: "📄 Coloque su papel dentro del marco", zh: "📄 把纸放进框里", vi: "📄 Đặt giấy vào khung", tl: "📄 Ilagay ang papel sa frame" },
   hint_face:        { en: "🙂 That looks like a face, not a document", es: "🙂 Eso parece una cara, no un documento", zh: "🙂 那看起来像脸,不是文件", vi: "🙂 Cái đó trông giống khuôn mặt, không phải tài liệu", tl: "🙂 Mukhang mukha iyan, hindi dokumento" },
