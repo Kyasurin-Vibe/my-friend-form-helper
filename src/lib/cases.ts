@@ -187,14 +187,117 @@ async function tightenToPaperPixels(
 }
 
 /**
+ * After paper-pixel tightening, trim residual dark bezel/background by
+ * sampling thin strips on each edge and stepping the edge inward while the
+ * strip's mean brightness is low. Stops if the box would shrink past 70%
+ * of the input bounds in either dimension.
+ */
+function trimDarkEdges(
+  img: HTMLImageElement,
+  bounds: DocumentBounds,
+): DocumentBounds {
+  const sampleW = 520;
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const scale = Math.min(1, sampleW / iw);
+  const w = Math.max(1, Math.round(iw * scale));
+  const h = Math.max(1, Math.round(ih * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return bounds;
+  ctx.drawImage(img, 0, 0, w, h);
+
+  let x = clamp01(bounds.x);
+  let y = clamp01(bounds.y);
+  let bw = Math.max(0, Math.min(1 - x, bounds.width));
+  let bh = Math.max(0, Math.min(1 - y, bounds.height));
+  const origW = bw;
+  const origH = bh;
+  const minW = origW * 0.7;
+  const minH = origH * 0.7;
+
+  const meanBrightness = (px: number, py: number, pw: number, ph: number) => {
+    const ix = Math.max(0, Math.floor(px));
+    const iy = Math.max(0, Math.floor(py));
+    const iw2 = Math.max(1, Math.min(w - ix, Math.round(pw)));
+    const ih2 = Math.max(1, Math.min(h - iy, Math.round(ph)));
+    const d = ctx.getImageData(ix, iy, iw2, ih2).data;
+    let sum = 0;
+    const n = iw2 * ih2;
+    for (let i = 0; i < d.length; i += 4) {
+      sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+    }
+    return sum / n;
+  };
+
+  const DARK = 95;
+  const STEP = 0.008;
+  const STRIP_FRAC = 0.04;
+
+  for (let i = 0; i < 6; i++) {
+    let trimmed = false;
+    // Left
+    if (bw > minW) {
+      const strip = Math.max(2, Math.round(bw * STRIP_FRAC * w));
+      const b = meanBrightness(x * w, y * h, strip, bh * h);
+      if (b < DARK) {
+        const d = Math.min(STEP, bw - minW);
+        x += d;
+        bw -= d;
+        trimmed = true;
+      }
+    }
+    // Right
+    if (bw > minW) {
+      const strip = Math.max(2, Math.round(bw * STRIP_FRAC * w));
+      const sx = (x + bw) * w - strip;
+      const b = meanBrightness(sx, y * h, strip, bh * h);
+      if (b < DARK) {
+        const d = Math.min(STEP, bw - minW);
+        bw -= d;
+        trimmed = true;
+      }
+    }
+    // Top
+    if (bh > minH) {
+      const strip = Math.max(2, Math.round(bh * STRIP_FRAC * h));
+      const b = meanBrightness(x * w, y * h, bw * w, strip);
+      if (b < DARK) {
+        const d = Math.min(STEP, bh - minH);
+        y += d;
+        bh -= d;
+        trimmed = true;
+      }
+    }
+    // Bottom
+    if (bh > minH) {
+      const strip = Math.max(2, Math.round(bh * STRIP_FRAC * h));
+      const sy = (y + bh) * h - strip;
+      const b = meanBrightness(x * w, sy, bw * w, strip);
+      if (b < DARK) {
+        const d = Math.min(STEP, bh - minH);
+        bh -= d;
+        trimmed = true;
+      }
+    }
+    if (!trimmed) break;
+  }
+
+  return { ...bounds, x, y, width: bw, height: bh };
+}
+
+/**
  * Crop a captured image to the AI-returned bounds with a small padding.
- * Refines the box by sampling paper-like pixels inside Claude's bounds.
+ * Refines the box by sampling paper-like pixels inside Claude's bounds,
+ * then trims any residual dark bezel/background on the edges.
  * Returns the original data URL if bounds are null or cropping fails.
  */
 export async function cropToBounds(
   imageDataUrl: string,
   bounds: DocumentBounds | null,
-  paddingFrac = 0.012,
+  paddingFrac = 0.006,
 ): Promise<string> {
   if (!bounds) return imageDataUrl;
   if (typeof window === "undefined") return imageDataUrl;
@@ -208,7 +311,8 @@ export async function cropToBounds(
     const iw = img.naturalWidth;
     const ih = img.naturalHeight;
     const refined = await tightenToPaperPixels(img, bounds);
-    const cropBounds = refined ?? bounds;
+    const tightened = refined ?? bounds;
+    const cropBounds = trimDarkEdges(img, tightened);
     const x0 = Math.max(0, cropBounds.x - paddingFrac);
     const y0 = Math.max(0, cropBounds.y - paddingFrac);
     const x1 = Math.min(1, cropBounds.x + cropBounds.width + paddingFrac);
@@ -229,6 +333,7 @@ export async function cropToBounds(
     return imageDataUrl;
   }
 }
+
 
 
 export async function sendToCenter(opts: {
