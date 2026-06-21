@@ -672,6 +672,7 @@ function ReviewScreen({
   analyzeError,
   onSend,
   onRetake,
+  onDone,
   speech,
 }: {
   analysis: AnalysisResult | null;
@@ -679,6 +680,7 @@ function ReviewScreen({
   analyzeError: string | null;
   onSend: () => void;
   onRetake: () => void;
+  onDone: () => void;
   speech: ReturnType<typeof useSpeech>;
 }) {
   const missing = analysis?.possibleMissingFields ?? [];
@@ -687,10 +689,12 @@ function ReviewScreen({
   const reviewActions: VoiceAction[] = [
     { id: "retake", label: "Retake", description: "Take the photo again" },
     { id: "connect", label: "Connect me with a person", description: `Send the document to a real human (a ${partner.name})` },
+    { id: "done", label: "No thanks — I'm done", description: "Politely exit and go home" },
   ];
   const onReviewAction = (id: string) => {
     if (id === "retake") onRetake();
     else if (id === "connect") onSend();
+    else if (id === "done") onDone();
   };
 
   useEffect(() => {
