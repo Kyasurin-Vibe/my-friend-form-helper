@@ -374,3 +374,24 @@ export async function speakWarm(text: string, opts?: { timeoutMs?: number; skipT
 }
 
 
+async function blobToBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+export async function detectSpokenLanguage(ms = 2500): Promise<{ language: string | null; transcript: string }> {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const rec = new MediaRecorder(stream, { mimeType: "audio/webm" });
+  const chunks: Blob[] = [];
+  rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  const stopped = new Promise<void>((r) => (rec.onstop = () => r()));
+  rec.start(); await new Promise((r) => setTimeout(r, ms)); rec.stop();
+  await stopped;
+  stream.getTracks().forEach((t) => t.stop());
+  const audio = await blobToBase64(new Blob(chunks, { type: "audio/webm" }));
+  const { data, error } = await supabase.functions.invoke("detect-language", { body: { audio } });
+  if (error) return { language: null, transcript: "" };
+  return data as { language: string | null; transcript: string };
+}
