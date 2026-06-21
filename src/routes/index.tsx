@@ -408,6 +408,83 @@ function StartGate({ onStart }: { onStart: (mode: A11yMode) => void }) {
   );
 }
 
+function HomeScreen({
+  onMagnifier,
+  onScanner,
+}: {
+  onMagnifier: () => void;
+  onScanner: () => void;
+}) {
+  const voiceOn = useContext(VoiceOnContext);
+  return (
+    <div className="flex-1 flex flex-col items-center p-6 text-center">
+      <div className="flex-1 flex flex-col items-center justify-center w-full">
+        <Mascot mode="idle" size={130} />
+        <h1 className="mt-3 font-extrabold" style={{ fontSize: 30, color: "var(--color-elder-ink)" }}>
+          My Friend
+        </h1>
+        <p className="mt-1 mb-5" style={{ fontSize: 17, color: "#6b5d52" }}>
+          How can I help you today?
+        </p>
+        <div className="w-full space-y-4">
+          <button
+            onClick={() => { cancelSpeech(); onMagnifier(); }}
+            className="w-full font-extrabold animate-button-pop active:scale-[0.96] text-left"
+            style={{
+              background: "#fff",
+              color: "var(--color-elder-ink)",
+              border: "3px solid var(--color-elder-sky)",
+              borderRadius: 24,
+              padding: "22px 22px",
+              fontSize: 22,
+              minHeight: 96,
+              boxShadow: "0 8px 22px rgba(47,111,176,0.14)",
+            }}
+          >
+            <div style={{ fontSize: 26 }}>🔍 Help me see this</div>
+            <div style={{ fontSize: 15, color: "#6b5d52", fontWeight: 600, marginTop: 4 }}>
+              Open the magnifier — just look, no upload.
+            </div>
+          </button>
+          <button
+            onClick={() => { cancelSpeech(); onScanner(); }}
+            className="w-full font-extrabold animate-button-pop-red active:scale-[0.96] text-left"
+            style={{
+              background: "var(--color-elder-red)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 24,
+              padding: "22px 22px",
+              fontSize: 22,
+              minHeight: 96,
+              boxShadow: "0 14px 30px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div style={{ fontSize: 26 }}>❓ I have a question about a document</div>
+            <div style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", fontWeight: 600, marginTop: 4 }}>
+              Scan it and I'll read it out and find help.
+            </div>
+          </button>
+        </div>
+      </div>
+      <VoiceBar
+        speakableText={speakableForPhase("home", { analysis: null, sendResult: null, analyzeError: null })}
+        voiceOn={voiceOn}
+        actions={[
+          { id: "see", label: "Help me see this", description: "Open the magnifier" },
+          { id: "question", label: "I have a question", description: "Scan a document" },
+        ]}
+        onAction={(id) => { if (id === "see") onMagnifier(); else if (id === "question") onScanner(); }}
+        onTranscript={(t) => {
+          const s = t.toLowerCase();
+          if (/\b(see|magnif|bigger|larger|zoom|look)\b/.test(s)) onMagnifier();
+          else if (/\b(question|document|help|scan|paper|form|read)\b/.test(s)) onScanner();
+        }}
+      />
+    </div>
+  );
+}
+
 function FindDocGate({ onOpenMagnifier }: { onOpenMagnifier: () => void }) {
   const voiceOn = useContext(VoiceOnContext);
   return (
