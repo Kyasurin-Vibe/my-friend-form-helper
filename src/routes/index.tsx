@@ -10,6 +10,7 @@ import {
   analyzeDocument,
   cropToBounds,
   detectDocumentBounds,
+  detectSpokenLanguage,
   sendToCenter,
   speakWarm,
   type AnalysisResult,
