@@ -208,10 +208,15 @@ function ElderApp() {
     if (sending) return;
     setSending(true);
     try {
+      const partner = getAccountablePartner(analysis?.resourceCategory);
+      const enrichedRecipient =
+        recipient.kind === "center"
+          ? { kind: "center" as const, partnerName: partner.name }
+          : recipient;
       const result = await sendToCenter({
         originalImage: capturedImage,
         processedImage: processedImage ?? capturedImage,
-        recipient,
+        recipient: enrichedRecipient,
         analysis:
           analysis ?? {
             readable: false,
