@@ -77,7 +77,7 @@ export function useCases(): CaseRow[] {
         console.error("load cases", error);
         return;
       }
-      setCases((data ?? []) as CaseRow[]);
+      setCases((data ?? []) as unknown as CaseRow[]);
     };
     load();
 
