@@ -1919,6 +1919,33 @@ function runPhaseAction(
 }
 
 
+function TopNav({ onHome, onLang }: { onHome: () => void; onLang: () => void }) {
+  const btn: React.CSSProperties = {
+    background: "rgba(255,255,255,0.95)",
+    color: "var(--color-elder-ink)",
+    border: "2px solid var(--color-elder-sky)",
+    borderRadius: 999,
+    padding: "6px 12px",
+    fontSize: 13,
+    fontWeight: 700,
+    boxShadow: "0 4px 12px rgba(47,111,176,0.18)",
+    backdropFilter: "blur(6px)",
+  };
+  return (
+    <div
+      className="absolute top-0 left-0 right-0 flex items-start justify-between pointer-events-none"
+      style={{ padding: "8px 10px", zIndex: 50 }}
+    >
+      <button type="button" onClick={onHome} aria-label="Home" className="pointer-events-auto active:scale-95" style={btn}>
+        {t("home_btn")}
+      </button>
+      <button type="button" onClick={onLang} aria-label="Language" className="pointer-events-auto active:scale-95" style={btn}>
+        {t("lang.change")}
+      </button>
+    </div>
+  );
+}
+
 function DoneButton({ onClick }: { onClick: () => void }) {
   return (
     <button
