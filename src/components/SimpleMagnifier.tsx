@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DemoServices } from "@/lib/services";
+import { translateAsync, translateSync, getLang, getBCP47, useTranslated } from "@/lib/i18n";
 
 type Props = {
   onBack: () => void;
@@ -11,13 +12,22 @@ function speak(text: string, onDone?: () => void) {
   const synth = window.speechSynthesis;
   if (!synth) { onDone?.(); return; }
   synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 0.95;
-  u.pitch = 1.05;
-  u.onend = () => onDone?.();
-  u.onerror = () => onDone?.();
-  synth.speak(u);
+  const lang = getLang();
+  const startSpeak = (final: string) => {
+    const u = new SpeechSynthesisUtterance(final);
+    u.rate = 0.95;
+    u.pitch = 1.05;
+    try { u.lang = getBCP47(); } catch { /* noop */ }
+    u.onend = () => onDone?.();
+    u.onerror = () => onDone?.();
+    synth.speak(u);
+  };
+  if (lang === "en") { startSpeak(text); return; }
+  const cached = translateSync(text, lang);
+  if (cached !== text) { startSpeak(cached); return; }
+  translateAsync(text, lang).then((tr) => startSpeak(tr || text)).catch(() => startSpeak(text));
 }
+
 
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 5;
@@ -42,6 +52,9 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [brightness, setBrightness] = useState(1);
+  const lblStarting = useTranslated("Starting camera…");
+  const lblQuestion = useTranslated("I have a question");
+  const lblBackHome = useTranslated("Back to home");
 
   const zoomRef = useRef(zoom);
   const brightRef = useRef(brightness);
@@ -250,7 +263,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
         />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center text-white text-lg">
-            {error ?? "Starting camera…"}
+            {error ?? lblStarting}
           </div>
         )}
         <div
@@ -284,7 +297,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
             boxShadow: "0 10px 24px rgba(0,0,0,0.35)",
           }}
         >
-          ❓ I have a question
+          ❓ {lblQuestion}
         </button>
         <button
           onClick={onBack}
@@ -299,7 +312,7 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
             minHeight: 72,
           }}
         >
-          ↩ Back to home
+          ↩ {lblBackHome}
         </button>
       </div>
     </div>

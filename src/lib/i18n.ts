@@ -1,4 +1,6 @@
 // Minimal i18n + language singleton. Used by STT/TTS, edge fns, and UI.
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 export type Lang = "en" | "es" | "zh" | "vi" | "tl";
 
 export const LANG_LABELS: Record<Lang, { native: string; question: string }> = {
@@ -66,3 +68,89 @@ export function t(key: string, lang: Lang = _lang): string {
   if (!entry) return key;
   return entry[lang] ?? entry.en ?? key;
 }
+
+// =====================================================================
+// Free-form translation with cache. Used for fixed app strings so that
+// EVERY spoken line and visible label appears in the chosen language.
+// Cache key: `${lang}:${text}`. Persisted to localStorage to avoid repeat
+// Claude calls across reloads.
+// =====================================================================
+const CACHE_KEY = "mf_translate_cache_v1";
+const cache: Map<string, string> = (() => {
+  try {
+    if (typeof localStorage === "undefined") return new Map();
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return new Map();
+    const obj = JSON.parse(raw) as Record<string, string>;
+    return new Map(Object.entries(obj));
+  } catch { return new Map(); }
+})();
+const inflight = new Map<string, Promise<string>>();
+const translateListeners = new Set<() => void>();
+
+function persistCache() {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const obj: Record<string, string> = {};
+    cache.forEach((v, k) => { obj[k] = v; });
+    localStorage.setItem(CACHE_KEY, JSON.stringify(obj));
+  } catch { /* noop */ }
+}
+
+function cacheKey(text: string, lang: Lang) { return `${lang}:${text}`; }
+
+/** Synchronous lookup — returns cached translation or original text. */
+export function translateSync(text: string, lang: Lang = _lang): string {
+  if (!text || lang === "en") return text;
+  return cache.get(cacheKey(text, lang)) ?? text;
+}
+
+/** Async — returns translated text. Caches forever. Falls back to original on error. */
+export async function translateAsync(text: string, lang: Lang = _lang): Promise<string> {
+  if (!text || lang === "en") return text;
+  const k = cacheKey(text, lang);
+  const hit = cache.get(k);
+  if (hit) return hit;
+  const existing = inflight.get(k);
+  if (existing) return existing;
+  const p = (async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("translate", {
+        body: { text, language: lang },
+      });
+      const out = (data && typeof (data as { text?: string }).text === "string")
+        ? (data as { text: string }).text
+        : text;
+      if (!error && out && out !== text) {
+        cache.set(k, out);
+        persistCache();
+        translateListeners.forEach((fn) => fn());
+      }
+      return out || text;
+    } catch {
+      return text;
+    } finally {
+      inflight.delete(k);
+    }
+  })();
+  inflight.set(k, p);
+  return p;
+}
+
+/** React hook: returns translated text. Triggers async fetch if not cached. */
+export function useTranslated(text: string): string {
+  const [, bump] = useState(0);
+  const lang = _lang;
+  useEffect(() => {
+    let alive = true;
+    const offLang = onLangChange(() => { if (alive) bump((n) => n + 1); });
+    const onCache = () => { if (alive) bump((n) => n + 1); };
+    translateListeners.add(onCache);
+    if (text && lang !== "en" && !cache.has(cacheKey(text, lang))) {
+      translateAsync(text, lang).then(() => { /* listener will bump */ });
+    }
+    return () => { alive = false; offLang(); translateListeners.delete(onCache); };
+  }, [text, lang]);
+  return translateSync(text, lang);
+}
+

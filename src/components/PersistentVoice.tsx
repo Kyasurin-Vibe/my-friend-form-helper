@@ -11,7 +11,7 @@ import { DemoServices } from "@/lib/services";
 import { cancelSpeech } from "@/lib/voice";
 import { speakWarm } from "@/lib/cases";
 import { interpretIntent, type IntentAction } from "@/lib/intent";
-import { getBCP47 } from "@/lib/i18n";
+import { getBCP47, getLang, translateAsync, translateSync } from "@/lib/i18n";
 
 export type PersistentVoiceProps = {
   /** Pause continuous listening (e.g. while another screen owns the mic). */
@@ -108,21 +108,30 @@ export function PersistentVoice({
     if (typeof window === "undefined") { speakingRef.current = false; setSpeaking(false); return; }
     const synth = window.speechSynthesis;
     if (!synth) { speakingRef.current = false; setSpeaking(false); return; }
-    const u = new SpeechSynthesisUtterance(msg);
-    u.rate = 0.95; u.pitch = 1.05;
-    try { u.lang = getBCP47(); } catch { /* noop */ }
-    u.onend = () => {
-      speakingRef.current = false;
-      setSpeaking(false);
-      // Resume listening the MOMENT TTS ends.
-      if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 150);
+    const lang = getLang();
+    const startSpeak = (final: string) => {
+      const u = new SpeechSynthesisUtterance(final);
+      u.rate = 0.95; u.pitch = 1.05;
+      try { u.lang = getBCP47(); } catch { /* noop */ }
+      u.onend = () => {
+        speakingRef.current = false;
+        setSpeaking(false);
+        if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 150);
+      };
+      u.onerror = () => {
+        speakingRef.current = false;
+        setSpeaking(false);
+        if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 150);
+      };
+      synth.speak(u);
     };
-    u.onerror = () => {
-      speakingRef.current = false;
-      setSpeaking(false);
-      if (shouldRunRef.current) window.setTimeout(() => { if (shouldRunRef.current) startLoop(); }, 150);
-    };
-    synth.speak(u);
+    if (lang === "en") {
+      startSpeak(msg);
+    } else {
+      const cached = translateSync(msg, lang);
+      if (cached !== msg) startSpeak(cached);
+      else translateAsync(msg, lang).then((tr) => startSpeak(tr || msg)).catch(() => startSpeak(msg));
+    }
     window.setTimeout(() => setConfirmation((c) => (c === msg ? "" : c)), 2400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
