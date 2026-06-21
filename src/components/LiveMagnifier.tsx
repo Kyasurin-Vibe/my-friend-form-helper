@@ -98,43 +98,18 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
     };
   }, []);
 
-  // === Guidance cycle → real vision detection on a captured frame ===
+  // === Local-only guidance cycle. NO AI calls happen in the magnifier. ===
+  // Recognition runs only after the user taps "Capture & analyze" (handled in parent).
   useEffect(() => {
     if (!ready) return;
-    const seq: Guidance[] = ["move-closer", "hold-still", "corners", "hold-still"];
+    const seq: Guidance[] = ["move-closer", "hold-still", "corners", "hold-still", "detected"];
     let i = 0;
-    let stopped = false;
-    const captureFrame = (): string | undefined => {
-      const v = videoRef.current;
-      if (!v || !v.videoWidth) return undefined;
-      const maxW = 1024;
-      const scale = Math.min(1, maxW / v.videoWidth);
-      const w = Math.round(v.videoWidth * scale);
-      const h = Math.round(v.videoHeight * scale);
-      const c = document.createElement("canvas");
-      c.width = w; c.height = h;
-      const ctx = c.getContext("2d");
-      if (!ctx) return undefined;
-      ctx.drawImage(v, 0, 0, w, h);
-      try { return c.toDataURL("image/jpeg", 0.82); } catch { return undefined; }
-    };
     const id = window.setInterval(() => {
-      setGuidance(seq[i % seq.length]);
+      setGuidance(seq[Math.min(i, seq.length - 1)]);
       i++;
-      if (i >= seq.length) {
-        window.clearInterval(id);
-        const frame = captureFrame();
-        DemoServices.vision.detect(frame).then((doc) => {
-          if (stopped) return;
-          setDetected(doc);
-          setGuidance(doc.confidence < 0.4 ? "blurry" : "detected");
-        });
-      }
+      if (i >= seq.length) window.clearInterval(id);
     }, 1500);
-    return () => {
-      stopped = true;
-      window.clearInterval(id);
-    };
+    return () => window.clearInterval(id);
   }, [ready]);
 
 
@@ -142,16 +117,15 @@ export function LiveMagnifier({ onConfirm, onCancel, onHandoff }: Props) {
   useEffect(() => {
     if (guidance === "init" || guidance === "hold-still") return;
     const text =
-      guidance === "detected" && detected
-        ? `This looks like ${detected.code}. Is this the file you are looking for? Say yes to check it now, or no to keep looking.`
+      guidance === "detected"
+        ? "When the page is clear, tap the red button to capture and check it."
         : guidance === "blurry"
           ? "The picture is too blurry. Please try again."
           : GUIDANCE_TEXT[guidance];
     speakingRef.current = true;
-    try { DemoServices.voice.stop(); } catch {}
+    try { DemoServices.voice.stop(); } catch { /* noop */ }
     speak(text, () => {
       speakingRef.current = false;
-      // Resume listening once TTS finished
       if (shouldListenRef.current) startVoice();
     });
   }, [guidance, detected]);
