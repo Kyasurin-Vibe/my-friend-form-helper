@@ -92,14 +92,14 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  const [autoCapture, setAutoCapture] = useState(true);
+  const [autoCapture] = useState(true);
   const [listening, setListening] = useState(false);
   const [voiceArmed, setVoiceArmed] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [heard, setHeard] = useState("");
   const [hint, setHint] = useState<Hint>("starting");
   const [aiStatus, setAiStatus] = useState<"idle" | "checking" | "no_doc" | "unreadable" | "ready" | "unavailable">("idle");
-  const [overlayBox, setOverlayBox] = useState<DocumentBounds | null>(null);
+  const [, setOverlayBox] = useState<DocumentBounds | null>(null);
   const [zoom, setZoom] = useState<{ scale: number; ox: number; oy: number }>({ scale: 1, ox: 50, oy: 50 });
   const [brightnessFilter, setBrightnessFilter] = useState(1);
 
@@ -376,9 +376,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
         if (present && readable && conf >= 0.65) {
           consecutiveReadyRef.current += 1;
           setAiStatus("ready");
-          if (consecutiveReadyRef.current >= 2 && autoCapture && countdown === 0 && !confirmedRef.current) {
-            startCountdown();
-          }
+          // Capture is NEVER auto-triggered — user must say "yes" or tap Capture.
         } else {
           consecutiveReadyRef.current = 0;
           if (!present) setAiStatus("no_doc");
@@ -545,16 +543,16 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
   const hintText: Record<Hint, string> = {
     starting: "Starting camera…",
     tooDark: "💡 Too dark — move to better light",
-    empty: "📄 Show me your paper",
+    empty: "📄 Fit your paper inside the frame",
     possibleFace: "🙂 That looks like a face, not a document",
     moveCloser: "↕ Move a little closer",
-    holdStill: "✋ Hold still…",
-    documentDetected: "✅ Document detected — hold still",
+    holdStill: "✋ Hold still",
+    documentDetected: "✋ Hold still",
     aiChecking: "🔍 Checking your document…",
-    aiNoDoc: "📄 Point the camera at your paper",
+    aiNoDoc: "📄 Fit your paper inside the frame",
     aiUnreadable: "🔎 Move closer and hold still",
-    aiReady: "✅ Document detected — hold still",
-    aiUnavailable: "📸 You can tap Capture when ready",
+    aiReady: "✋ Hold still",
+    aiUnavailable: "📸 Say \"yes\" or tap Capture when ready",
   };
   const hintColor: Record<Hint, string> = {
     starting: "#6b5d52",
@@ -618,21 +616,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
               borderRadius: 12,
               boxShadow: "0 0 0 9999px rgba(0,0,0,0.22)",
             }} />
-            {/* Live detected document outline */}
-            {overlayBox && overlayBox.confidence > 0.15 && (
-              <div aria-hidden className="absolute pointer-events-none" style={{
-                left: `${overlayBox.x * 100}%`,
-                top: `${overlayBox.y * 100}%`,
-                width: `${overlayBox.width * 100}%`,
-                height: `${overlayBox.height * 100}%`,
-                border: `3px solid ${hint === "documentDetected" ? "#22c55e" : "#fbbf24"}`,
-                borderRadius: 10,
-                boxShadow: hint === "documentDetected"
-                  ? "0 0 0 3px rgba(34,197,94,0.25)"
-                  : "0 0 0 3px rgba(251,191,36,0.2)",
-                transition: "all 180ms ease-out",
-              }} />
-            )}
+            {/* Live document outline removed — static guide frame above is the only guide */}
             {countdown > 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ background: "rgba(0,0,0,0.35)" }}>
                 <div key={countdown} style={{
@@ -654,7 +638,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
           fontSize: 18, color: hintColor[hint], minHeight: 26, transition: "color 200ms",
         }}>{hintText[hint]}</p>
         <p className="text-center" style={{ fontSize: 14, color: "#6b5d52", minHeight: 20 }}>
-          Fit your paper inside the frame. {autoCapture ? "I'll capture automatically." : "Tap the red button when ready."}
+          Fit your paper inside the frame. Say &quot;yes&quot; or tap the red button when ready.
         </p>
         {heard && listening && (
           <p className="text-center" style={{ fontSize: 13, color: "#6b5d52", fontStyle: "italic", minHeight: 18 }}>
@@ -675,16 +659,7 @@ export function LiveMagnifier({ onConfirm, onCancel }: Props) {
       </div>
 
       <div className="px-4 pt-2 flex justify-center gap-2 flex-wrap">
-        <button onClick={() => {
-          setAutoCapture((v) => !v);
-          consecutiveReadyRef.current = 0;
-        }} aria-pressed={autoCapture} style={{
-
-          background: autoCapture ? "var(--color-elder-teal)" : "#fff",
-          color: autoCapture ? "#fff" : "var(--color-elder-ink)",
-          border: "2px solid var(--color-elder-teal)",
-          borderRadius: 999, padding: "8px 14px", fontWeight: 800, fontSize: 14,
-        }}>⏱ Auto-capture {autoCapture ? "ON" : "OFF"}</button>
+        {/* Auto-capture toggle removed — capture only fires on voice "yes" or tapping Capture */}
         <button onClick={() => {
           if (voiceArmed) {
             shouldListenRef.current = false;

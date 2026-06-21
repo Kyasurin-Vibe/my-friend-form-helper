@@ -31,7 +31,7 @@ export interface VoiceRecognitionService {
 export function classifyCommand(raw: string): VoiceCommand {
   const t = raw.toLowerCase().trim();
   if (!t) return "unknown";
-  if (/\b(yes|yeah|yep|yup|correct|right|that's it|sure|ok|okay|capture|snap|take it|do it|go|ready|scan)\b/.test(t)) return "yes";
+  if (/\b(yes|yeah|yea|yep|yup|ya|uh huh|mhm|correct|right|that's it|sure|ok|okay|okey|alright|all right|fine|please|capture|snap|take it|take the picture|take the photo|do it|go|go ahead|ready|scan|now)\b/.test(t)) return "yes";
   if (/\b(no|nope|nah|wrong|not this|keep looking|wait|stop|cancel)\b/.test(t)) return "no";
   if (/\b(zoom|bigger|larger|closer|zoom in)\b/.test(t)) return "zoom";
   if (/\b(bright|brighter|lighter|light)\b/.test(t)) return "brighter";
