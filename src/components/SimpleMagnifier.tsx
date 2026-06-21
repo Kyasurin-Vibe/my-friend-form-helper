@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DemoServices } from "@/lib/services";
 
 type Props = {
@@ -19,9 +19,16 @@ function speak(text: string, onDone?: () => void) {
   synth.speak(u);
 }
 
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 5;
+const ZOOM_STEP = 0.5;
+const BRIGHT_MIN = 0.6;
+const BRIGHT_MAX = 2.2;
+const BRIGHT_STEP = 0.2;
+
 /**
- * Pure seeing aid. Opens camera, gently auto-zooms / auto-brightens
- * onto whatever the user points at. No capture, no AI, no sliders.
+ * Pure seeing aid. Opens camera. Voice + buttons control zoom + brightness.
+ * No capture, no AI.
  */
 export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -29,14 +36,17 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
   const introSpokenRef = useRef(false);
   const speakingRef = useRef(false);
   const shouldListenRef = useRef(false);
-
-  const smoothBoxRef = useRef<{ x: number; y: number; w: number; h: number; c: number } | null>(null);
-  const smoothBrightnessRef = useRef(1);
+  const lastCmdAtRef = useRef(0);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [zoom, setZoom] = useState({ scale: 1, ox: 50, oy: 50 });
+  const [zoom, setZoom] = useState(1);
   const [brightness, setBrightness] = useState(1);
+
+  const zoomRef = useRef(zoom);
+  const brightRef = useRef(brightness);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { brightRef.current = brightness; }, [brightness]);
 
   // Camera
   useEffect(() => {
@@ -73,13 +83,51 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
     };
   }, []);
 
-  // Intro
+  const speakConfirm = useCallback((text: string) => {
+    speakingRef.current = true;
+    try { DemoServices.voice.stop(); } catch { /* noop */ }
+    speak(text, () => {
+      speakingRef.current = false;
+      if (shouldListenRef.current) startVoice();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const doBigger = useCallback(() => {
+    const next = Math.min(ZOOM_MAX, +(zoomRef.current + ZOOM_STEP).toFixed(2));
+    if (next === zoomRef.current) { speakConfirm("That's as big as it goes."); return; }
+    setZoom(next);
+    speakConfirm("Okay — bigger.");
+  }, [speakConfirm]);
+
+  const doSmaller = useCallback(() => {
+    const next = Math.max(ZOOM_MIN, +(zoomRef.current - ZOOM_STEP).toFixed(2));
+    if (next === zoomRef.current) { speakConfirm("That's the smallest."); return; }
+    setZoom(next);
+    speakConfirm("Smaller.");
+  }, [speakConfirm]);
+
+  const doBrighter = useCallback(() => {
+    const next = Math.min(BRIGHT_MAX, +(brightRef.current + BRIGHT_STEP).toFixed(2));
+    if (next === brightRef.current) { speakConfirm("That's as bright as it goes."); return; }
+    setBrightness(next);
+    speakConfirm("Brighter now.");
+  }, [speakConfirm]);
+
+  const doDimmer = useCallback(() => {
+    const next = Math.max(BRIGHT_MIN, +(brightRef.current - BRIGHT_STEP).toFixed(2));
+    if (next === brightRef.current) { speakConfirm("That's the dimmest."); return; }
+    setBrightness(next);
+    speakConfirm("Dimmer.");
+  }, [speakConfirm]);
+
+  // Intro + start listening
   useEffect(() => {
     if (!ready || introSpokenRef.current) return;
     introSpokenRef.current = true;
     speakingRef.current = true;
     speak(
-      "Magnifier. Point your camera at anything you'd like to see bigger. Say 'back' to return, or 'I have a question' to scan a document.",
+      "I'll make things bigger and clearer. If it's hard to see, just say 'bigger', 'smaller', or 'brighter'.",
       () => {
         speakingRef.current = false;
         if (shouldListenRef.current) startVoice();
@@ -98,107 +146,6 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
     };
   }, []);
 
-  // Per-frame analysis for auto-zoom + auto-brighten
-  useEffect(() => {
-    if (!ready) return;
-    const video = videoRef.current;
-    if (!video) return;
-    const W = 64, H = 48;
-    const canvas = document.createElement("canvas");
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
-
-    const id = window.setInterval(() => {
-      if (!video.videoWidth) return;
-      try {
-        ctx.drawImage(video, 0, 0, W, H);
-        const data = ctx.getImageData(0, 0, W, H).data;
-        let lumSum = 0;
-        let minX = W, minY = H, maxX = -1, maxY = -1;
-        let interestCount = 0;
-        // Pass: find brightest contiguous region (paper/text-like)
-        for (let y = 0; y < H; y++) {
-          for (let x = 0; x < W; x++) {
-            const i = (y * W + x) * 4;
-            const r = data[i], g = data[i + 1], b = data[i + 2];
-            const Y = 0.299 * r + 0.587 * g + 0.114 * b;
-            lumSum += Y;
-            const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-            const sat = mx - mn;
-            // "interesting" = brightish or text-edge candidate
-            if (Y > 110 && sat < 60) {
-              interestCount++;
-              if (x < minX) minX = x;
-              if (y < minY) minY = y;
-              if (x > maxX) maxX = x;
-              if (y > maxY) maxY = y;
-            }
-          }
-        }
-        const total = W * H;
-        const meanLum = lumSum / total;
-        const frac = interestCount / total;
-
-        // Brightness boost when dark — gentle, capped
-        const targetB = meanLum > 0
-          ? Math.max(1, Math.min(1.6, 160 / Math.max(50, meanLum)))
-          : 1;
-        smoothBrightnessRef.current = smoothBrightnessRef.current * 0.85 + targetB * 0.15;
-        setBrightness(smoothBrightnessRef.current);
-
-        // Box
-        let raw: { x: number; y: number; w: number; h: number; c: number } | null = null;
-        if (maxX >= minX && frac > 0.06) {
-          raw = {
-            x: minX / W,
-            y: minY / H,
-            w: Math.max(1, maxX - minX + 1) / W,
-            h: Math.max(1, maxY - minY + 1) / H,
-            c: Math.min(1, frac * 2),
-          };
-        }
-        const prev = smoothBoxRef.current;
-        let smooth = prev;
-        if (raw && prev) {
-          const a = 0.25;
-          smooth = {
-            x: prev.x * (1 - a) + raw.x * a,
-            y: prev.y * (1 - a) + raw.y * a,
-            w: prev.w * (1 - a) + raw.w * a,
-            h: prev.h * (1 - a) + raw.h * a,
-            c: prev.c * (1 - a) + raw.c * a,
-          };
-        } else if (raw) {
-          smooth = raw;
-        } else if (prev) {
-          smooth = { ...prev, c: prev.c * 0.8 };
-          if (smooth.c < 0.05) smooth = null;
-        }
-        smoothBoxRef.current = smooth;
-
-        // Gentle auto-zoom (cap 1.8x). Center on detected region.
-        if (smooth && smooth.c > 0.15) {
-          const target = Math.max(1, Math.min(1.8, 0.7 / Math.max(smooth.w, smooth.h)));
-          const cx = (smooth.x + smooth.w / 2) * 100;
-          const cy = (smooth.y + smooth.h / 2) * 100;
-          setZoom((p) => ({
-            scale: p.scale * 0.88 + target * 0.12,
-            ox: p.ox * 0.88 + cx * 0.12,
-            oy: p.oy * 0.88 + cy * 0.12,
-          }));
-        } else {
-          setZoom((p) => ({
-            scale: p.scale * 0.9 + 1.15 * 0.1,
-            ox: p.ox * 0.9 + 50 * 0.1,
-            oy: p.oy * 0.9 + 50 * 0.1,
-          }));
-        }
-      } catch { /* transient */ }
-    }, 200);
-    return () => window.clearInterval(id);
-  }, [ready]);
-
   function startVoice() {
     const service = DemoServices.voice;
     if (!service.available()) return;
@@ -214,20 +161,75 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
         onError: () => { /* swallow */ },
         onTranscript: () => undefined,
         onCommand: (_cmd, raw) => {
-          const t = (raw || "").toLowerCase();
-          if (/\b(question|document|help|scan|paper|form|read)\b/.test(t)) {
+          const t = (raw || "").toLowerCase().trim();
+          if (!t) return;
+          // de-dupe rapid duplicate fires
+          const now = Date.now();
+          if (now - lastCmdAtRef.current < 400) return;
+
+          // Navigation intents first
+          if (/\b(question|document|scan|paper|form|read|help me read)\b/.test(t)) {
+            lastCmdAtRef.current = now;
             shouldListenRef.current = false;
             try { service.stop(); } catch { /* noop */ }
             onQuestion();
-          } else if (/\b(back|home|exit|cancel|stop|done|return)\b/.test(t)) {
+            return;
+          }
+          if (/\b(go back|back to home|home|exit|cancel|quit|done|return)\b/.test(t)) {
+            lastCmdAtRef.current = now;
             shouldListenRef.current = false;
             try { service.stop(); } catch { /* noop */ }
             onBack();
+            return;
+          }
+
+          // Brightness intents
+          if (/\b(too bright|dimmer|darker|less light|too light)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            doDimmer();
+            return;
+          }
+          if (/\b(bright|brighter|too dark|more light|lighter|can't see it|cant see it|still can't see|still cant see)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            doBrighter();
+            return;
+          }
+
+          // Zoom intents
+          if (/\b(smaller|too big|zoom out|further|farther|back out|less)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            doSmaller();
+            return;
+          }
+          if (/\b(bigger|larger|zoom in|closer|enlarge|magnify|more|can't see|cant see|hard to see)\b/.test(t)) {
+            lastCmdAtRef.current = now;
+            doBigger();
+            return;
           }
         },
       });
     } catch { /* noop */ }
   }
+
+  const btn = (label: string, onClick: () => void, big = false) => (
+    <button
+      onClick={onClick}
+      className="flex-1 font-extrabold active:scale-[0.95]"
+      style={{
+        background: "rgba(255,255,255,0.95)",
+        color: "#111",
+        border: "none",
+        borderRadius: 20,
+        padding: big ? "20px 0" : "16px 0",
+        fontSize: big ? 32 : 20,
+        minHeight: big ? 84 : 64,
+        boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
+      }}
+      aria-label={label}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div className="flex-1 flex flex-col" style={{ background: "#000" }}>
@@ -239,8 +241,8 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
           autoPlay
           className="absolute inset-0 w-full h-full object-cover"
           style={{
-            transform: `scale(${zoom.scale})`,
-            transformOrigin: `${zoom.ox}% ${zoom.oy}%`,
+            transform: `scale(${zoom.toFixed(2)})`,
+            transformOrigin: "50% 50%",
             filter: `brightness(${brightness.toFixed(2)}) contrast(1.15) saturate(1.05)`,
             transition: "transform 220ms ease-out, filter 220ms ease-out",
           }}
@@ -254,7 +256,15 @@ export function SimpleMagnifier({ onBack, onQuestion }: Props) {
           className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-white text-sm"
           style={{ background: "rgba(0,0,0,0.55)" }}
         >
-          🔍 Magnifier
+          🔍 {zoom.toFixed(1)}× · ☀ {Math.round(brightness * 100)}%
+        </div>
+
+        {/* Floating control row on top of camera */}
+        <div className="absolute bottom-3 left-3 right-3 flex gap-2">
+          {btn("➖", doSmaller, true)}
+          {btn("➕", doBigger, true)}
+          {btn("🔅", doDimmer, true)}
+          {btn("🔆", doBrighter, true)}
         </div>
       </div>
 
