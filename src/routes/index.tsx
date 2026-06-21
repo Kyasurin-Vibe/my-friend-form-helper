@@ -939,11 +939,13 @@ function ChooseRecipientScreen({
       sending={sending}
       name={name}
       relationship={relationship}
+      email={email}
       onChangeName={setName}
       onChangeRelationship={setRelationship}
+      onChangeEmail={setEmail}
       onBack={() => setMode("pick")}
       onSend={() =>
-        canSend && onPick({ kind: "trusted", name: name.trim(), relationship: relationship.trim() })
+        canSend && onPick({ kind: "trusted", name: name.trim(), relationship: relationship.trim(), email: email.trim() || undefined })
       }
       canSend={canSend}
       speech={speech}
