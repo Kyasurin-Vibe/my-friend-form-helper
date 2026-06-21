@@ -758,11 +758,17 @@ function Screen3({
 
 function Screen4({
   branch,
+  analysis,
+  sending,
+  analyzeError,
   onSendToCenter,
   onFixSelf,
   speech,
 }: {
   branch: Branch;
+  analysis: AnalysisResult | null;
+  sending: boolean;
+  analyzeError: string | null;
   onSendToCenter: () => void;
   onFixSelf: () => void;
   speech: ReturnType<typeof useSpeech>;
@@ -770,25 +776,13 @@ function Screen4({
   useEffect(() => {
     if (branch === "missing") playWarning();
   }, [branch]);
-  const rows =
-    branch === "missing"
-      ? [
-          { ok: true, label: "Name" },
-          { ok: true, label: "Assets" },
-          { ok: true, label: "Debts" },
-          { ok: false, label: "Signature" },
-          { ok: false, label: "Date" },
-        ]
-      : [
-          { ok: true, label: "Name" },
-          { ok: true, label: "Assets" },
-          { ok: true, label: "Debts" },
-          { ok: true, label: "Signature" },
-          { ok: true, label: "Date" },
-        ];
+
+  const missing = analysis?.possibleMissingFields ?? (branch === "missing" ? ["Signature area appears blank", "Date area appears blank"] : []);
+  const docTitle = analysis ? `${analysis.documentType} — ${analysis.documentName}` : "FL-142 — Schedule of Assets and Debts";
+
   return (
     <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-      <MascotHeader speech={speech} small face="surprised" />
+      <MascotHeader speech={speech} small face={missing.length ? "surprised" : "smile"} />
       <div
         className="rounded-3xl p-4 mt-3 mb-3"
         style={{
@@ -797,62 +791,56 @@ function Screen4({
           boxShadow: "0 8px 24px rgba(36,31,26,0.06)",
         }}
       >
-        <p className="font-bold mb-2" style={{ fontSize: 20 }}>
-          Here's what I found:
+        <p className="text-xs uppercase font-bold tracking-wide mb-1" style={{ color: "#6b5d52" }}>
+          Document
         </p>
-        <ul className="space-y-2">
-          {rows.map((r) => (
-            <li
-              key={r.label}
-              className="flex items-center gap-3"
-              style={{ fontSize: 22, fontWeight: 600 }}
-            >
-              <span
-                aria-hidden
-                className="inline-flex items-center justify-center"
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 10,
-                  background: r.ok ? "#E6F3EE" : "#FBEBD8",
-                  color: r.ok
-                    ? "var(--color-elder-teal)"
-                    : "var(--color-elder-amber)",
-                  fontWeight: 800,
-                }}
-              >
-                {r.ok ? "✓" : "!"}
-              </span>
-              <span style={{ color: r.ok ? "var(--color-elder-ink)" : "#7a5a1c" }}>
-                {r.label}
-              </span>
-              <span
-                className="ml-auto text-xs font-bold uppercase tracking-wide"
-                style={{
-                  color: r.ok
-                    ? "var(--color-elder-teal)"
-                    : "var(--color-elder-amber)",
-                }}
-              >
-                {r.ok ? "found" : "missing"}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <p
-          className="mt-3 font-semibold"
-          style={{
-            fontSize: 18,
-            color: branch === "missing" ? "#7a5a1c" : "var(--color-elder-teal)",
-          }}
-        >
-          {branch === "missing"
-            ? "I'm not sure this one is ready."
-            : "This looks complete."}
+        <p className="font-extrabold mb-3" style={{ fontSize: 19, color: "var(--color-elder-ink)" }}>
+          {docTitle}
         </p>
+        {analysis?.plainEnglishSummary && (
+          <p className="mb-3" style={{ fontSize: 16, color: "#6b5d52" }}>
+            {analysis.plainEnglishSummary}
+          </p>
+        )}
+        {missing.length > 0 ? (
+          <>
+            <p className="font-bold mb-2" style={{ fontSize: 18, color: "#7a5a1c" }}>
+              I see some spots that may be blank:
+            </p>
+            <ul className="space-y-2">
+              {missing.map((m, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-3"
+                  style={{ fontSize: 18, fontWeight: 600 }}
+                >
+                  <span
+                    aria-hidden
+                    className="inline-flex items-center justify-center shrink-0"
+                    style={{
+                      width: 30, height: 30, borderRadius: 10,
+                      background: "#FBEBD8", color: "var(--color-elder-amber)",
+                      fontWeight: 800,
+                    }}
+                  >!</span>
+                  <span style={{ color: "#7a5a1c" }}>{m}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="font-semibold" style={{ fontSize: 18, color: "var(--color-elder-teal)" }}>
+            ✓ Nothing obviously missing. A person will still confirm before anything is filed.
+          </p>
+        )}
+        {analyzeError && (
+          <p className="mt-2 text-sm" style={{ color: "#b91c1c" }}>
+            (Note: {analyzeError})
+          </p>
+        )}
       </div>
       <VoiceControls speech={speech} />
-      {branch === "missing" ? (
+      {missing.length > 0 ? (
         <div className="space-y-2">
           <BigButton
             variant="ghost"
@@ -861,14 +849,16 @@ function Screen4({
               onFixSelf();
             }}
           >
-            ✍️ I'll fix it myself
+            ✍️ No, keep looking
           </BigButton>
           <BigButton variant="danger" onClick={onSendToCenter}>
-            🤝 I don't know — send to a person
+            {sending ? "Sending…" : "🤝 Yes, send it"}
           </BigButton>
         </div>
       ) : (
-        <BigButton variant="danger" onClick={onSendToCenter}>What happens now?</BigButton>
+        <BigButton variant="danger" onClick={onSendToCenter}>
+          {sending ? "Sending…" : "✓ Yes, send it"}
+        </BigButton>
       )}
     </div>
   );
