@@ -10,6 +10,7 @@ import {
   sendToCenter,
   speakWarm,
   type AnalysisResult,
+  type DocumentBounds,
   type SendResult,
 } from "@/lib/cases";
 import { cancelSpeech, type VoiceIntent } from "@/lib/voice";
@@ -54,6 +55,7 @@ function ElderApp() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | undefined>(undefined);
   const [processedImage, setProcessedImage] = useState<string | undefined>(undefined);
+  const [capturedBounds, setCapturedBounds] = useState<DocumentBounds | null>(null);
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
   const [sending, setSending] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -67,7 +69,6 @@ function ElderApp() {
     speech.setEnabled(voiceOn);
   }, [voiceOn, speech]);
 
-  // Auto-speak the whole screen on entry (real data for dynamic ones).
   useEffect(() => {
     if (!voiceOn) return;
     const text = speakableForPhase(phase, { analysis, sendResult, analyzeError });
@@ -82,26 +83,32 @@ function ElderApp() {
     setSendResult(null);
     setCapturedImage(undefined);
     setProcessedImage(undefined);
+    setCapturedBounds(null);
     setAnalyzeError(null);
     speech.cancel();
   };
 
-  async function handleCapture(image?: string) {
-    setCapturedImage(image);
-    setProcessedImage(image);
-    if (!image) {
+  async function handleCapture(result?: { processed: string; original: string; bounds: DocumentBounds | null }) {
+    if (!result) {
+      setCapturedImage(undefined);
+      setProcessedImage(undefined);
+      setCapturedBounds(null);
       setAnalysis(null);
       setPhase("review");
       return;
     }
-    // Show the preview screen first — user confirms before we send to Claude.
+    setCapturedImage(result.original);
+    setProcessedImage(result.processed);
+    setCapturedBounds(result.bounds);
     setAnalyzeError(null);
     setPhase("preview");
   }
 
   async function runAnalyze() {
-    const image = capturedImage;
-    if (!image) {
+    // We send the already-cropped image (processedImage) to Claude so it focuses
+    // on the document, not hands/background.
+    const imageForClaude = processedImage ?? capturedImage;
+    if (!imageForClaude) {
       setPhase("magnifier");
       return;
     }
@@ -110,10 +117,17 @@ function ElderApp() {
     const startedAt = Date.now();
     const minDisplay = 1200;
     try {
-      const result = await analyzeDocument(image);
-      // Crop to AI-returned bounds (or full frame if null).
-      const cropped = await cropToBounds(image, result.documentBounds, 0.03);
-      setProcessedImage(cropped);
+      const result = await analyzeDocument(imageForClaude);
+      // Optional refinement: if Claude returns bounds, crop again (relative to
+      // the image we sent). If not, keep the frontend crop.
+      if (result.documentBounds) {
+        try {
+          const refined = await cropToBounds(imageForClaude, result.documentBounds, 0.03);
+          setProcessedImage(refined);
+        } catch { /* keep existing processedImage */ }
+      }
+      void capturedBounds;
+
 
       const elapsed = Date.now() - startedAt;
       if (elapsed < minDisplay) {
@@ -228,11 +242,12 @@ function ElderApp() {
               />
             ) : phase === "preview" ? (
               <PreviewScreen
-                image={capturedImage}
+                image={processedImage ?? capturedImage}
                 speech={speech}
                 onUse={runAnalyze}
                 onRetake={() => setPhase("magnifier")}
               />
+
             ) : phase === "analyzing" ? (
               <AnalyzingScreen />
             ) : phase === "retake" ? (
