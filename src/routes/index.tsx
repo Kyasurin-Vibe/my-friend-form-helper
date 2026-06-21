@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, createContext, useContext } from "react";
 import { Mascot } from "@/components/Mascot";
 import { LiveMagnifier } from "@/components/LiveMagnifier";
+import { VoiceBar } from "@/components/VoiceBar";
 import { useSpeech } from "@/lib/useSpeech";
 import {
   analyzeDocument,
@@ -10,6 +11,7 @@ import {
   type AnalysisResult,
   type SendResult,
 } from "@/lib/cases";
+import { cancelSpeech, type VoiceIntent } from "@/lib/voice";
 import { playWarning } from "@/lib/chime";
 
 export const Route = createFileRoute("/")({
